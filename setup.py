@@ -15,6 +15,10 @@ setup(
     description=__doc__,
     license='Apache',
     zip_safe=False,
+    install_requires=(
+        'peewee',
+        #'aiopg', # using dev version
+    ),
     packages=find_packages(),
     classifiers=[
         'Development Status :: 3 - Alpha',

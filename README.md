@@ -92,7 +92,7 @@ TestModel.create_table(True)
 def my_handler():
     # Open async connection in place to simplify example
     yield from database.connect(loop=loop)
-    all_objects = yield from aiopeewee.select(MyModel.select())
+    all_objects = yield from aiopeewee.select(TestModel.select())
     database.close()
 
 loop.run_until_complete(my_handler())
