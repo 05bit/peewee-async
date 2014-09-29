@@ -29,7 +29,8 @@ Install
 Databases
 ---------
 
-    class PostgresDatabase(peewee.PostgresDatabase)
+    class PostgresqlDatabase(peewee.PostgresqlDatabase)
+    class PooledPostgresqlDatabase(peewee.PostgresqlDatabase)
 
 It provides a drop-in sync interface and extra async interface, so it's
 possible to migrate codebase from sync to async without breaking everything
@@ -74,7 +75,7 @@ import asyncio
 import peewee
 import aiopeewee
 
-database = aiopeewee.PostgresDatabase('test')
+database = aiopeewee.PostgresqlDatabase('test')
 loop = asyncio.get_event_loop()
 
 class TestModel(peewee.Model):
