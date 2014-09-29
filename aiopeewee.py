@@ -320,8 +320,12 @@ class PooledPostgresqlDatabase(PostgresqlDatabase):
 
 class AsyncPostgresDatabase:
     """
-    Asynchronous database interface, subclass of `aiopg.Connection`
-    providing thin interface adapter for `peewee`.
+    Asynchronous single connection database interface.
+
+    Async methods:
+
+        connect()
+        cursor()
     """
     def __init__(self, database, timeout, loop, **connect_kwargs):
         self._conn = None
@@ -355,8 +359,12 @@ class AsyncPostgresDatabase:
 
 class PooledAsyncPostgresDatabase:
     """
-    Asynchronous database connection pool, subclass of `aiopg.Pool`
-    providing thin interface adapter for `peewee`.
+    Asynchronous pooled connection database interface.
+
+    Async methods:
+
+        connect()
+        cursor()
     """
     def __init__(self, database, minsize, maxsize, loop, timeout, **connect_kwargs):
         self._pool = None
