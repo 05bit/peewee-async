@@ -4,11 +4,11 @@ https://github.com/05bit/python-aiopeewee
 """
 from setuptools import setup, find_packages
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 setup(
     name="aiopeewee",
-    version=str(__version__),
+    version=__version__,
     author="Alexey Kinev",
     author_email='rudy@05bit.com',
     url='https://github.com/05bit/python-aiopeewee',
@@ -16,8 +16,8 @@ setup(
     license='Apache',
     zip_safe=False,
     install_requires=(
-        'peewee',
-        #'aiopg', # using dev version
+        'peewee>=2.3.3',
+        'aiopg>=0.4.1',
     ),
     packages=find_packages(),
     classifiers=[

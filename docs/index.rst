@@ -17,8 +17,9 @@ Current state: **alpha**, yet API seems fine and mostly stable.
 * Databases supported: PostgreSQL
 * Provides drop-in replacement for synchronous code
 
-| Source code hosted on GitHub:
-| https://github.com/05bit/python-aiopeewee
+Source code hosted on `GitHub`_.
+
+.. _GitHub: https://github.com/05bit/python-aiopeewee
 
 Quickstart
 ----------

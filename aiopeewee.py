@@ -28,7 +28,6 @@ import aiopg
 import peewee
 import contextlib
 
-__version__ = '0.0.2'
 __all__ = [
     # Queries
     'execute',
@@ -80,7 +79,7 @@ def create_object(model, **data):
     :param data: data for initializing object
     :return: new object saved to database
     """
-    obj = model(**query)
+    obj = model(**data)
 
     # NOTE! Here are private calls involved:
     #
