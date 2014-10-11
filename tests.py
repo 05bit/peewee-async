@@ -8,11 +8,7 @@ import peewee
 import aiopeewee
 
 # Shortcuts
-delete = aiopeewee.delete
-insert = aiopeewee.insert
-select = aiopeewee.select
-update = aiopeewee.update
-
+execute = aiopeewee.execute
 get_object = aiopeewee.get_object
 create_object = aiopeewee.create_object
 delete_object = aiopeewee.delete_object
@@ -119,7 +115,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async select
         @asyncio.coroutine
         def test():
-            result = yield from select(TestModel.select())
+            result = yield from execute(TestModel.select())
             return result
 
         q2 = self.run_until_complete(test())
@@ -146,7 +142,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         def test():
             query = (TestModel.update(text='[async] [test_update_obj] [update]')
                               .where(TestModel.id == obj1.id))
-            result = yield from update(query)
+            result = yield from execute(query)
             return result
 
         upd2 = self.run_until_complete(test())

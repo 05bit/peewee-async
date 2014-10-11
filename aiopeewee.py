@@ -26,25 +26,22 @@ import aiopg
 import peewee
 import contextlib
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __all__ = [
     # Queries
-    'delete',
-    'insert',
-    'select',
-    'update',
+    'execute',
 
-    # Single object
+    # Object actions
     'get_object',
     'create_object',
     'delete_object',
     'update_object',
 
-    # Databases
+    # Database backends
     'PostgresqlDatabase',
     'PooledPostgresqlDatabase',
 
-    # Sync fallback
+    # Sync calls helpers
     'sync_unwanted',
     'UnwantedSyncQueryError',
 
@@ -52,6 +49,26 @@ __all__ = [
     # 'count',
     # 'scalar',
 ]
+
+
+@asyncio.coroutine
+def execute(query):
+    """ Execute SELECT, INSERT, UPDATE or DELETE query asyncronously.
+
+    query -- peewee query instance created with `Model.select()`,
+             `Model.update()` etc.
+
+    Result depends on query type, it's the same as for sync `query.execute()`.
+    """
+    if isinstance(query, peewee.UpdateQuery):
+        coroutine = update
+    elif isinstance(query, peewee.InsertQuery):
+        coroutine = insert
+    elif isinstance(query, peewee.DeleteQuery):
+        coroutine = delete
+    else:
+        coroutine = select
+    return (yield from coroutine(query))
 
 
 @asyncio.coroutine
@@ -84,37 +101,6 @@ def create_object(model, **query):
 
 
 @asyncio.coroutine
-def select(query_):
-    """ Perform SELECT query asynchronously.
-
-    NOTE! It relies on internal peewee logic for generating
-    results from queries and well, a bit hacky.
-    """
-    query = query_.clone()
-
-    # Perform *real* async query
-    cursor = yield from _execute(query)
-
-    # Perform *fake* query: we only need a result wrapper
-    # here, not the query result itself.
-    query._execute = lambda: None
-    result_wrapper = query.execute() # Get empty result wrapper!
-
-    # Fetch result
-    result = AsyncQueryResult(result_wrapper=result_wrapper, cursor=cursor)
-    try:
-        while True:
-            yield from result.fetchone()
-    except GeneratorExit:
-        pass
-
-    # Release cursor
-    cursor.release()
-
-    return result
-
-
-@asyncio.coroutine
 def get_object(from_, *args):
     """ Get object asynchronously or raise `DoesNotExist` error.
 
@@ -136,16 +122,6 @@ def get_object(from_, *args):
 
     # No objects found
     raise model.DoesNotExist
-
-
-@asyncio.coroutine
-def count(query):
-    raise NotImplementedError
-
-
-@asyncio.coroutine
-def scalar(query):
-    raise NotImplementedError
 
 
 @asyncio.coroutine
@@ -199,12 +175,45 @@ def update_object(obj, only=None):
 
 
 @asyncio.coroutine
+def select(query_):
+    """ Perform SELECT query asynchronously.
+
+    NOTE! It relies on internal peewee logic for generating
+    results from queries and well, a bit hacky.
+    """
+    assert isinstance(query_, peewee.SelectQuery), ("Error, trying to run select coroutine"
+                                                    "with wrong query class %s" % str(query_))
+    query = query_.clone()
+
+    # Perform *real* async query
+    cursor = yield from cursor_with_query(query)
+
+    # Perform *fake* query: we only need a result wrapper
+    # here, not the query result itself.
+    query._execute = lambda: None
+    result_wrapper = query.execute() # Get empty result wrapper!
+
+    # Fetch result
+    result = AsyncQueryResult(result_wrapper=result_wrapper, cursor=cursor)
+    try:
+        while True:
+            yield from result.fetchone()
+    except GeneratorExit:
+        pass
+
+    # Release cursor
+    cursor.release()
+
+    return result
+
+
+@asyncio.coroutine
 def insert(query):
     """ Perform INSERT query asynchronously. Returns last insert ID.
     """
     assert isinstance(query, peewee.InsertQuery), ("Error, trying to run insert coroutine"
                                                    "with wrong query class %s" % str(query))
-    cursor = yield from _execute(query)
+    cursor = yield from cursor_with_query(query)
     result = yield from query.database.last_insert_id_async(cursor, query.model_class)
     cursor.release()
     return result
@@ -216,7 +225,7 @@ def update(query):
     """
     assert isinstance(query, peewee.UpdateQuery), ("Error, trying to run update coroutine"
                                                    "with wrong query class %s" % str(query))
-    cursor = yield from _execute(query)
+    cursor = yield from cursor_with_query(query)
     rowcount = cursor.rowcount
     cursor.release()
     return rowcount
@@ -228,14 +237,24 @@ def delete(query):
     """
     assert isinstance(query, peewee.DeleteQuery), ("Error, trying to run delete coroutine"
                                                    "with wrong query class %s" % str(query))
-    cursor = yield from _execute(query)
+    cursor = yield from cursor_with_query(query)
     rowcount = cursor.rowcount
     cursor.release()
     return rowcount
 
 
 @asyncio.coroutine
-def _execute(query):
+def count(query):
+    raise NotImplementedError
+
+
+@asyncio.coroutine
+def scalar(query):
+    raise NotImplementedError
+
+
+@asyncio.coroutine
+def cursor_with_query(query):
     """ Execute query and return cursor object.
     """
     assert query.database.async_conn, "Error, no async database connection."

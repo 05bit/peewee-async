@@ -52,14 +52,11 @@ Some thoughts on that:
 Wrappers
 --------
 
-**Generic query:**
+**Generic queries:**
 
-    select(query)
-    insert(query)
-    update(query)
-    delete(query)
+    execute(query)
 
-**One object queries**:
+**Single object actions**:
 
     get_object(model_or_query, *args)
     create_object(model, **kwargs)
@@ -100,7 +97,7 @@ database.close()
 def my_handler():
     # Open async connection in place to simplify example
     yield from database.connect_async(loop=loop)
-    all_objects = yield from aiopeewee.select(TestModel.select())
+    all_objects = yield from aiopeewee.execute(TestModel.select())
     database.close()
 
 loop.run_until_complete(my_handler())
