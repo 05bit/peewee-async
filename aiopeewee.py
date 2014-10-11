@@ -19,8 +19,8 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-"""
 
+"""
 import asyncio
 import aiopg
 import peewee
@@ -29,11 +29,7 @@ import contextlib
 __all__ = (
     'create',
     'delete',
-    'delete_instance',
     'select',
-    # 'count',
-    # 'scalar',
-    'save',
     'insert',
     'update',
 
@@ -42,13 +38,18 @@ __all__ = (
 
     'sync_unwanted',
     'UnwantedSyncQuery',
+
+    # Drafts or not implemented:
+    # 'count',
+    # 'scalar',
+    # 'delete_instance',
+    # 'save',
 )
 
 
 @asyncio.coroutine
 def create(model, **query):
-    """
-    Create object asynchronously.
+    """ Create object asynchronously.
     
     NOTE: copy-paste, try to avoid
     https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L3372
@@ -61,8 +62,7 @@ def create(model, **query):
 
 @asyncio.coroutine
 def delete_instance(obj, recursive=False, delete_nullable=False):
-    """
-    Delete object asynchronously.
+    """ *Draft interface*. Delete object asynchronously.
 
     NOTE: design decision is nessecary to avoid copy-paste from
           `peewee.Model.delete_instance()`
@@ -82,8 +82,7 @@ def delete_instance(obj, recursive=False, delete_nullable=False):
 
 @asyncio.coroutine
 def select(query_):
-    """
-    Perform SELECT query asynchronously.
+    """ Perform SELECT query asynchronously.
     """
     query = query_.clone()
 
@@ -144,7 +143,8 @@ def scalar(query):
 
 @asyncio.coroutine
 def save(obj, force_insert=False, only=None):
-    """
+    """ *Draft interface*. Save object asynchronously.
+
     NOTE: it's a copy-paste, not sure how to make it better
     https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L3486
     """
@@ -171,8 +171,7 @@ def save(obj, force_insert=False, only=None):
 
 @asyncio.coroutine
 def insert(query):
-    """
-    Perform INSERT query asynchronously. Returns last insert ID.
+    """ Perform INSERT query asynchronously. Returns last insert ID.
     """
     assert isinstance(query, peewee.InsertQuery), ("Error, trying to run insert coroutine"
                                                    "with wrong query class %s" % str(query))
@@ -184,8 +183,7 @@ def insert(query):
 
 @asyncio.coroutine
 def update(query):
-    """
-    Perform UPDATE query asynchronously. Returns number of rows updated.
+    """ Perform UPDATE query asynchronously. Returns number of rows updated.
     """
     assert isinstance(query, peewee.UpdateQuery), ("Error, trying to run update coroutine"
                                                    "with wrong query class %s" % str(query))
@@ -197,8 +195,7 @@ def update(query):
 
 @asyncio.coroutine
 def delete(query):
-    """
-    Perform DELETE query asynchronously. Returns number of rows deleted.
+    """ Perform DELETE query asynchronously. Returns number of rows deleted.
     """
     assert isinstance(query, peewee.DeleteQuery), ("Error, trying to run delete coroutine"
                                                    "with wrong query class %s" % str(query))
@@ -210,10 +207,9 @@ def delete(query):
 
 @asyncio.coroutine
 def _execute(query):
+    """ Execute query and return cursor object.
     """
-    Execute query and return cursor.
-    """
-    conn = query.database.async
+    conn = query.database.async_conn
     assert conn, "Error, database is not connected"
     cursor = yield from conn.cursor()
     yield from cursor.execute(*query.sql())
@@ -224,62 +220,57 @@ class PostgresqlDatabase(peewee.PostgresqlDatabase):
     """
     Drop-in replacement for default `peewee.PostgresqlDatabase` backend with
     extra `asyncio` powered interface.
+
+    Run `connect_async(loop=None)` to set up async connection. This has to be
+    done explicitly before performing any async queries.
     """
     def __init__(self, database, threadlocals=True, autocommit=True,
                  fields=None, ops=None, autorollback=True, **connect_kwargs):
-        # Base sync connection
+        # Sync fallback connection
         super().__init__(database, threadlocals=True, autocommit=autocommit,
                          fields=fields, ops=ops, autorollback=autorollback,
                          **connect_kwargs)
 
         # Async connection
-        self.async = None
+        self.async_conn = None
         self._sync_unwanted = False
         self._loop = None
 
-    def connect(self, loop=None):
-        """
-        Connect is sync or async mode. For async connection you should
-        provide `loop` parameter.
-        """
-        if loop:
-            if self.async: # and not self.async.closed:
-                raise Exception("Error, async connection is already opened")
-
-            self._loop = loop if loop else asyncio.get_event_loop()
-            return self.connect_async()
-        else:
-            if not self.is_closed():
-                raise Exception("Error, sync connection is already opened")
-
-            super().connect()
-
     @asyncio.coroutine
-    def connect_async(self):
-        timeout = aiopg.DEFAULT_TIMEOUT
-        conn = AsyncPostgresDatabase(self.database, timeout, self._loop, **self.connect_kwargs)
-        yield from conn.connect()
-        self.async = conn
+    def connect_async(self, loop=None, timeout=None):
+        """ Set up async connection on specified event loop or
+        on default event loop.
+        """
+        if not self.async_conn:
+            timeout = timeout if timeout else aiopg.DEFAULT_TIMEOUT
+            self._loop = loop if loop else asyncio.get_event_loop()
+            self.async_conn = AsyncPostgresDatabase(self.database, timeout,
+                                                    self._loop, **self.connect_kwargs)
+            yield from self.async_conn.connect()
 
     def close(self):
-        """
-        Close both sync and async connections.
+        """ Close both sync and async connections.
         """
         super().close()
 
-        if self.async:
-            self.async.close()
-            self.async = None
+        if self.async_conn:
+            self.async_conn.close()
+            self.async_conn = None
             self._loop = None
 
     def execute_sql(self, *args, **kwargs):
+        """ Sync execute SQL query. If this query is performing within
+        `sync_unwanted()` context, then `UnwantedSyncQuery` exception
+        is raised.
+        """
         if self._sync_unwanted:
             raise UnwantedSyncQuery("Error, unwanted sync query", args, kwargs)
         return super().execute_sql(*args, **kwargs)
 
     @asyncio.coroutine
     def last_insert_id_async(self, cursor, model):
-        """
+        """ Get ID of last inserted row.
+
         NOTE: it's a copy-paste, not sure how to make it better
         https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L2907
         """
@@ -303,19 +294,32 @@ class PostgresqlDatabase(peewee.PostgresqlDatabase):
 
 class PooledPostgresqlDatabase(PostgresqlDatabase):
     def __init__(self, *args, **kwargs):
+        # Pool parameters
         self.max_connections = kwargs.pop('max_connections', 20)
         self.min_connections = kwargs.pop('min_connections', self.max_connections)
+
+        # Single sync fallback connection
         super().__init__(*args, **kwargs)
 
+        # Async connection
+        self.async_conn = None
+        self._sync_unwanted = False
+        self._loop = None
+
     @asyncio.coroutine
-    def connect_async(self):
-        minsize = self.min_connections
-        maxsize = self.max_connections
-        timeout = aiopg.DEFAULT_TIMEOUT
-        pool = PooledAsyncPostgresDatabase(self.database, minsize, maxsize,
-                                           self._loop, timeout, **self.connect_kwargs)
-        yield from pool.connect()
-        self.async = pool
+    def connect_async(self, loop=None, timeout=None):
+        """ Set up async connections pool on specified event loop or
+        on default event loop.
+        """
+        if not self.async_conn:
+            timeout = timeout if timeout else aiopg.DEFAULT_TIMEOUT
+            minsize = self.min_connections
+            maxsize = self.max_connections
+            self._loop = loop if loop else asyncio.get_event_loop()
+            self.async_conn = PooledAsyncPostgresDatabase(
+                self.database, minsize, maxsize,
+                self._loop, timeout, **self.connect_kwargs)
+            yield from self.async_conn.connect()
 
 
 class AsyncPostgresDatabase:
@@ -390,32 +394,31 @@ class PooledAsyncPostgresDatabase:
 
     @asyncio.coroutine
     def cursor(self, *args, **kwargs):
+        """ Get cursor for connection picked from pool.
+        """
         conn = yield from self._pool.acquire()
         cursor = yield from conn.cursor(*args, **kwargs)
         cursor.release = lambda: all((cursor.close(), self._pool.release(conn)))
         return cursor
 
     def close(self):
-        """
-        Hmmm... :) How to close all pool connections?..
+        """ Hmmm... :) How to close all pool connections?..
         """
         for c in self._pool._used:
             c.close()
 
 
 @contextlib.contextmanager
-def sync_unwanted(database, flag=True):
-    """
-    Context manager for preventing unwanted sync queries.
+def sync_unwanted(database, enabled=True):
+    """ Context manager for preventing unwanted sync queries.
     `UnwantedSyncQuery` exception will raise on such query.
     """
-    database._sync_unwanted = flag
+    database._sync_unwanted = enabled
     yield
     database._sync_unwanted = False
 
 
 class UnwantedSyncQuery(Exception):
-    """
-    Exception raised when performing unwanted sync query.
+    """ Exception which is raised when performing unwanted sync query.
     """
     pass

@@ -55,7 +55,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         cls.loop = asyncio.get_event_loop()
         @asyncio.coroutine
         def do():
-            yield from database.connect(loop=cls.loop)
+            yield from database.connect_async(loop=cls.loop)
         cls.loop.run_until_complete(do())
 
         # Clean up after possible errors
@@ -75,16 +75,10 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Close database
         database.close()
 
-    # def setUp(self):
-    #     # New loop for each test
-    #     self.loop = asyncio.new_event_loop()
-
     def run_until_complete(self, coroutine):
         @asyncio.coroutine
         def do():
-            # yield from database.connect(loop=self.loop)
             result = yield from coroutine
-            # database.close()
             return result
         return self.loop.run_until_complete(do())
 
