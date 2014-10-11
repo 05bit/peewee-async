@@ -1,7 +1,7 @@
 """
 Asynchronous interface for peewee ORM powered by asyncio.
 """
-from setuptools import setup, find_packages
+from setuptools import setup
 
 __version__ = '0.0.2'
 
@@ -19,7 +19,8 @@ setup(
         'peewee>=2.3.3',
         'aiopg>=0.4.1',
     ),
-    packages=find_packages(),
+    # packages=find_packages(),
+    py_modules=['aiopeewee'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
