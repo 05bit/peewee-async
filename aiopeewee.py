@@ -29,13 +29,16 @@ import contextlib
 __version__ = '0.0.1'
 __all__ = [
     # Queries
-    'create',
     'delete',
-    'delete_instance',
     'insert',
     'select',
     'update',
-    'update_instance',
+
+    # Single object
+    'get_object',
+    'create_object',
+    'delete_object',
+    'update_object',
 
     # Databases
     'PostgresqlDatabase',
@@ -52,7 +55,7 @@ __all__ = [
 
 
 @asyncio.coroutine
-def create(model, **query):
+def create_object(model, **query):
     """ Create object asynchronously. Returns created instance.
     
     NOTE! Private calls involved.
@@ -112,6 +115,30 @@ def select(query_):
 
 
 @asyncio.coroutine
+def get_object(from_, *args):
+    """ Get object asynchronously or raise `DoesNotExist` error.
+
+    Arguments:
+
+        from_ -- model class or query to get object from
+        *args -- lookup parameters
+    """
+    if isinstance(from_, peewee.Query):
+        base_query = from_
+        model = base_query.model_class
+    else:
+        base_query = from_.select()
+        model = from_
+
+    # Return first object from query
+    for obj in (yield from select(base_query.where(*args).limit(1))):
+        return obj
+
+    # No objects found
+    raise model.DoesNotExist
+
+
+@asyncio.coroutine
 def count(query):
     raise NotImplementedError
 
@@ -122,7 +149,7 @@ def scalar(query):
 
 
 @asyncio.coroutine
-def delete_instance(obj, recursive=False, delete_nullable=False):
+def delete_object(obj, recursive=False, delete_nullable=False):
     """ Delete object asynchronously.
 
     NOTE! Private calls involved.
@@ -142,7 +169,7 @@ def delete_instance(obj, recursive=False, delete_nullable=False):
 
 
 @asyncio.coroutine
-def update_instance(obj, only=None):
+def update_object(obj, only=None):
     """ Update object asynchronously.
 
     NOTE! Private calls involved.
@@ -226,7 +253,7 @@ class AsyncQueryResult:
         result_wrapper -- empty results wrapper produced by sync `execute()` call
         cursor -- async cursor just executed query
 
-    To retrieve results after async fetching just iterate over object,
+    To retrieve results after async fetching just iterate over this class instance,
     like you generally iterate over sync results wrapper.
     """
     def __init__(self, result_wrapper=None, cursor=None):
@@ -243,6 +270,8 @@ class AsyncQueryResult:
         row = yield from self._cursor.fetchone()
 
         if not row:
+            self._cursor = None
+            self._result_wrapper = None
             raise GeneratorExit
         elif not self._initialized:
             self._result_wrapper.initialize(self._cursor.description)

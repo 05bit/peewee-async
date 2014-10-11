@@ -8,13 +8,15 @@ import peewee
 import aiopeewee
 
 # Shortcuts
-create = aiopeewee.create
 delete = aiopeewee.delete
-delete_instance = aiopeewee.delete_instance
 insert = aiopeewee.insert
 select = aiopeewee.select
 update = aiopeewee.update
-update_instance = aiopeewee.update_instance
+
+get_object = aiopeewee.get_object
+create_object = aiopeewee.create_object
+delete_object = aiopeewee.delete_object
+update_object = aiopeewee.update_object
 
 # Configure tests
 ini_config = configparser.ConfigParser()
@@ -54,9 +56,9 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async connect
         cls.loop = asyncio.get_event_loop()
         @asyncio.coroutine
-        def do():
+        def test():
             yield from database.connect_async(loop=cls.loop)
-        cls.loop.run_until_complete(do())
+        cls.loop.run_until_complete(test())
 
         # Clean up after possible errors
         TestModel.drop_table(True)
@@ -65,7 +67,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         TestModel.create_table()
 
         # Create at least one object
-        obj = TestModel.create(text='[sync] Hello!')
+        cls.obj = TestModel.create(text='[sync] Hello!')
 
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
@@ -76,15 +78,23 @@ class AsyncPostgresTestCase(unittest.TestCase):
         database.close()
 
     def run_until_complete(self, coroutine):
-        @asyncio.coroutine
-        def do():
-            result = yield from coroutine
-            return result
-        return self.loop.run_until_complete(do())
+        result = self.loop.run_until_complete(coroutine)
+        self.assertTrue(result)
+        return result
 
     #
     # Test methods
     #
+
+    def test_get_obj(self):
+        # Async get
+        @asyncio.coroutine
+        def test():
+            obj = yield from get_object(TestModel, TestModel.id == self.obj.id)
+            self.assertEqual(obj.text, self.obj.text)
+            return obj
+
+        self.assertTrue(self.run_until_complete(test()))
 
     def test_create_obj(self):
         # Sync create
@@ -93,10 +103,12 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         # Async create
         @asyncio.coroutine
-        def do():
-            obj2 = yield from create(TestModel, text='[async] [test_create_obj]')
+        def test():
+            obj2 = yield from create_object(TestModel, text='[async] [test_create_obj]')
             self.assertTrue(not obj2.id is None)
-        self.loop.run_until_complete(do())
+            return obj2
+
+        self.run_until_complete(test())
 
     def test_select_query(self):
         # Sync select
@@ -106,10 +118,11 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         # Async select
         @asyncio.coroutine
-        def do():
+        def test():
             result = yield from select(TestModel.select())
             return result
-        q2 = self.run_until_complete(do())
+
+        q2 = self.run_until_complete(test())
         len2 = len([o for o in q2])
         self.assertTrue(len2 > 0)
 
@@ -130,12 +143,13 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         # Async update
         @asyncio.coroutine
-        def do():
+        def test():
             query = (TestModel.update(text='[async] [test_update_obj] [update]')
                               .where(TestModel.id == obj1.id))
             result = yield from update(query)
             return result
-        upd2 = self.run_until_complete(do())
+
+        upd2 = self.run_until_complete(test())
         self.assertEqual(upd2, 1)
         self.assertEqual(TestModel.get(id=obj1.id).text,
                          '[async] [test_update_obj] [update]')
@@ -146,10 +160,11 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         # Async delete
         @asyncio.coroutine
-        def do():
-            result = yield from delete_instance(obj1)
+        def test():
+            result = yield from delete_object(obj1)
             return result
-        del1 = self.run_until_complete(do())
+
+        del1 = self.run_until_complete(test())
         self.assertEqual(del1, 1)
         try:
             TestModel.get(id=obj1.id)
@@ -163,23 +178,15 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         # Async save
         @asyncio.coroutine
-        def do():
+        def test():
             obj1.text = '[async] [test_save_obj]'
-            result = yield from update_instance(obj1)
+            result = yield from update_object(obj1)
             return result
-        sav1 = self.run_until_complete(do())
+
+        sav1 = self.run_until_complete(test())
         self.assertEqual(sav1, 1)
         self.assertEqual(TestModel.get(id=obj1.id).text,
                          '[async] [test_save_obj]')
-        
-    def test_create_obj(self):
-        # Async create
-        @asyncio.coroutine
-        def do():
-            result = yield from create(TestModel, text='[async] [test_create_obj]')
-            return result
-        obj1 = self.run_until_complete(do())
-        self.assertTrue(not obj1.id is None)
 
 
 if __name__ == '__main__':

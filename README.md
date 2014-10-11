@@ -61,7 +61,7 @@ These ones **seems ok**:
 
 These ones may be **thrown away**:
 
-    delete_instance(obj, recursive=False, delete_nullable=False)
+    delete_object(obj, recursive=False, delete_nullable=False)
     save(obj, force_insert=False, only=None)
 
 All wrappers are asyncio coroutines.
