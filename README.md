@@ -52,21 +52,23 @@ Some thoughts on that:
 Wrappers
 --------
 
-These ones **seems ok**:
+**Generic query:**
 
-    create(cls, model, **query)
-    update(query)
     select(query)
+    insert(query)
+    update(query)
     delete(query)
 
-These ones may be **thrown away**:
+**One object queries**:
 
+    get_object(model_or_query, *args)
+    create_object(model, **kwargs)
     delete_object(obj, recursive=False, delete_nullable=False)
-    save(obj, force_insert=False, only=None)
+    update_object(obj, only=None)
 
 All wrappers are asyncio coroutines.
 
-Not implemented yet::
+Not implemented yet:
 
 * transactions, see http://aiopg.readthedocs.org/en/0.3/core.html#transactions
 * aggregated queries produced with aggregate_rows()
