@@ -66,6 +66,7 @@ Wrappers
 **Aggregation:**
 
     scalar(query, as_tuple=False)
+    count(query, clear_limit=False)
 
 All wrappers are asyncio coroutines.
 
@@ -73,7 +74,6 @@ Not implemented yet:
 
 * transactions, see http://aiopg.readthedocs.org/en/0.3/core.html#transactions
 * aggregated queries produced with aggregate_rows()
-* count()
 
 Basic example
 -------------

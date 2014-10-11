@@ -9,11 +9,13 @@ import aiopeewee
 
 # Shortcuts
 execute = aiopeewee.execute
+count = aiopeewee.count
 scalar = aiopeewee.scalar
 get_object = aiopeewee.get_object
 create_object = aiopeewee.create_object
 delete_object = aiopeewee.delete_object
 update_object = aiopeewee.update_object
+sync_unwanted = aiopeewee.sync_unwanted
 
 # Configure tests
 ini_config = configparser.ConfigParser()
@@ -87,7 +89,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async get
         @asyncio.coroutine
         def test():
-            obj = yield from get_object(TestModel, TestModel.id == self.obj.id)
+            with sync_unwanted(database):
+                obj = yield from get_object(TestModel, TestModel.id == self.obj.id)
             self.assertEqual(obj.text, self.obj.text)
             return obj
 
@@ -101,7 +104,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async create
         @asyncio.coroutine
         def test():
-            obj2 = yield from create_object(TestModel, text='[async] [test_create_obj]')
+            with sync_unwanted(database):
+                obj2 = yield from create_object(TestModel, text='[async] [test_create_obj]')
             self.assertTrue(not obj2.id is None)
             return obj2
 
@@ -116,7 +120,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async select
         @asyncio.coroutine
         def test():
-            result = yield from execute(TestModel.select())
+            with sync_unwanted(database):
+                result = yield from execute(TestModel.select())
             return result
 
         q2 = self.run_until_complete(test())
@@ -143,7 +148,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
         def test():
             query = (TestModel.update(text='[async] [test_update_obj] [update]')
                               .where(TestModel.id == obj1.id))
-            result = yield from execute(query)
+            with sync_unwanted(database):
+                result = yield from execute(query)
             return result
 
         upd2 = self.run_until_complete(test())
@@ -158,7 +164,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async delete
         @asyncio.coroutine
         def test():
-            result = yield from delete_object(obj1)
+            with sync_unwanted(database):
+                result = yield from delete_object(obj1)
             return result
 
         del1 = self.run_until_complete(test())
@@ -177,7 +184,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
         @asyncio.coroutine
         def test():
             obj1.text = '[async] [test_save_obj]'
-            result = yield from update_object(obj1)
+            with sync_unwanted(database):
+                result = yield from update_object(obj1)
             return result
 
         sav1 = self.run_until_complete(test())
@@ -189,9 +197,30 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async scalar query
         @asyncio.coroutine
         def test():
-            sync_count = TestModel.select(peewee.fn.Count(TestModel.id)).scalar()
-            async_count = yield from scalar(TestModel.select(peewee.fn.Count(TestModel.id)))
-            self.assertEqual(sync_count, async_count)
+            count1 = TestModel.select(peewee.fn.Count(TestModel.id)).scalar()
+            with sync_unwanted(database):
+                count2 = yield from scalar(TestModel.select(peewee.fn.Count(TestModel.id)))
+            self.assertEqual(count1, count2)
+            return True
+
+        self.run_until_complete(test())
+
+    def test_count_query(self):
+        # Async count query
+        @asyncio.coroutine
+        def test():
+            count0 = TestModel.select().count()
+            TestModel.create(text='[sync] [test_count_query]')
+            count1 = TestModel.select().count()
+
+            with sync_unwanted(database):
+                count2 = yield from count(TestModel.select())
+                self.assertEqual(count2, count1)
+                self.assertEqual(count2, count0 + 1)
+
+                count3 = yield from count(TestModel.select().limit(1))
+                self.assertEqual(count3, 1)
+            
             return True
 
         self.run_until_complete(test())

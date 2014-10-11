@@ -244,13 +244,29 @@ def delete(query):
 
 
 @asyncio.coroutine
-def count(query):
-    raise NotImplementedError
+def count(query, clear_limit=False):
+    """ Perform COUNT aggregated query asynchronously. Returns int value.
+    """
+    if query._distinct or query._group_by or query._limit or query._offset:
+        # wrapped_count()
+        clone = query.order_by()
+        if clear_limit:
+            clone._limit = clone._offset = None
+
+        sql, params = clone.sql()
+        wrapped = 'SELECT COUNT(1) FROM (%s) AS wrapped_select' % sql
+        raw_query = query.model_class.raw(wrapped, *params)
+        return (yield from scalar(raw_query)) or 0
+    else:
+        # simple count()
+        query = query.order_by()
+        query._select = [peewee.fn.Count(peewee.SQL('*'))]
+        return (yield from scalar(query)) or 0
 
 
 @asyncio.coroutine
 def scalar(query, as_tuple=False):
-    """ Get single value from query, i.e. in for aggregation.
+    """ Get single value from query, i.e. for aggregation.
     """
     cursor = yield from cursor_with_query(query)
     row = yield from cursor.fetchone()
