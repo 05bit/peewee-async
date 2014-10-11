@@ -1,0 +1,3 @@
+aiopg
+peewee
+-e git+https://github.com/05bit/python-aiopeewee.git#egg=aiopeewee
