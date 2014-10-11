@@ -4,79 +4,26 @@ aiopeewee = asyncio + peewee
 Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
 orm powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 
-Current state: **proof of concept**.
-
 Module provides database backends and wrappers for performing asynchronous
 queries.
+
+Documentation: http://python-aiopeewee.readthedocs.org/en/latest/
 
 Install
 -------
 
-1. Python 3.3+ is required
+Works on Python 3.3+ and PostgreSQL database.
 
-2. Install latest [aiopg](https://github.com/aio-libs/aiopg/) from GitHub
-    ```
-    pip install -e git+https://github.com/aio-libs/aiopg.git#egg=aiopg
-    ```
+Install with `pip`:
 
-3. Install development version
-    ```
-    git clone https://github.com/05bit/python-aiopeewee.git
-    cd python-aiopeewee
-    python setup.py develop
-    ```
+```
+pip install aiopeewee
+```
 
-Databases
----------
+Quickstart
+----------
 
-    class PostgresqlDatabase(peewee.PostgresqlDatabase)
-    class PooledPostgresqlDatabase(peewee.PostgresqlDatabase)
-
-It provides a drop-in sync interface and extra async interface, so it's
-possible to migrate codebase from sync to async without breaking everything
-at once.
-
-The tradeoff is that **two connections may be opened at one time** -- one for sync and
-another for async mode. And yet we don't prevent queries from (occasional) syncronous
-blocking evaluation! We may probably need async only interface later. Maybe not.
-
-Some thoughts on that:
-
-* Initial setup e.g. tables creation is generally easier and it's ok to run **synchronously**
-  before starting event loop.
-* Peewee interface should remain peewee interface and it's originally syncronous, we may **extend**
-  the interface but not break good old one.
-* We may prefetch related objects explicitly and have a kind of "warning mode"
-  to get notified (logged) on unwanted blocking queries execution.
-
-Wrappers
---------
-
-**Generic queries:**
-
-    execute(query)
-
-**Single object actions**:
-
-    get_object(model_or_query, *args)
-    create_object(model, **kwargs)
-    delete_object(obj, recursive=False, delete_nullable=False)
-    update_object(obj, only=None)
-
-**Aggregation:**
-
-    scalar(query, as_tuple=False)
-    count(query, clear_limit=False)
-
-All wrappers are asyncio coroutines.
-
-Not implemented yet:
-
-* transactions, see http://aiopg.readthedocs.org/en/0.3/core.html#transactions
-* aggregated queries produced with aggregate_rows()
-
-Basic example
--------------
+Create test PostgreSQL database, i.e. 'test' for running this snippet:
 
 ```python
 import asyncio
@@ -99,23 +46,20 @@ database.close()
 
 @asyncio.coroutine
 def my_handler():
-    # Open async connection in place to simplify example
-    yield from database.connect_async(loop=loop)
+    TestModel.create(text="Yo, I can do it sync!")
+    yield from aiopeewee.create_object(TestModel, text="Not bad. Watch this, I'm async!")
     all_objects = yield from aiopeewee.execute(TestModel.select())
-    database.close()
+    for obj in all_objects:
+        print(obj.text)
 
+loop.run_until_complete(database.connect_async(loop=loop))
 loop.run_until_complete(my_handler())
 ```
-
-Wrapping is possible because peewee queries are lazy objects. So you may
-construct them in generic way, you should just avoid avaluation. At this time
-module does not provide asynchronous reading of related objects.
 
 Discuss
 -------
 
-Project state is "poof of concept proto", so feel free to add discussion
-topics to issue tracker: https://github.com/05bit/python-aiopeewee/issues
+You are welcome to add discussion topics or bug reports to tracker on GitHub: https://github.com/05bit/python-aiopeewee/issues
 
 License
 -------

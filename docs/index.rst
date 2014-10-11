@@ -63,7 +63,7 @@ Install latest version from PyPI:
 
 .. code-block:: console
 
-    pip install peewee
+    pip install aiopeewee
 
 Install from sources
 ++++++++++++++++++++
