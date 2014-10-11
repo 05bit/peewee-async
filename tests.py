@@ -9,6 +9,7 @@ import aiopeewee
 
 # Shortcuts
 execute = aiopeewee.execute
+scalar = aiopeewee.scalar
 get_object = aiopeewee.get_object
 create_object = aiopeewee.create_object
 delete_object = aiopeewee.delete_object
@@ -183,6 +184,17 @@ class AsyncPostgresTestCase(unittest.TestCase):
         self.assertEqual(sav1, 1)
         self.assertEqual(TestModel.get(id=obj1.id).text,
                          '[async] [test_save_obj]')
+
+    def test_scalar_query(self):
+        # Async scalar query
+        @asyncio.coroutine
+        def test():
+            sync_count = TestModel.select(peewee.fn.Count(TestModel.id)).scalar()
+            async_count = yield from scalar(TestModel.select(peewee.fn.Count(TestModel.id)))
+            self.assertEqual(sync_count, async_count)
+            return True
+
+        self.run_until_complete(test())
 
 
 if __name__ == '__main__':

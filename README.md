@@ -63,13 +63,17 @@ Wrappers
     delete_object(obj, recursive=False, delete_nullable=False)
     update_object(obj, only=None)
 
+**Aggregation:**
+
+    scalar(query, as_tuple=False)
+
 All wrappers are asyncio coroutines.
 
 Not implemented yet:
 
 * transactions, see http://aiopg.readthedocs.org/en/0.3/core.html#transactions
 * aggregated queries produced with aggregate_rows()
-* count(), scalar() queries
+* count()
 
 Basic example
 -------------

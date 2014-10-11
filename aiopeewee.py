@@ -249,8 +249,15 @@ def count(query):
 
 
 @asyncio.coroutine
-def scalar(query):
-    raise NotImplementedError
+def scalar(query, as_tuple=False):
+    """ Get single value from query, i.e. in for aggregation.
+    """
+    cursor = yield from cursor_with_query(query)
+    row = yield from cursor.fetchone()
+    if row and not as_tuple:
+        return row[0]
+    else:
+        return row
 
 
 @asyncio.coroutine
