@@ -52,16 +52,21 @@ Some thoughts on that:
 Wrappers
 --------
 
+These ones **seems ok**:
+
     create(cls, model, **query)
-    delete_instance(obj, recursive=False, delete_nullable=False)
-    select(query)
-    save(obj, force_insert=False, only=None)
     update(query)
+    select(query)
     delete(query)
+
+These ones may be **thrown away**:
+
+    delete_instance(obj, recursive=False, delete_nullable=False)
+    save(obj, force_insert=False, only=None)
 
 All wrappers are asyncio coroutines.
 
-Not implemented::
+Not implemented yet::
 
 * transactions, see http://aiopg.readthedocs.org/en/0.3/core.html#transactions
 * aggregated queries produced with aggregate_rows()
@@ -87,12 +92,12 @@ class TestModel(peewee.Model):
 # Create table synchronously!
 TestModel.create_table(True)
 # This is optional: close sync connection
-# database.close()
+database.close()
 
 @asyncio.coroutine
 def my_handler():
     # Open async connection in place to simplify example
-    yield from database.connect(loop=loop)
+    yield from database.connect_async(loop=loop)
     all_objects = yield from aiopeewee.select(TestModel.select())
     database.close()
 

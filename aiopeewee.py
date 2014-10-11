@@ -26,7 +26,8 @@ import aiopg
 import peewee
 import contextlib
 
-__all__ = (
+__version__ = '0.0.1'
+__all__ = [
     'create',
     'delete',
     'select',
@@ -44,7 +45,7 @@ __all__ = (
     # 'scalar',
     # 'delete_instance',
     # 'save',
-)
+]
 
 
 @asyncio.coroutine
