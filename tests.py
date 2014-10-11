@@ -94,10 +94,9 @@ class AsyncPostgresTestCase(unittest.TestCase):
         # Async create
         @asyncio.coroutine
         def do():
-            obj2 = TestModel.create(text='[async] [test_create_obj]')
+            obj2 = yield from create(TestModel, text='[async] [test_create_obj]')
             self.assertTrue(not obj2.id is None)
         self.loop.run_until_complete(do())
-
 
     def test_fetch_obj(self):
         # Sync fetch

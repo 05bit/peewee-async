@@ -50,15 +50,31 @@ __all__ = [
 
 @asyncio.coroutine
 def create(model, **query):
-    """ Create object asynchronously.
+    """ Create object asynchronously. Returns created instance.
     
-    NOTE: copy-paste, try to avoid
-    https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L3372
+    NOTE! Private calls involved.
     """
-    inst = model(**query)
-    yield from save(inst, force_insert=True)
-    inst.prepared()
-    return inst
+    obj = model(**query)
+
+    # NOTE! Here are private calls involved:
+    #
+    # - obj._data
+    # - obj._get_pk_value()
+    # - obj._set_pk_value()
+    # - obj._prepare_instance()
+    #
+    field_dict = dict(obj._data)
+    pk = obj._get_pk_value()
+    pk_from_cursor = yield from insert(obj.insert(**field_dict))
+    if pk_from_cursor is not None:
+        pk = pk_from_cursor
+    obj._set_pk_value(pk)  # Do not overwrite current ID with None.
+    
+    # obj._prepare_instance()
+    obj._dirty.clear()
+    obj.prepared()
+
+    return obj
 
 
 @asyncio.coroutine
@@ -77,7 +93,7 @@ def delete_instance(obj, recursive=False, delete_nullable=False):
                 yield from update(model.update(**{fk.name: None}).where(query))
             else:
                 yield from delete(model.delete().where(query))
-    result = yield from delete(obj.delete().where(obj.pk_expr()))
+    result = yield from delete(obj.delete().where(obj._pk_expr()))
     return result
 
 
@@ -158,7 +174,7 @@ def save(obj, force_insert=False, only=None):
             field_dict.pop(pk_field.name, None)
         else:
             field_dict = obj._prune_fields(field_dict, obj.dirty_fields)
-        rows = yield from update(obj.update(**field_dict).where(obj.pk_expr()))
+        rows = yield from update(obj.update(**field_dict).where(obj._pk_expr()))
     else:
         pk = obj.get_id()
         pk_from_cursor = yield from insert(obj.insert(**field_dict))
