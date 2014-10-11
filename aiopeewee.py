@@ -2,9 +2,11 @@
 aiopeewee = asyncio + peewee
 ============================
 
-Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
-orm powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
-Current state: **proof of concept**.
+Asynchronous interface for `peewee`_ ORM powered by `asyncio`_:
+https://github.com/05bit/python-aiopeewee
+
+.. _peewee: https://github.com/coleifer/peewee
+.. _asyncio: https://docs.python.org/3/library/asyncio.html
 
 Copyright 2014 Alexey Kinev, 05Bit http://05bit.com
 
@@ -45,20 +47,19 @@ __all__ = [
     'sync_unwanted',
     'UnwantedSyncQueryError',
 
-    # Not implemented:
-    # 'count',
-    # 'scalar',
+    # Aggregation:
+    'count',
+    'scalar',
 ]
 
 
 @asyncio.coroutine
 def execute(query):
-    """ Execute SELECT, INSERT, UPDATE or DELETE query asyncronously.
+    """ Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
-    query -- peewee query instance created with `Model.select()`,
-             `Model.update()` etc.
-
-    Result depends on query type, it's the same as for sync `query.execute()`.
+    :param query: peewee query instance created with ``Model.select()``,
+                  ``Model.update()`` etc.
+    :return: result depends on query type, it's the same as for sync ``query.execute()``
     """
     if isinstance(query, peewee.UpdateQuery):
         coroutine = update
@@ -72,10 +73,12 @@ def execute(query):
 
 
 @asyncio.coroutine
-def create_object(model, **query):
-    """ Create object asynchronously. Returns created instance.
+def create_object(model, **data):
+    """ Create object asynchronously.
     
-    NOTE! Private calls involved.
+    :param model: mode class
+    :param data: data for initializing object
+    :return: new object saved to database
     """
     obj = model(**query)
 
@@ -101,20 +104,19 @@ def create_object(model, **query):
 
 
 @asyncio.coroutine
-def get_object(from_, *args):
-    """ Get object asynchronously or raise `DoesNotExist` error.
+def get_object(source, *args):
+    """ Get object asynchronously.
 
-    Arguments:
-
-        from_ -- model class or query to get object from
-        *args -- lookup parameters
+    :param source: mode class or query to get object from
+    :param args: lookup parameters
+    :return: model instance or raises ``peewee.DoesNotExist`` if object not found
     """
-    if isinstance(from_, peewee.Query):
-        base_query = from_
+    if isinstance(source, peewee.Query):
+        base_query = source
         model = base_query.model_class
     else:
-        base_query = from_.select()
-        model = from_
+        base_query = source.select()
+        model = source
 
     # Return first object from query
     for obj in (yield from select(base_query.where(*args).limit(1))):
@@ -128,7 +130,13 @@ def get_object(from_, *args):
 def delete_object(obj, recursive=False, delete_nullable=False):
     """ Delete object asynchronously.
 
-    NOTE! Private calls involved.
+    :param obj: object to delete
+    :param recursive: if ``True`` also delete all other objects depends on object
+    :param delete_nullable: if `True` and delete is recursive then delete even 'nullable' dependencies
+
+    For details please check out `Model.delete_instance()`_ in peewee docs.
+
+    .. _Model.delete_instance(): http://peewee.readthedocs.org/en/latest/peewee/api.html#Model.delete_instance
     """
     # Here are private calls involved:
     # - obj._pk_expr()
@@ -148,7 +156,14 @@ def delete_object(obj, recursive=False, delete_nullable=False):
 def update_object(obj, only=None):
     """ Update object asynchronously.
 
-    NOTE! Private calls involved.
+    :param obj: object to update
+    :param only: list or tuple of fields to updata, is `None` then all fields updated
+
+    This function does the same as `Model.save()`_ for already saved object, but it
+    doesn't invoke ``save()`` method on model class. That is important to know if you
+    overrided save method for your model.
+
+    .. _Model.save(): http://peewee.readthedocs.org/en/latest/peewee/api.html#Model.save
     """
     # Here are private calls involved:
     #
@@ -245,7 +260,9 @@ def delete(query):
 
 @asyncio.coroutine
 def count(query, clear_limit=False):
-    """ Perform COUNT aggregated query asynchronously. Returns int value.
+    """ Perform *COUNT* aggregated query asynchronously.
+
+    :return: number of objects in ``select()`` query
     """
     if query._distinct or query._group_by or query._limit or query._offset:
         # wrapped_count()
@@ -266,7 +283,9 @@ def count(query, clear_limit=False):
 
 @asyncio.coroutine
 def scalar(query, as_tuple=False):
-    """ Get single value from query, i.e. for aggregation.
+    """ Get single value from ``select()`` query, i.e. for aggregation.
+
+    :return: result is the same as after sync ``query.scalar()`` call
     """
     cursor = yield from cursor_with_query(query)
     row = yield from cursor.fetchone()
@@ -324,12 +343,10 @@ class AsyncQueryResult:
 
 
 class PostgresqlDatabase(peewee.PostgresqlDatabase):
-    """
-    Drop-in replacement for default `peewee.PostgresqlDatabase` backend with
-    extra `asyncio` powered interface.
+    """ PosgreSQL database driver providing **single drop-in sync** connection
+    and **single async connection** interface.
 
-    Run `connect_async(loop=None)` to set up async connection. This has to be
-    done explicitly before performing any async queries.
+    See also: http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
     """
     def __init__(self, database, threadlocals=True, autocommit=True,
                  fields=None, ops=None, autorollback=True, **connect_kwargs):
@@ -400,6 +417,13 @@ class PostgresqlDatabase(peewee.PostgresqlDatabase):
 
 
 class PooledPostgresqlDatabase(PostgresqlDatabase):
+    """ PosgreSQL database driver providing **single drop-in sync** connection
+    and **async connections pool** interface.
+
+    :param max_connections: connections pool size
+
+    See also: http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
+    """
     def __init__(self, *args, **kwargs):
         # Pool parameters
         self.max_connections = kwargs.pop('max_connections', 20)
@@ -416,7 +440,7 @@ class PooledPostgresqlDatabase(PostgresqlDatabase):
     @asyncio.coroutine
     def connect_async(self, loop=None, timeout=None):
         """ Set up async connections pool on specified event loop or
-        on default event loop.
+        on default event loop. This method is coroutine.
         """
         if not self.async_conn:
             timeout = timeout if timeout else aiopg.DEFAULT_TIMEOUT
