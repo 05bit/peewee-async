@@ -4,10 +4,10 @@ aiopeewee = asyncio + peewee
 Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
 orm powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 
-Module provides database backends and wrappers for performing asynchronous
-queries.
+Documentation
+-------------
 
-Documentation: http://python-aiopeewee.readthedocs.org/en/latest/
+http://python-aiopeewee.readthedocs.org
 
 Install
 -------
