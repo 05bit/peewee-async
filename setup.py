@@ -1,6 +1,5 @@
 """
-aiopeewee = asyncio + peewee
-https://github.com/05bit/python-aiopeewee
+Asynchronous interface for peewee ORM powered by asyncio.
 """
 from setuptools import setup, find_packages
 
@@ -13,6 +12,7 @@ setup(
     author_email='rudy@05bit.com',
     url='https://github.com/05bit/python-aiopeewee',
     description=__doc__,
+    # long_description=__doc__,
     license='Apache',
     zip_safe=False,
     install_requires=(
