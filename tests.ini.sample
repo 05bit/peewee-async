@@ -1,0 +1,3 @@
+[tests]
+db = test
+pool_size = 4
