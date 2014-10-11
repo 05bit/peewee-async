@@ -9,12 +9,12 @@ import aiopeewee
 
 # Shortcuts
 create = aiopeewee.create
-update = aiopeewee.update
-select = aiopeewee.select
-insert = aiopeewee.insert
 delete = aiopeewee.delete
 delete_instance = aiopeewee.delete_instance
-save = aiopeewee.save
+insert = aiopeewee.insert
+select = aiopeewee.select
+update = aiopeewee.update
+update_instance = aiopeewee.update_instance
 
 # Configure tests
 ini_config = configparser.ConfigParser()
@@ -98,13 +98,13 @@ class AsyncPostgresTestCase(unittest.TestCase):
             self.assertTrue(not obj2.id is None)
         self.loop.run_until_complete(do())
 
-    def test_fetch_obj(self):
-        # Sync fetch
+    def test_select_query(self):
+        # Sync select
         q1 = TestModel.select()
         len1 = len([o for o in q1])
         self.assertTrue(len1 > 0)
 
-        # Async fetch
+        # Async select
         @asyncio.coroutine
         def do():
             result = yield from select(TestModel.select())
@@ -118,7 +118,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         for o1, o2 in zip(q1, q2):
             self.assertEqual(o1, o2)
 
-    def test_update_obj(self):
+    def test_update_query(self):
         # Sync create
         obj1 = TestModel.create(text='[sync] [test_update_obj]')
         self.assertEqual(obj1.text, '[sync] [test_update_obj]')
@@ -157,7 +157,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         except TestModel.DoesNotExist:
             pass
 
-    def test_save_obj(self):
+    def test_update_obj(self):
         # Sync create
         obj1 = TestModel.create(text='[sync] [test_save_obj]')
 
@@ -165,7 +165,7 @@ class AsyncPostgresTestCase(unittest.TestCase):
         @asyncio.coroutine
         def do():
             obj1.text = '[async] [test_save_obj]'
-            result = yield from save(obj1)
+            result = yield from update_instance(obj1)
             return result
         sav1 = self.run_until_complete(do())
         self.assertEqual(sav1, 1)

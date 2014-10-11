@@ -28,23 +28,26 @@ import contextlib
 
 __version__ = '0.0.1'
 __all__ = [
+    # Queries
     'create',
     'delete',
-    'select',
+    'delete_instance',
     'insert',
+    'select',
     'update',
+    'update_instance',
 
+    # Databases
     'PostgresqlDatabase',
     'PooledPostgresqlDatabase',
 
+    # Sync fallback
     'sync_unwanted',
-    'UnwantedSyncQuery',
+    'UnwantedSyncQueryError',
 
-    # Drafts or not implemented:
+    # Not implemented:
     # 'count',
     # 'scalar',
-    # 'delete_instance',
-    # 'save',
 ]
 
 
@@ -78,67 +81,27 @@ def create(model, **query):
 
 
 @asyncio.coroutine
-def delete_instance(obj, recursive=False, delete_nullable=False):
-    """ *Draft interface*. Delete object asynchronously.
-
-    NOTE: design decision is nessecary to avoid copy-paste from
-          `peewee.Model.delete_instance()`
-          https://github.com/05bit/peewee/blob/master/peewee.py#L3547
-    """
-    if recursive:
-        dependencies = obj.dependencies(delete_nullable)
-        for query, fk in reversed(list(dependencies)):
-            model = fk.model_class
-            if fk.null and not delete_nullable:
-                yield from update(model.update(**{fk.name: None}).where(query))
-            else:
-                yield from delete(model.delete().where(query))
-    result = yield from delete(obj.delete().where(obj._pk_expr()))
-    return result
-
-
-@asyncio.coroutine
 def select(query_):
     """ Perform SELECT query asynchronously.
+
+    NOTE! It relies on internal peewee logic for generating
+    results from queries and well, a bit hacky.
     """
     query = query_.clone()
 
-    # Perform async query
+    # Perform *real* async query
     cursor = yield from _execute(query)
 
-    # Perform fake execute: we only need result wrapper class
-    # TODO: sugest to expose some API in peewee?
+    # Perform *fake* query: we only need a result wrapper
+    # here, not the query result itself.
     query._execute = lambda: None
-    result_wrapper = query.execute()
+    result_wrapper = query.execute() # Get empty result wrapper!
 
-    # Async fetch results
-    class AsyncQueryResult(result_wrapper.__class__):
-        def __iter__(self):
-            return iter(self._result_cache)
-
-        def __next__(self):
-            raise NotImplementedError
-
-        @asyncio.coroutine
-        def iterate(self):
-            row = yield from self.cursor.fetchone()
-
-            if not row:
-                self._populated = True
-                raise GeneratorExit
-            elif not self._initialized:
-                self.initialize(self.cursor.description)
-                self._initialized = True
-
-            obj = self.process_row(row)
-            self._result_cache.append(obj)
-
-    result = AsyncQueryResult(query.model_class, cursor,
-                              query.get_query_meta())
-
+    # Fetch result
+    result = AsyncQueryResult(result_wrapper=result_wrapper, cursor=cursor)
     try:
         while True:
-            yield from result.iterate()
+            yield from result.fetchone()
     except GeneratorExit:
         pass
 
@@ -159,29 +122,51 @@ def scalar(query):
 
 
 @asyncio.coroutine
-def save(obj, force_insert=False, only=None):
-    """ *Draft interface*. Save object asynchronously.
+def delete_instance(obj, recursive=False, delete_nullable=False):
+    """ Delete object asynchronously.
 
-    NOTE: it's a copy-paste, not sure how to make it better
-    https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L3486
+    NOTE! Private calls involved.
     """
+    # Here are private calls involved:
+    # - obj._pk_expr()
+    if recursive:
+        dependencies = obj.dependencies(delete_nullable)
+        for query, fk in reversed(list(dependencies)):
+            model = fk.model_class
+            if fk.null and not delete_nullable:
+                yield from update(model.update(**{fk.name: None}).where(query))
+            else:
+                yield from delete(model.delete().where(query))
+    result = yield from delete(obj.delete().where(obj._pk_expr()))
+    return result
+
+
+@asyncio.coroutine
+def update_instance(obj, only=None):
+    """ Update object asynchronously.
+
+    NOTE! Private calls involved.
+    """
+    # Here are private calls involved:
+    #
+    # - obj._data
+    # - obj._meta
+    # - obj._prune_fields()
+    # - obj._pk_expr()
+    # - obj._dirty.clear()
+    #
     field_dict = dict(obj._data)
     pk_field = obj._meta.primary_key
+
     if only:
         field_dict = obj._prune_fields(field_dict, only)
-    if obj.get_id() is not None and not force_insert:
-        if not isinstance(pk_field, peewee.CompositeKey):
-            field_dict.pop(pk_field.name, None)
-        else:
-            field_dict = obj._prune_fields(field_dict, obj.dirty_fields)
-        rows = yield from update(obj.update(**field_dict).where(obj._pk_expr()))
+
+    if not isinstance(pk_field, peewee.CompositeKey):
+        field_dict.pop(pk_field.name, None)
     else:
-        pk = obj.get_id()
-        pk_from_cursor = yield from insert(obj.insert(**field_dict))
-        if pk_from_cursor is not None:
-            pk = pk_from_cursor
-        obj.set_id(pk)  # Do not overwrite current ID with a None value.
-        rows = 1
+        field_dict = obj._prune_fields(field_dict, obj.dirty_fields)
+    rows = yield from update(obj.update(**field_dict).where(obj._pk_expr()))
+
     obj._dirty.clear()
     return rows
 
@@ -226,11 +211,45 @@ def delete(query):
 def _execute(query):
     """ Execute query and return cursor object.
     """
-    conn = query.database.async_conn
-    assert conn, "Error, database is not connected"
-    cursor = yield from conn.cursor()
+    assert query.database.async_conn, "Error, no async database connection."
+    cursor = yield from query.database.async_conn.cursor()
     yield from cursor.execute(*query.sql())
     return cursor
+
+
+class AsyncQueryResult:
+    """ Async query results wrapper for async `select()`. Internally uses
+    results wrapper produced by sync peewee select query.
+
+    Arguments:
+
+        result_wrapper -- empty results wrapper produced by sync `execute()` call
+        cursor -- async cursor just executed query
+
+    To retrieve results after async fetching just iterate over object,
+    like you generally iterate over sync results wrapper.
+    """
+    def __init__(self, result_wrapper=None, cursor=None):
+        self._result = []
+        self._initialized = False
+        self._result_wrapper = result_wrapper
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._result)
+
+    @asyncio.coroutine
+    def fetchone(self):
+        row = yield from self._cursor.fetchone()
+
+        if not row:
+            raise GeneratorExit
+        elif not self._initialized:
+            self._result_wrapper.initialize(self._cursor.description)
+            self._initialized = True
+
+        obj = self._result_wrapper.process_row(row)
+        self._result.append(obj)
 
 
 class PostgresqlDatabase(peewee.PostgresqlDatabase):
@@ -277,11 +296,11 @@ class PostgresqlDatabase(peewee.PostgresqlDatabase):
 
     def execute_sql(self, *args, **kwargs):
         """ Sync execute SQL query. If this query is performing within
-        `sync_unwanted()` context, then `UnwantedSyncQuery` exception
+        `sync_unwanted()` context, then `UnwantedSyncQueryError` exception
         is raised.
         """
         if self._sync_unwanted:
-            raise UnwantedSyncQuery("Error, unwanted sync query", args, kwargs)
+            raise UnwantedSyncQueryError("Error, unwanted sync query", args, kwargs)
         return super().execute_sql(*args, **kwargs)
 
     @asyncio.coroutine
@@ -428,14 +447,14 @@ class PooledAsyncPostgresDatabase:
 @contextlib.contextmanager
 def sync_unwanted(database, enabled=True):
     """ Context manager for preventing unwanted sync queries.
-    `UnwantedSyncQuery` exception will raise on such query.
+    `UnwantedSyncQueryError` exception will raise on such query.
     """
     database._sync_unwanted = enabled
     yield
     database._sync_unwanted = False
 
 
-class UnwantedSyncQuery(Exception):
+class UnwantedSyncQueryError(Exception):
     """ Exception which is raised when performing unwanted sync query.
     """
     pass
