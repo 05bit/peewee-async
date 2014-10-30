@@ -59,12 +59,12 @@ loop.run_until_complete(my_handler())
 Discuss
 -------
 
-You are welcome to add discussion topics or bug reports to tracker on GitHub: https://github.com/05bit/python-peewee_async/issues
+You are welcome to add discussion topics or bug reports to tracker on GitHub: https://github.com/05bit/peewee-async/issues
 
 License
 -------
 
-Copyright 2014 Alexey Kinev, 05Bit http://05bit.com
+Copyright (c) 2014, Alexey Kinev <rudy@05bit.com>
 
 Licensed under The MIT License (MIT),
 see LICENSE file for more details.
