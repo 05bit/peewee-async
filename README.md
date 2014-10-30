@@ -2,7 +2,7 @@ peewee-async
 ============
 
 Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
-orm powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
+ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 
 Documentation
 -------------
