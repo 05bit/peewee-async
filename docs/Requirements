@@ -1,3 +1,0 @@
-peewee>=2.3.3
-aiopg>=0.4.1
--e git+https://github.com/05bit/python-aiopeewee.git#egg=aiopeewee

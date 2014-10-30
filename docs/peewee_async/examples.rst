@@ -8,9 +8,9 @@ Using both sync and async calls
 
     import asyncio
     import peewee
-    import aiopeewee
+    import peewee_async
 
-    database = aiopeewee.PostgresqlDatabase('test')
+    database = peewee_async.PostgresqlDatabase('test')
     loop = asyncio.get_event_loop()
 
     class TestModel(peewee.Model):
@@ -27,14 +27,14 @@ Using both sync and async calls
     @asyncio.coroutine
     def my_handler():
         obj1 = TestModel.create(text="Yo, I can do it sync!")
-        obj2 = yield from aiopeewee.create_object(TestModel, text="Not bad. Watch this, I'm async!")
+        obj2 = yield from peewee_async.create_object(TestModel, text="Not bad. Watch this, I'm async!")
 
-        all_objects = yield from aiopeewee.execute(TestModel.select())
+        all_objects = yield from peewee_async.execute(TestModel.select())
         for obj in all_objects:
             print(obj.text)
 
         obj1.delete_instance()
-        yield from aiopeewee.delete_object(obj2)
+        yield from peewee_async.delete_object(obj2)
 
     loop.run_until_complete(database.connect_async(loop=loop))
     loop.run_until_complete(my_handler())

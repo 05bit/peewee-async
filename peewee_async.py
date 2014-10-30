@@ -1,9 +1,9 @@
 """
-aiopeewee = asyncio + peewee
-============================
+peewee-async
+============
 
 Asynchronous interface for `peewee`_ ORM powered by `asyncio`_:
-https://github.com/05bit/python-aiopeewee
+https://github.com/05bit/peewee-async
 
 .. _peewee: https://github.com/coleifer/peewee
 .. _asyncio: https://docs.python.org/3/library/asyncio.html

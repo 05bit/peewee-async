@@ -1,5 +1,5 @@
-aiopeewee = asyncio + peewee
-============================
+peewee-async
+============
 
 Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
 orm powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
@@ -7,7 +7,7 @@ orm powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 Documentation
 -------------
 
-http://python-aiopeewee.readthedocs.org
+http://peewee-async.readthedocs.org
 
 Install
 -------
@@ -17,7 +17,7 @@ Works on Python 3.3+ and PostgreSQL database.
 Install with `pip`:
 
 ```
-pip install aiopeewee
+pip install peewee-async
 ```
 
 Quickstart
@@ -28,9 +28,9 @@ Create test PostgreSQL database, i.e. 'test' for running this snippet:
 ```python
 import asyncio
 import peewee
-import aiopeewee
+import peewee_async
 
-database = aiopeewee.PostgresqlDatabase('test')
+database = peewee_async.PostgresqlDatabase('test')
 loop = asyncio.get_event_loop()
 
 class TestModel(peewee.Model):
@@ -47,8 +47,8 @@ database.close()
 @asyncio.coroutine
 def my_handler():
     TestModel.create(text="Yo, I can do it sync!")
-    yield from aiopeewee.create_object(TestModel, text="Not bad. Watch this, I'm async!")
-    all_objects = yield from aiopeewee.execute(TestModel.select())
+    yield from peewee_async.create_object(TestModel, text="Not bad. Watch this, I'm async!")
+    all_objects = yield from peewee_async.execute(TestModel.select())
     for obj in all_objects:
         print(obj.text)
 
@@ -59,7 +59,7 @@ loop.run_until_complete(my_handler())
 Discuss
 -------
 
-You are welcome to add discussion topics or bug reports to tracker on GitHub: https://github.com/05bit/python-aiopeewee/issues
+You are welcome to add discussion topics or bug reports to tracker on GitHub: https://github.com/05bit/python-peewee_async/issues
 
 License
 -------

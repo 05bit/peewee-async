@@ -5,17 +5,17 @@ import unittest
 import peewee
 
 # Testing module
-import aiopeewee
+import peewee_async
 
 # Shortcuts
-execute = aiopeewee.execute
-count = aiopeewee.count
-scalar = aiopeewee.scalar
-get_object = aiopeewee.get_object
-create_object = aiopeewee.create_object
-delete_object = aiopeewee.delete_object
-update_object = aiopeewee.update_object
-sync_unwanted = aiopeewee.sync_unwanted
+execute = peewee_async.execute
+count = peewee_async.count
+scalar = peewee_async.scalar
+get_object = peewee_async.get_object
+create_object = peewee_async.create_object
+delete_object = peewee_async.delete_object
+update_object = peewee_async.update_object
+sync_unwanted = peewee_async.sync_unwanted
 
 # Configure tests
 ini_config = configparser.ConfigParser()
@@ -30,9 +30,9 @@ config.setdefault('db', 'test')
 
 if 'pool_size' in config:
     max_connections = int(config['pool_size'])
-    database = aiopeewee.PooledPostgresqlDatabase(config['db'], max_connections=max_connections)
+    database = peewee_async.PooledPostgresqlDatabase(config['db'], max_connections=max_connections)
 else:
-    database = aiopeewee.PostgresqlDatabase(config['db'])
+    database = peewee_async.PostgresqlDatabase(config['db'])
 
 
 #

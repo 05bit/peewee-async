@@ -1,12 +1,12 @@
-.. aiopeewee documentation master file, created by
+.. peewee-async documentation master file, created by
    sphinx-quickstart on Sat Oct 11 20:12:24 2014.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-aiopeewee = asyncio + peewee
-============================
+peewee-async
+============
 
-**aiopeewee** is a library providing asynchronous interface powered by `asyncio`_ for `peewee`_ ORM.
+**peewee-async** is a library providing asynchronous interface powered by `asyncio`_ for `peewee`_ ORM.
 
 .. _peewee: https://github.com/coleifer/peewee
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
@@ -19,7 +19,7 @@ Current state: **alpha**, yet API seems fine and mostly stable.
 
 Source code hosted on `GitHub`_.
 
-.. _GitHub: https://github.com/05bit/python-aiopeewee
+.. _GitHub: https://github.com/05bit/peewee-async
 
 Quickstart
 ----------
@@ -28,9 +28,9 @@ Quickstart
 
     import asyncio
     import peewee
-    import aiopeewee
+    import peewee_async
 
-    database = aiopeewee.PostgresqlDatabase('test')
+    database = peewee_async.PostgresqlDatabase('test')
     loop = asyncio.get_event_loop()
 
     class TestModel(peewee.Model):
@@ -47,8 +47,8 @@ Quickstart
     @asyncio.coroutine
     def my_handler():
         TestModel.create(text="Yo, I can do it sync!")
-        yield from aiopeewee.create_object(TestModel, text="Not bad. Watch this, I'm async!")
-        all_objects = yield from aiopeewee.execute(TestModel.select())
+        yield from peewee_async.create_object(TestModel, text="Not bad. Watch this, I'm async!")
+        all_objects = yield from peewee_async.execute(TestModel.select())
         for obj in all_objects:
             print(obj.text)
 
@@ -63,15 +63,15 @@ Install latest version from PyPI:
 
 .. code-block:: console
 
-    pip install aiopeewee
+    pip install peewee-async
 
 Install from sources
 ++++++++++++++++++++
 
 .. code-block:: console
 
-    git clone https://github.com/05bit/python-aiopeewee.git
-    cd python-aiopeewee
+    git clone https://github.com/05bit/peewee-async.git
+    cd peewee-async
     python setup.py install
 
 Running tests
@@ -94,7 +94,7 @@ Report bugs and discuss
 
 You are welcome to add discussion topics or bug reports to `tracker on GitHub`_!
 
-.. _tracker on GitHub: https://github.com/05bit/python-aiopeewee/issues
+.. _tracker on GitHub: https://github.com/05bit/peewee-async/issues
 
 Contents
 --------
@@ -102,8 +102,8 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-   aiopeewee/api
-   aiopeewee/examples
+   peewee_async/api
+   peewee_async/examples
 
 Indices and tables
 ==================
