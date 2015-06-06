@@ -27,12 +27,16 @@ except KeyError:
     config = {}
 
 config.setdefault('db', 'test')
+config.setdefault('user', 'postgres')
+config.setdefault('password', '')
 
 if 'pool_size' in config:
     max_connections = int(config['pool_size'])
-    database = peewee_async.PooledPostgresqlDatabase(config['db'], max_connections=max_connections)
+    database = peewee_async.PooledPostgresqlDatabase(config['db'], max_connections=max_connections,
+                                                     user=config['user'], password=config['password'])
 else:
-    database = peewee_async.PostgresqlDatabase(config['db'])
+    database = peewee_async.PostgresqlDatabase(config['db'],
+                                               user=config['user'], password=config['password'])
 
 
 #
