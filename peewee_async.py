@@ -341,7 +341,7 @@ class AsyncQueryResult:
         self._result.append(obj)
 
 
-class PostgresqlDatabase(peewee.PostgresqlDatabase):
+class _PostgresqlDatabase:
     """ PosgreSQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
 
@@ -414,8 +414,22 @@ class PostgresqlDatabase(peewee.PostgresqlDatabase):
             result = yield from cursor.fetchone()
             return result
 
+def PostgresqlDatabase(database, threadlocals=True, autocommit=True,
+                       fields=None, ops=None, autorollback=True,
+                       database_cls=peewee.PostgresqlDatabase, **connect_kwargs):
+    if not issubclass(database_cls, peewee.PostgresqlDatabase):
+        raise TypeError("database_cls parameter should be peewee.PostgresqlDatabase instance")
 
-class PooledPostgresqlDatabase(PostgresqlDatabase):
+    class PostgresqlDatabase(_PostgresqlDatabase, database_cls):
+        pass
+
+    return PostgresqlDatabase(database, threadlocals=True, autocommit=True,
+                              fields=None, ops=None, autorollback=True,
+                              **connect_kwargs)
+
+
+
+class _PooledPostgresqlDatabase(_PostgresqlDatabase):
     """ PosgreSQL database driver providing **single drop-in sync** connection
     and **async connections pool** interface.
 
@@ -450,6 +464,16 @@ class PooledPostgresqlDatabase(PostgresqlDatabase):
                 self.database, minsize, maxsize,
                 self._loop, timeout, **self.connect_kwargs)
             yield from self.async_conn.connect()
+
+
+def PooledPostgresqlDatabase(*args, database_cls=peewee.PostgresqlDatabase, **kwargs):
+    if not issubclass(database_cls, peewee.PostgresqlDatabase):
+        raise TypeError("database_cls parameter should be peewee.PostgresqlDatabase instance")
+
+    class PooledPostgresqlDatabase(_PooledPostgresqlDatabase, database_cls):
+        pass
+
+    return PostgresqlDatabase(*args, **kwargs)
 
 
 class AsyncPostgresDatabase:
