@@ -1,3 +1,10 @@
+"""
+peewee-async tests
+==================
+
+Create tests.ini file to configure tests.
+
+"""
 import asyncio
 import configparser
 import sys
@@ -6,6 +13,7 @@ import peewee
 
 # Testing module
 import peewee_async
+import peewee_asyncext
 
 # Shortcuts
 execute = peewee_async.execute
@@ -17,7 +25,10 @@ delete_object = peewee_async.delete_object
 update_object = peewee_async.update_object
 sync_unwanted = peewee_async.sync_unwanted
 
+#
 # Configure tests
+#
+
 ini_config = configparser.ConfigParser()
 ini_config.read(['tests.ini'])
 
@@ -31,13 +42,24 @@ config.setdefault('user', 'postgres')
 config.setdefault('password', '')
 
 if 'pool_size' in config:
-    max_connections = int(config['pool_size'])
-    database = peewee_async.PooledPostgresqlDatabase(config['db'], max_connections=max_connections,
-                                                     user=config['user'], password=config['password'])
-else:
-    database = peewee_async.PostgresqlDatabase(config['db'],
-                                               user=config['user'], password=config['password'])
+    if config.get('ext', None):
+        db_cls = peewee_asyncext.PooledPostgresqlExtDatabase
+    else:
+        db_cls = peewee_async.PooledPostgresqlDatabase
 
+    database = db_cls(config['db'],
+                        user=config['user'],
+                        password=config['password'],
+                        max_connections=int(config['pool_size']))
+else:
+    if config.get('ext', None):
+        db_cls = peewee_asyncext.PostgresqlExtDatabase
+    else:
+        db_cls = peewee_async.PostgresqlDatabase
+
+    database = db_cls(config['db'],
+                        user=config['user'],
+                        password=config['password'])
 
 #
 # Tests
