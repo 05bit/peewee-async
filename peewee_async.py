@@ -328,6 +328,12 @@ class AsyncQueryResult:
     def __iter__(self):
         return iter(self._result)
 
+    def __getitem__(self, key):
+        return self._result[key]
+
+    def __len__(self):
+        return len(self._result)
+
     @asyncio.coroutine
     def fetchone(self):
         row = yield from self._cursor.fetchone()
