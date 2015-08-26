@@ -71,12 +71,12 @@ def create_object(model, **data):
     """
     obj = model(**data)
 
-    # NOTE! Here are private calls involved:
+    # NOTE! Here are internals involved:
     #
     # - obj._data
+    # - obj._dirty
     # - obj._get_pk_value()
     # - obj._set_pk_value()
-    # - obj._prepare_instance()
     #
     field_dict = dict(obj._data)
     pk = obj._get_pk_value()
@@ -85,7 +85,6 @@ def create_object(model, **data):
         pk = pk_from_cursor
     obj._set_pk_value(pk)  # Do not overwrite current ID with None.
     
-    # obj._prepare_instance()
     obj._dirty.clear()
     obj.prepared()
 
@@ -224,7 +223,8 @@ def insert(query):
         cursor, query.model_class)
 
     cursor.release()
-    return result
+    if result:
+        return result[0]
 
 
 @asyncio.coroutine

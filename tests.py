@@ -9,6 +9,7 @@ import asyncio
 import configparser
 import sys
 import unittest
+import uuid
 import peewee
 
 # Testing module
@@ -72,6 +73,15 @@ class TestModel(peewee.Model):
         database = database
 
 
+class UUIDTestModel(peewee.Model):
+    id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
+    text = peewee.CharField()
+
+    class Meta:
+        database = database
+
+
+
 class AsyncPostgresTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls, *args, **kwargs):
@@ -87,12 +97,15 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         # Clean up after possible errors
         TestModel.drop_table(True)
+        UUIDTestModel.drop_table(True)
 
         # Create table with sync connection
         TestModel.create_table()
+        UUIDTestModel.create_table()
 
-        # Create at least one object
+        # Create at least one object per model
         cls.obj = TestModel.create(text='[sync] Hello!')
+        cls.uuid_obj = UUIDTestModel.create(text='[sync] Hello!')
 
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
@@ -122,18 +135,36 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
         self.assertTrue(self.run_until_complete(test()))
 
-    def test_create_obj(self):
-        # Sync create
-        obj1 = TestModel.create(text='[sync] [test_create_obj]')
-        self.assertTrue(not obj1.id is None)
+    def test_get_uuid_obj(self):
+        # Async get
+        @asyncio.coroutine
+        def test():
+            with sync_unwanted(database):
+                obj = yield from get_object(UUIDTestModel, UUIDTestModel.id == self.uuid_obj.id)
+            self.assertEqual(obj.text, self.obj.text)
+            return obj
 
+        self.assertTrue(self.run_until_complete(test()))
+
+    def test_create_obj(self):
         # Async create
         @asyncio.coroutine
         def test():
             with sync_unwanted(database):
-                obj2 = yield from create_object(TestModel, text='[async] [test_create_obj]')
-            self.assertTrue(not obj2.id is None)
-            return obj2
+                obj = yield from create_object(TestModel, text='[async] [test_create_obj]')
+            self.assertTrue(obj.id is not None)
+            return obj
+
+        self.run_until_complete(test())
+
+    def test_create_uuid_obj(self):
+        # Async create
+        @asyncio.coroutine
+        def test():
+            with sync_unwanted(database):
+                obj = yield from create_object(UUIDTestModel, text='[async] [test_create_uuid_obj]')
+            self.assertTrue(obj.id is not None)
+            return obj
 
         self.run_until_complete(test())
 
@@ -158,6 +189,43 @@ class AsyncPostgresTestCase(unittest.TestCase):
         self.assertEqual(len1, len2)
         for o1, o2 in zip(q1, q2):
             self.assertEqual(o1, o2)
+
+    def test_insert_many_rows_query(self):
+        @asyncio.coroutine
+        def test():
+            with sync_unwanted(database):
+                query = TestModel.insert_many([
+                    {'text': '[async] [test_insert_many_1]'},
+                    {'text': '[async] [test_insert_many_2]'}
+                ])
+                result = yield from execute(query)
+            return result
+
+        lst_id = self.run_until_complete(test())
+        self.assertTrue(lst_id is not None)
+
+    def test_insert_one_row_query(self):
+        @asyncio.coroutine
+        def test():
+            with sync_unwanted(database):
+                query = TestModel.insert(text='[async] [test_insert_one_query]')
+                result = yield from execute(query)
+            return result
+
+        last_id = self.run_until_complete(test())
+        self.assertTrue(last_id is not None)
+
+    @unittest.skip("not implemented")
+    def test_insert_one_row_uuid_query(self):
+        @asyncio.coroutine
+        def test():
+            with sync_unwanted(database):
+                query = UUIDTestModel.insert(text='[async] [test_insert_uuid_query]')
+                result = yield from execute(query)
+            return result
+
+        last_id = self.run_until_complete(test())
+        self.assertTrue(last_id is not None)
 
     def test_update_query(self):
         # Sync create
