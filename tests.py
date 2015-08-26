@@ -215,7 +215,6 @@ class AsyncPostgresTestCase(unittest.TestCase):
         last_id = self.run_until_complete(test())
         self.assertTrue(last_id is not None)
 
-    @unittest.skip("not implemented")
     def test_insert_one_row_uuid_query(self):
         @asyncio.coroutine
         def test():

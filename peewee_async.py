@@ -219,8 +219,12 @@ def insert(query):
          "with wrong query class %s" % str(query))
 
     cursor = yield from cursor_with_query(query)
-    result = yield from query.database.last_insert_id_async(
-        cursor, query.model_class)
+
+    if query.is_insert_returning:
+        result = yield from cursor.fetchone()
+    else:
+        result = yield from query.database.last_insert_id_async(
+            cursor, query.model_class)
 
     cursor.release()
     if result:
