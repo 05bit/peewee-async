@@ -18,6 +18,8 @@ import aiopg
 import peewee
 import contextlib
 
+__version__ = '0.3'
+
 __all__ = [
     # Queries
     'execute',
