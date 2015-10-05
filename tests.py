@@ -201,8 +201,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
                 result = yield from execute(query)
             return result
 
-        lst_id = self.run_until_complete(test())
-        self.assertTrue(lst_id is not None)
+        last_id = self.run_until_complete(test())
+        self.assertTrue(last_id is not None)
 
     def test_insert_one_row_query(self):
         @asyncio.coroutine

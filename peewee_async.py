@@ -223,14 +223,13 @@ def insert(query):
     cursor = yield from cursor_with_query(query)
 
     if query.is_insert_returning:
-        result = yield from cursor.fetchone()
+        result = (yield from cursor.fetchone())[0]
     else:
         result = yield from query.database.last_insert_id_async(
             cursor, query.model_class)
 
     cursor.release()
-    if result:
-        return result[0]
+    return result
 
 
 @asyncio.coroutine
