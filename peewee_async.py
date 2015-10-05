@@ -497,7 +497,7 @@ class AsyncPostgresqlMixin:
 
         if seq:
             yield from cursor.execute("SELECT CURRVAL('%s\"%s\"')" % (schema, seq))
-            result = yield from cursor.fetchone()
+            result = (yield from cursor.fetchone())[0]
             return result
 
     def close(self):
