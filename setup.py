@@ -16,7 +16,7 @@ setup(
     license='MIT',
     zip_safe=False,
     install_requires=(
-        'peewee>=2.6.1',
+        'peewee>=2.6.4',
         'aiopg>=0.7.0',
     ),
     py_modules=[
