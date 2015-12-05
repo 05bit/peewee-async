@@ -21,10 +21,14 @@ Aggregation
 Databases
 ---------
 
-.. autoclass:: peewee_async.PooledPostgresqlDatabase
-    :members: connect_async
-
 .. autoclass:: peewee_async.PostgresqlDatabase
     :members: connect_async
 
+.. autoclass:: peewee_async.PooledPostgresqlDatabase
+    :members: connect_async
 
+.. autoclass:: peewee_asyncext.PostgresqlExtDatabase
+    :members: connect_async
+
+.. autoclass:: peewee_asyncext.PooledPostgresqlExtDatabase
+    :members: connect_async

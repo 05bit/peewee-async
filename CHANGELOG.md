@@ -4,6 +4,7 @@
 
 - Add public `allow_sync` flag to database class, `True` by default
 - Remove arguments from `sync_unwanted()` context manager function
+- Add autodocs on `peewee_asyncext`
 
 ## 0.3
 
