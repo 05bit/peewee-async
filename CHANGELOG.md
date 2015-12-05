@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3
+
+- Add public `allow_sync` flag to database class, `True` by default
+- Remove arguments from `sync_unwanted()` context manager function
+
 ## 0.3
 
 - #7, fixed bug with empty result after inserting row with UUID pk 

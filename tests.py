@@ -49,9 +49,9 @@ if 'pool_size' in config:
         db_cls = peewee_async.PooledPostgresqlDatabase
 
     database = db_cls(config['db'],
-                        user=config['user'],
-                        password=config['password'],
-                        max_connections=int(config['pool_size']))
+                      user=config['user'],
+                      password=config['password'],
+                      max_connections=int(config['pool_size']))
 else:
     if config.get('ext', None):
         db_cls = peewee_asyncext.PostgresqlExtDatabase
@@ -59,8 +59,8 @@ else:
         db_cls = peewee_async.PostgresqlDatabase
 
     database = db_cls(config['db'],
-                        user=config['user'],
-                        password=config['password'])
+                      user=config['user'],
+                      password=config['password'])
 
 #
 # Tests
