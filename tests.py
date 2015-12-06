@@ -5,16 +5,36 @@ peewee-async tests
 Create tests.ini file to configure tests.
 
 """
+import os
 import asyncio
 import configparser
 import sys
+import urllib.parse
 import unittest
 import uuid
 import peewee
-
-# Testing module
 import peewee_async
 import peewee_asyncext
+
+
+class ProxyDatabase(object):
+    """Proxy database for deferred initialization.
+    """
+    def __init__(self):
+        self.conn = None
+
+    def __getattr__(self, attr):
+        if self.conn is None:
+            raise AttributeError('Cannot use uninitialized Proxy.')
+        return getattr(self.conn, attr)
+
+    def __setattr__(self, attr, value):
+        if attr == 'conn':
+            return super(ProxyDatabase, self).__setattr__(attr, value)
+        elif (self.conn is None) and (attr != 'conn'):
+            raise AttributeError('Cannot use uninitialized Proxy.')
+        else:
+            return setattr(self.conn, attr, value)        
 
 # Shortcuts
 execute = peewee_async.execute
@@ -26,45 +46,57 @@ delete_object = peewee_async.delete_object
 update_object = peewee_async.update_object
 sync_unwanted = peewee_async.sync_unwanted
 
-#
-# Configure tests
-#
+# Globals
+config = {}
+database = ProxyDatabase()
 
-ini_config = configparser.ConfigParser()
-ini_config.read(['tests.ini'])
 
-try:
-    config = dict(**ini_config['tests'])
-except KeyError:
-    config = {}
+def setUpModule():
+    global config
+    global database
 
-config.setdefault('db', 'test')
-config.setdefault('user', 'postgres')
-config.setdefault('password', '')
+    ini_config = configparser.ConfigParser()
+    ini_config.read(['tests.ini'])
 
-if 'pool_size' in config:
-    if config.get('ext', None):
-        db_cls = peewee_asyncext.PooledPostgresqlExtDatabase
+    try:
+        config = dict(**ini_config['tests'])
+    except KeyError:
+        pass
+
+    config.setdefault('database', 'test')
+    config.setdefault('host', '127.0.0.1')
+    config.setdefault('port', None)
+    config.setdefault('user', 'postgres')
+    config.setdefault('password', '')
+
+    if 'DATABASE_URL' in os.environ:
+        url = urllib.parse.urlparse(os.environ['DATABASE_URL'])
+        config['user'] = url.username or config['user']
+        config['host'] = url.host or config['host']
+        config['port'] = url.port or config['port']
+
+    db_cfg = config.copy()
+    use_ext = db_cfg.pop('use_ext', False)
+
+    if 'max_connections' in db_cfg:
+        db_cfg['max_connections'] = int(db_cfg['max_connections'])
+        use_pool = db_cfg['max_connections'] > 1
     else:
-        db_cls = peewee_async.PooledPostgresqlDatabase
+        use_pool = False
 
-    database = db_cls(config['db'],
-                      user=config['user'],
-                      password=config['password'],
-                      max_connections=int(config['pool_size']))
-else:
-    if config.get('ext', None):
-        db_cls = peewee_asyncext.PostgresqlExtDatabase
+    if use_pool:
+        if use_ext:
+            db_cls = peewee_asyncext.PooledPostgresqlExtDatabase
+        else:
+            db_cls = peewee_async.PooledPostgresqlDatabase
     else:
-        db_cls = peewee_async.PostgresqlDatabase
+        if use_ext:
+            db_cls = peewee_asyncext.PostgresqlExtDatabase
+        else:
+            db_cls = peewee_async.PostgresqlDatabase
 
-    database = db_cls(config['db'],
-                      user=config['user'],
-                      password=config['password'])
+    database.conn = db_cls(**db_cfg)
 
-#
-# Tests
-#
 
 class TestModel(peewee.Model):
     text = peewee.CharField()

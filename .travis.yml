@@ -1,0 +1,14 @@
+language: python
+python:
+  - "3.4"
+  - "3.5"
+  - "3.5-dev" # 3.5 development branch
+  - "nightly" # currently points to 3.6-dev
+addons:
+  postgresql: "9.3"
+before_script:
+  - psql -c 'create database test;' -U postgres
+# command to install dependencies
+install: "pip install -e ."
+# command to run tests
+script: "python setup.py test"
