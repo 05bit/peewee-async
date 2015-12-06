@@ -4,6 +4,9 @@ peewee-async
 Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
 ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 
+[![Build Status](https://travis-ci.org/05bit/peewee-async.svg)](https://travis-ci.org/05bit/peewee-async) [![Documentation Status](https://readthedocs.org/projects/peewee-async/badge/?version=latest)](http://peewee-async.readthedocs.org/en/latest/?badge=latest)
+    
+
 Documentation
 -------------
 
