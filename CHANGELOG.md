@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4
+
+- Fix: cursor is released back to connection pool after SQL execution error
+
 ## 0.3.3
 
 - Add public `allow_sync` flag to database class, `True` by default
