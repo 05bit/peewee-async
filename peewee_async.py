@@ -192,7 +192,7 @@ def select(query):
 
     # Perform *real* async query
     query = query.clone()
-    cursor = yield from cursor_with_query(query)
+    cursor = yield from _execute_query_async(query)
 
     # Perform *fake* query: we only need a result wrapper
     # here, not the query result itself:
@@ -220,7 +220,7 @@ def insert(query):
         ("Error, trying to run insert coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from cursor_with_query(query)
+    cursor = yield from _execute_query_async(query)
 
     if query.is_insert_returning:
         result = (yield from cursor.fetchone())[0]
@@ -240,7 +240,7 @@ def update(query):
         ("Error, trying to run update coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from cursor_with_query(query)
+    cursor = yield from _execute_query_async(query)
     rowcount = cursor.rowcount
 
     cursor.release()
@@ -255,7 +255,7 @@ def delete(query):
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from cursor_with_query(query)
+    cursor = yield from _execute_query_async(query)
     rowcount = cursor.rowcount
 
     cursor.release()
@@ -291,7 +291,7 @@ def scalar(query, as_tuple=False):
 
     :return: result is the same as after sync ``query.scalar()`` call
     """
-    cursor = yield from cursor_with_query(query)
+    cursor = yield from _execute_query_async(query)
     row = yield from cursor.fetchone()
 
     cursor.release()
@@ -300,16 +300,6 @@ def scalar(query, as_tuple=False):
         return row[0]
     else:
         return row
-
-
-@asyncio.coroutine
-def cursor_with_query(query):
-    """Execute query and return cursor object.
-    """
-    assert query.database._async_conn, "Error, no async database connection."
-    cursor = yield from query.database._async_conn.cursor()
-    yield from cursor.execute(*query.sql())
-    return cursor
 
 
 class AsyncQueryResult:
@@ -353,20 +343,6 @@ class AsyncQueryResult:
 
         obj = self._result_wrapper.process_row(row)
         self._result.append(obj)
-
-
-def _compose_dsn(dbname, **kwargs):
-    """Compose DSN string by set of connection parameters.
-    Extract parameters: dbname, user, password, host, port.
-
-    Return DSN string and remain parameters dict.
-    """
-    dsn = 'dbname=%s' % dbname
-    for k in ('user', 'password', 'host', 'port'):
-        v = kwargs.pop(k, None)
-        if v:
-            dsn += ' %s=%s' % (k, v)
-    return dsn, kwargs
 
 
 class AsyncConnection:
@@ -563,3 +539,32 @@ class UnwantedSyncQueryError(Exception):
     """Exception which is raised when performing unwanted sync query.
     """
     pass
+
+
+@asyncio.coroutine
+def _execute_query_async(query):
+    """Execute query and return cursor object.
+    """
+    db = query.database
+    assert db._async_conn, "Error, no async database connection."
+    cursor = yield from db._async_conn.cursor()
+    try:
+        yield from cursor.execute(*query.sql())
+    except Exception as e:
+        cursor.release()
+        raise e
+    return cursor
+
+
+def _compose_dsn(dbname, **kwargs):
+    """Compose DSN string by set of connection parameters.
+    Extract parameters: dbname, user, password, host, port.
+
+    Return DSN string and remain parameters dict.
+    """
+    dsn = 'dbname=%s' % dbname
+    for k in ('user', 'password', 'host', 'port'):
+        v = kwargs.pop(k, None)
+        if v:
+            dsn += ' %s=%s' % (k, v)
+    return dsn, kwargs
