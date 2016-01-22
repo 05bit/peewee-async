@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Add `db.async_atomic()` context manager to support transactions.
+
 ## 0.3.4
 
 - Fix: cursor is released back to connection pool after SQL execution error

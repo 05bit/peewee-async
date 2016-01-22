@@ -11,4 +11,6 @@ before_script:
 # command to install dependencies
 install: "pip install -e ."
 # command to run tests
-script: "python setup.py test"
+script:
+  - python setup.py test
+  - if [[ $TRAVIS_PYTHON_VERSION != '3.4' ]]; then python tests_3_5.py; fi
