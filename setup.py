@@ -3,7 +3,7 @@ Asynchronous interface for peewee ORM powered by asyncio.
 """
 from setuptools import setup
 
-__version__ = '0.3.4'
+__version__ = '0.4.0'
 
 setup(
     name="peewee-async",

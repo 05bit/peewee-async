@@ -14,11 +14,13 @@ Copyright (c) 2014, Alexey Kinev <rudy@05bit.com>
 
 """
 import asyncio
+import uuid
+
 import aiopg
 import peewee
 import contextlib
 
-__version__ = '0.3.4'
+__version__ = '0.4.0'
 
 __all__ = [
     # Queries
@@ -58,6 +60,8 @@ def execute(query):
         coroutine = insert
     elif isinstance(query, peewee.DeleteQuery):
         coroutine = delete
+    elif isinstance(query, peewee.RawQuery):
+        coroutine = raw_query
     else:
         coroutine = select
     return (yield from coroutine(query))
@@ -302,6 +306,17 @@ def scalar(query, as_tuple=False):
         return row
 
 
+@asyncio.coroutine
+def raw_query(query):
+    assert isinstance(query, peewee.RawQuery),\
+        ("Error, trying to run delete coroutine"
+         "with wrong query class %s" % str(query))
+
+    cursor = yield from _execute_query_async(query)
+    message = cursor.statusmessage
+    return message
+
+
 class AsyncQueryResult:
     """Async query results wrapper for async `select()`. Internally uses
     results wrapper produced by sync peewee select query.
@@ -413,6 +428,109 @@ class PooledAsyncConnection:
         self._pool.terminate()
 
 
+class transaction(peewee._callable_context_manager):
+    def __init__(self, db):
+        self.db = db
+
+    @asyncio.coroutine
+    def _begin(self):
+        return (yield from _run_sql(self.db, "BEGIN"))
+
+    @asyncio.coroutine
+    def commit(self, begin=True):
+        yield from _run_sql(self.db, "COMMIT")
+        if begin:
+            self._begin()
+
+    @asyncio.coroutine
+    def rollback(self, begin=True):
+        yield from _run_sql(self.db, "ROLLBACK")
+        if begin:
+            self._begin()
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        self._orig = self.db.get_autocommit()
+        self.db.set_autocommit(False)
+        if self.db.transaction_depth() == 0:
+            yield from self._begin()
+        self.db.push_transaction(self)
+        return self
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type:
+                yield from self.rollback(False)
+            elif self.db.transaction_depth() == 1:
+                try:
+                    yield from self.commit(False)
+                except:
+                    yield from self.rollback(False)
+                    raise
+        finally:
+            self.db.set_autocommit(self._orig)
+            self.db.pop_transaction()
+
+
+class savepoint(peewee._callable_context_manager):
+    def __init__(self, db, sid=None):
+        self.db = db
+        _compiler = db.compiler()
+        self.sid = sid or 's' + uuid.uuid4().hex
+        self.quoted_sid = _compiler.quote(self.sid)
+
+    @asyncio.coroutine
+    def _execute(self, query):
+        yield from _run_sql(query)
+
+    @asyncio.coroutine
+    def commit(self):
+        yield from self._execute('RELEASE SAVEPOINT %s;' % self.quoted_sid)
+
+    @asyncio.coroutine
+    def rollback(self):
+        yield from self._execute('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        self._orig_autocommit = self.db.get_autocommit()
+        self.db.set_autocommit(False)
+        yield from self._execute('SAVEPOINT %s;' % self.quoted_sid)
+        return self
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type:
+                yield from self.rollback()
+            else:
+                try:
+                    yield from self.commit()
+                except:
+                    yield from self.rollback()
+                    raise
+        finally:
+            self.db.set_autocommit(self._orig_autocommit)
+
+
+class atomic(peewee._callable_context_manager):
+    def __init__(self, db):
+        self.db = db
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        if self.db.transaction_depth() == 0:
+            self._helper = self.db.async_transaction()
+        else:
+            self._helper = self.db.async_savepoint()
+        yield from self._helper.__aenter__()
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        yield from self._helper.__aexit__(exc_type, exc_val, exc_tb)
+
+
 class AsyncPostgresqlMixin:
     """Mixin for peewee database class providing extra methods
     for managing async connection.
@@ -467,6 +585,9 @@ class AsyncPostgresqlMixin:
             result = (yield from cursor.fetchone())[0]
             return result
 
+    def async_atomic(self):
+        return atomic(self)
+
     def close(self):
         """Close both sync and async connections.
         """
@@ -486,6 +607,12 @@ class AsyncPostgresqlMixin:
             raise UnwantedSyncQueryError("Error, unwanted sync query",
                                          args, kwargs)
         return super().execute_sql(*args, **kwargs)
+
+    def async_transaction(self):
+        return transaction(self)
+
+    def async_savepoint(self):
+        return savepoint(self)
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -542,18 +669,23 @@ class UnwantedSyncQueryError(Exception):
 
 
 @asyncio.coroutine
-def _execute_query_async(query):
-    """Execute query and return cursor object.
-    """
-    db = query.database
+def _run_sql(db, *args, **kwargs):
     assert db._async_conn, "Error, no async database connection."
     cursor = yield from db._async_conn.cursor()
     try:
-        yield from cursor.execute(*query.sql())
+        yield from cursor.execute(*args, **kwargs)
     except Exception as e:
         cursor.release()
         raise e
     return cursor
+
+
+@asyncio.coroutine
+def _execute_query_async(query):
+    """Execute query and return cursor object.
+    """
+    db = query.database
+    return (yield from _run_sql(db, *query.sql()))
 
 
 def _compose_dsn(dbname, **kwargs):
