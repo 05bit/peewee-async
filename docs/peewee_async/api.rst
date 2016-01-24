@@ -12,6 +12,15 @@ Select, update, delete
 .. autofunction:: peewee_async.delete_object
 .. autofunction:: peewee_async.update_object
 
+Transactions
+------------
+
+**Warning** For some reason doesn't work with pooled connection yet! This is bug, of course.
+
+.. autofunction:: peewee_async.atomic
+.. autofunction:: peewee_async.savepoint
+.. autofunction:: peewee_async.transaction
+
 Aggregation
 -----------
 
@@ -22,13 +31,13 @@ Databases
 ---------
 
 .. autoclass:: peewee_async.PostgresqlDatabase
-    :members: connect_async
+    :members: connect_async, atomic_async, transaction_async, savepoint_async
 
 .. autoclass:: peewee_async.PooledPostgresqlDatabase
     :members: connect_async
 
 .. autoclass:: peewee_asyncext.PostgresqlExtDatabase
-    :members: connect_async
+    :members: connect_async, atomic_async, transaction_async, savepoint_async
 
 .. autoclass:: peewee_asyncext.PooledPostgresqlExtDatabase
     :members: connect_async

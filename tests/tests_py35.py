@@ -38,7 +38,7 @@ class AsyncPostgresTransactionsTestCase(BaseAsyncPostgresTestCase):
                 obj = await create_object(TestModel, text='FOO')
                 obj_id = obj.id
 
-                async with database.async_atomic():
+                async with database.atomic_async():
                     obj.text = 'BAR'
                     await update_object(obj)
 
@@ -56,7 +56,7 @@ class AsyncPostgresTransactionsTestCase(BaseAsyncPostgresTestCase):
                 obj_id = obj.id
 
                 try:
-                    async with database.async_atomic():
+                    async with database.atomic_async():
                         obj.text = 'BAR'
                         await update_object(obj)
                         raise FakeUpdateError()

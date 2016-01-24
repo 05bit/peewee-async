@@ -429,6 +429,9 @@ class PooledAsyncConnection:
 
 
 class transaction(peewee._callable_context_manager):
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.transaction()`.
+    """
     def __init__(self, db):
         self.db = db
 
@@ -474,6 +477,9 @@ class transaction(peewee._callable_context_manager):
 
 
 class savepoint(peewee._callable_context_manager):
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.savepoint()`.
+    """
     def __init__(self, db, sid=None):
         self.db = db
         _compiler = db.compiler()
@@ -515,15 +521,18 @@ class savepoint(peewee._callable_context_manager):
 
 
 class atomic(peewee._callable_context_manager):
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.atomic()`.
+    """
     def __init__(self, db):
         self.db = db
 
     @asyncio.coroutine
     def __aenter__(self):
         if self.db.transaction_depth() == 0:
-            self._helper = self.db.async_transaction()
+            self._helper = self.db.transaction_async()
         else:
-            self._helper = self.db.async_savepoint()
+            self._helper = self.db.savepoint_async()
         yield from self._helper.__aenter__()
 
     @asyncio.coroutine
@@ -585,8 +594,23 @@ class AsyncPostgresqlMixin:
             result = (yield from cursor.fetchone())[0]
             return result
 
-    def async_atomic(self):
+    def atomic_async(self):
+        """Similar to peewee `Database.atomic()` method, but returns
+        asynchronous context manager.
+        """
         return atomic(self)
+
+    def transaction_async(self):
+        """Similar to peewee `Database.transaction()` method, but returns
+        asynchronous context manager.
+        """
+        return transaction(self)
+
+    def savepoint_async(self, sid=None):
+        """Similar to peewee `Database.savepoint()` method, but returns
+        asynchronous context manager.
+        """
+        return savepoint(self, sid=sid)
 
     def close(self):
         """Close both sync and async connections.
@@ -607,12 +631,6 @@ class AsyncPostgresqlMixin:
             raise UnwantedSyncQueryError("Error, unwanted sync query",
                                          args, kwargs)
         return super().execute_sql(*args, **kwargs)
-
-    def async_transaction(self):
-        return transaction(self)
-
-    def async_savepoint(self):
-        return savepoint(self)
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):

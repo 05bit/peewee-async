@@ -2,7 +2,7 @@
 
 ## 0.4.0
 
-- Add `db.async_atomic()` context manager to support transactions.
+- Add `db.atomic_async()` context manager to support transactions. Thanks, @mrbox!
 
 ## 0.3.4
 
