@@ -440,13 +440,13 @@ class transaction(peewee._callable_context_manager):
     def commit(self, begin=True):
         yield from _run_sql(self.db, "COMMIT")
         if begin:
-            self._begin()
+            yield from self._begin()
 
     @asyncio.coroutine
     def rollback(self, begin=True):
         yield from _run_sql(self.db, "ROLLBACK")
         if begin:
-            self._begin()
+            yield from self._begin()
 
     @asyncio.coroutine
     def __aenter__(self):
@@ -669,11 +669,13 @@ class UnwantedSyncQueryError(Exception):
 
 
 @asyncio.coroutine
-def _run_sql(db, *args, **kwargs):
+def _run_sql(db, operation, *args, **kwargs):
+    """Run SQL operation (query or command) against database.
+    """    
     assert db._async_conn, "Error, no async database connection."
     cursor = yield from db._async_conn.cursor()
     try:
-        yield from cursor.execute(*args, **kwargs)
+        yield from cursor.execute(operation, *args, **kwargs)
     except Exception as e:
         cursor.release()
         raise e

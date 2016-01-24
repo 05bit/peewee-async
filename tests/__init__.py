@@ -16,6 +16,9 @@ import peewee
 import peewee_async
 import peewee_asyncext
 
+# import logging
+# logging.basicConfig(level=logging.DEBUG)
+
 
 class ProxyDatabase(object):
     """Proxy database for deferred initialization.
@@ -113,8 +116,7 @@ class UUIDTestModel(peewee.Model):
         database = database
 
 
-
-class AsyncPostgresTestCase(unittest.TestCase):
+class BaseAsyncPostgresTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls, *args, **kwargs):
         # Sync connect 
@@ -149,13 +151,10 @@ class AsyncPostgresTestCase(unittest.TestCase):
 
     def run_until_complete(self, coroutine):
         result = self.loop.run_until_complete(coroutine)
-        self.assertTrue(result)
         return result
 
-    #
-    # Test methods
-    #
 
+class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
     def test_get_obj(self):
         # Async get
         @asyncio.coroutine
@@ -165,7 +164,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
             self.assertEqual(obj.text, self.obj.text)
             return obj
 
-        self.assertTrue(self.run_until_complete(test()))
+        obj = self.run_until_complete(test())
+        self.assertTrue(obj is not None)
 
     def test_get_uuid_obj(self):
         # Async get
@@ -176,7 +176,8 @@ class AsyncPostgresTestCase(unittest.TestCase):
             self.assertEqual(obj.text, self.obj.text)
             return obj
 
-        self.assertTrue(self.run_until_complete(test()))
+        obj = self.run_until_complete(test())
+        self.assertTrue(obj is not None)
 
     def test_create_obj(self):
         # Async create
@@ -351,5 +352,5 @@ class AsyncPostgresTestCase(unittest.TestCase):
         self.run_until_complete(test())
 
 
-if __name__ == '__main__':
-    unittest.main(argv=sys.argv)
+if sys.version_info >= (3, 5):
+    from .tests_py35 import *

@@ -32,4 +32,5 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     test_suite='tests',
+    test_loader='unittest:TestLoader',
 )
