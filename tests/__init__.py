@@ -108,6 +108,29 @@ class TestModel(peewee.Model):
         database = database
 
 
+class TestModelAlpha(peewee.Model):
+    text = peewee.CharField()
+
+    class Meta:
+        database = database
+
+
+class TestModelBeta(peewee.Model):
+    alpha = peewee.ForeignKeyField(TestModelAlpha, related_name='betas')
+    text = peewee.CharField()
+
+    class Meta:
+        database = database
+
+
+class TestModelGamma(peewee.Model):
+    text = peewee.CharField()
+    beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
+
+    class Meta:
+        database = database
+
+
 class UUIDTestModel(peewee.Model):
     id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
     text = peewee.CharField()
@@ -117,6 +140,8 @@ class UUIDTestModel(peewee.Model):
 
 
 class BaseAsyncPostgresTestCase(unittest.TestCase):
+    db_tables = [TestModel, UUIDTestModel, TestModelAlpha, TestModelBeta, TestModelGamma]
+
     @classmethod
     def setUpClass(cls, *args, **kwargs):
         # Sync connect 
@@ -129,22 +154,38 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
             yield from database.connect_async(loop=cls.loop)
         cls.loop.run_until_complete(test())
 
-        # Clean up after possible errors
-        TestModel.drop_table(True)
-        UUIDTestModel.drop_table(True)
+        for table in reversed(cls.db_tables):
+            # Clean up after possible errors
+            table.drop_table(True, cascade=True)
 
-        # Create table with sync connection
-        TestModel.create_table()
-        UUIDTestModel.create_table()
+        for table in cls.db_tables:
+            # Create table with sync connection
+            table.create_table()
 
         # Create at least one object per model
         cls.obj = TestModel.create(text='[sync] Hello!')
         cls.uuid_obj = UUIDTestModel.create(text='[sync] Hello!')
 
+        cls.alpha_1 = TestModelAlpha.create(text='Alpha 1')
+        cls.alpha_2 = TestModelAlpha.create(text='Alpha 2')
+
+        cls.beta_11 = TestModelBeta.create(text='Beta 1', alpha=cls.alpha_1)
+        cls.beta_12 = TestModelBeta.create(text='Beta 2', alpha=cls.alpha_1)
+
+        cls.beta_21 = TestModelBeta.create(text='Beta 1', alpha=cls.alpha_2)
+        cls.beta_22 = TestModelBeta.create(text='Beta 2', alpha=cls.alpha_2)
+
+        cls.gamma_111 = TestModelGamma.create(text='Gamma 1', beta=cls.beta_11)
+        cls.gamma_112 = TestModelGamma.create(text='Gamma 2', beta=cls.beta_11)
+
+        cls.gamma_121 = TestModelGamma.create(text='Gamma 1', beta=cls.beta_12)
+
+
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
+        for table in reversed(cls.db_tables):
         # Finally, clean up
-        TestModel.drop_table()
+            table.drop_table()
 
         # Close database
         database.close()
@@ -348,6 +389,29 @@ class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
                 self.assertEqual(count3, 1)
             
             return True
+
+        self.run_until_complete(test())
+
+    def test_prefetch(self):
+        # Async prefetch
+        @asyncio.coroutine
+        def test():
+            with sync_unwanted(database):
+                result = yield from peewee_async.prefetch(TestModelAlpha.select(), TestModelBeta.select(),
+                                                          TestModelGamma.select())
+
+                result = list(result)   # this should NOT fire any call (will read it from query cache)
+
+                # Check if we have here both alpha items in specific order
+                self.assertEqual(result, [self.alpha_1, self.alpha_2])
+
+                alpha_1 = result[0]
+                self.assertEqual(alpha_1.betas_prefetch, [self.beta_11, self.beta_12])
+
+                beta_11 = alpha_1.betas_prefetch[0]
+                self.assertEqual(beta_11, self.beta_11)
+
+                self.assertEqual(beta_11.gammas_prefetch, [self.gamma_111, self.gamma_112])
 
         self.run_until_complete(test())
 
