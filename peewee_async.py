@@ -720,3 +720,44 @@ def _compose_dsn(dbname, **kwargs):
         if v:
             dsn += ' %s=%s' % (k, v)
     return dsn, kwargs
+
+
+@asyncio.coroutine
+def prefetch(sq, *subqueries):
+    """Asynchronous version of the prefetch function from peewee.
+
+    Returns Query that has already cached data.
+    """
+
+    # This code is copied from peewee.prefetch and adopted to use async execute
+
+    if not subqueries:
+        return sq
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
+
+    deps = {}
+    rel_map = {}
+    for prefetch_result in reversed(fixed_queries):
+        query_model = prefetch_result.model
+        if prefetch_result.fields:
+            for rel_model in prefetch_result.rel_models:
+                rel_map.setdefault(rel_model, [])
+                rel_map[rel_model].append(prefetch_result)
+
+        deps[query_model] = {}
+        id_map = deps[query_model]
+        has_relations = bool(rel_map.get(query_model))
+
+        # This is hack, because peewee async execute do a copy of query and do not change state of query
+        # comparing to what real peewee is doing when execute method is called
+        prefetch_result.query._qr = yield from execute(prefetch_result.query)
+        prefetch_result.query._dirty = False
+
+        for instance in prefetch_result.query._qr:
+            if prefetch_result.fields:
+                prefetch_result.store_instance(instance, id_map)
+            if has_relations:
+                for rel in rel_map[query_model]:
+                    rel.populate_instance(instance, deps[rel.model])
+
+    return prefetch_result.query
