@@ -556,6 +556,9 @@ class AsyncPostgresqlMixin:
             'enable_hstore': False,
         }
         self._async_kwargs.update(kwargs)
+        self.connect_kwargs = kwargs.copy()
+        self.connect_kwargs.pop('enable_json', None)
+        self.connect_kwargs.pop('enable_hstore', None)
 
     @asyncio.coroutine
     def connect_async(self, loop=None, timeout=None):
