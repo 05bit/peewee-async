@@ -14,11 +14,14 @@ Copyright (c) 2014, Alexey Kinev <rudy@05bit.com>
 
 """
 import asyncio
+import datetime
 import uuid
 
 import aiopg
 import peewee
 import contextlib
+
+from tasklocals import local
 
 __version__ = '0.4.0'
 
@@ -368,21 +371,23 @@ class AsyncConnection:
         self._loop = loop if loop else asyncio.get_event_loop()
         self.database = database
         self.timeout = timeout
-        self.dsn, self.connect_kwargs = _compose_dsn(self.database, **kwargs)
+        self.connect_kwargs = kwargs
 
     @asyncio.coroutine
     def connect(self):
         """Connect asynchronously.
         """
         self._conn = yield from aiopg.connect(
-            dsn=self.dsn, timeout=self.timeout, loop=self._loop,
+            timeout=self.timeout, loop=self._loop, database=self.database,
             **self.connect_kwargs)
 
     @asyncio.coroutine
-    def cursor(self, *args, **kwargs):
+    def cursor(self, conn=None, *args, **kwargs):
         """Get connection cursor asynchronously.
         """
-        cursor = yield from self._conn.cursor(*args, **kwargs)
+        if conn is None:
+            conn = self._conn
+        cursor = yield from conn.cursor(*args, **kwargs)
         cursor.release = lambda: None
         return cursor
 
@@ -401,25 +406,38 @@ class PooledAsyncConnection:
         self._loop = loop if loop else asyncio.get_event_loop()
         self.database = database
         self.timeout = timeout
-        self.dsn, self.connect_kwargs = _compose_dsn(self.database, **kwargs)
+        self.connect_kwargs = kwargs
+
+    @asyncio.coroutine
+    def get_conn(self):
+        return (yield from self._pool.acquire())
 
     @asyncio.coroutine
     def connect(self):
         """Create connection pool asynchronously.
         """
         self._pool = yield from aiopg.create_pool(
-            dsn=self.dsn,
             loop=self._loop,
             timeout=self.timeout,
+            database=self.database,
             **self.connect_kwargs)
 
     @asyncio.coroutine
-    def cursor(self, *args, **kwargs):
+    def cursor(self, conn=None, *args, **kwargs):
         """Get cursor for connection from pool.
         """
-        conn = yield from self._pool.acquire()
-        cursor = yield from conn.cursor(*args, **kwargs)
-        cursor.release = lambda: all((cursor.close(), self._pool.release(conn)))
+        if conn is None:
+            conn = yield from self._pool.acquire()
+            cursor = yield from conn.cursor(*args, **kwargs)
+
+            def releaser():
+                cursor.close()
+                conn.close()
+                self._pool.release(conn)
+            cursor.release = releaser
+        else:
+            cursor = yield from conn.cursor(*args, **kwargs)
+            cursor.release = lambda: cursor.close()
         return cursor
 
     def close(self):
@@ -428,7 +446,7 @@ class PooledAsyncConnection:
         self._pool.terminate()
 
 
-class transaction(peewee._callable_context_manager):
+class transaction:
     """Asynchronous context manager (`async with`), similar to
     `peewee.transaction()`.
     """
@@ -476,7 +494,7 @@ class transaction(peewee._callable_context_manager):
             self.db.pop_transaction()
 
 
-class savepoint(peewee._callable_context_manager):
+class savepoint:
     """Asynchronous context manager (`async with`), similar to
     `peewee.savepoint()`.
     """
@@ -520,7 +538,7 @@ class savepoint(peewee._callable_context_manager):
             self.db.set_autocommit(self._orig_autocommit)
 
 
-class atomic(peewee._callable_context_manager):
+class atomic:
     """Asynchronous context manager (`async with`), similar to
     `peewee.atomic()`.
     """
@@ -533,20 +551,25 @@ class atomic(peewee._callable_context_manager):
             self._helper = self.db.transaction_async()
         else:
             self._helper = self.db.savepoint_async()
-        yield from self._helper.__aenter__()
+        self.db.locals.transaction_conn = yield from self.db._async_conn.get_conn()
+        return (yield from self._helper.__aenter__())
 
     @asyncio.coroutine
     def __aexit__(self, exc_type, exc_val, exc_tb):
         yield from self._helper.__aexit__(exc_type, exc_val, exc_tb)
+        self.db.locals.transaction_conn.close()
+        self.db._async_conn._pool.release(self.db.locals.transaction_conn)
+        self.db.locals.transaction_conn = None
 
 
 class AsyncPostgresqlMixin:
     """Mixin for peewee database class providing extra methods
     for managing async connection.
     """
-    def init_async(self, conn_cls=AsyncConnection, **kwargs):
+    def init_async(self, database, conn_cls=AsyncConnection, **kwargs):
         self.allow_sync = True
-
+        self.deferred = database is None
+        self.database = database
         self._loop = None
         self._async_conn = None
         self._async_conn_cls = conn_cls
@@ -555,12 +578,21 @@ class AsyncPostgresqlMixin:
             'enable_hstore': False,
         }
         self._async_kwargs.update(kwargs)
+        self.connect_kwargs = kwargs.copy()
+        self.connect_kwargs.pop('enable_json', None)
+        self.connect_kwargs.pop('enable_hstore', None)
+
+        self.locals = local()
 
     @asyncio.coroutine
     def connect_async(self, loop=None, timeout=None):
         """Set up async connection on specified event loop or
         on default event loop.
         """
+        if self.deferred:
+            raise Exception('Error, database not properly initialized '
+                            'before opening connection')
+
         if not self._async_conn:
             self._loop = loop if loop else asyncio.get_event_loop()
             self._async_conn = self._async_conn_cls(
@@ -633,6 +665,13 @@ class AsyncPostgresqlMixin:
         return super().execute_sql(*args, **kwargs)
 
 
+class PooledAsyncPostgresqlMixin(AsyncPostgresqlMixin):
+    def init_async(self, database, conn_cls=PooledAsyncConnection, minsize=1, maxsize=20, **kwargs):
+        super(PooledAsyncPostgresqlMixin, self).init_async(database, conn_cls, **kwargs)
+        self._async_kwargs['minsize'] = minsize
+        self._async_kwargs['maxsize'] = maxsize
+
+
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
@@ -646,10 +685,10 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
                          fields=fields, ops=ops, autorollback=autorollback,
                          **kwargs)
 
-        self.init_async(**self.connect_kwargs)
+        self.init_async(database, **self.connect_kwargs)
 
 
-class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -665,7 +704,7 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
                          fields=fields, ops=ops, autorollback=autorollback,
                          **kwargs)
 
-        self.init_async(conn_cls=PooledAsyncConnection, minsize=1,
+        self.init_async(database, conn_cls=PooledAsyncConnection, minsize=1,
                         maxsize=max_connections, **self.connect_kwargs)
 
 
@@ -691,7 +730,10 @@ def _run_sql(db, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """    
     assert db._async_conn, "Error, no async database connection."
-    cursor = yield from db._async_conn.cursor()
+    if getattr(db.locals, 'transaction_conn', None) is not None:
+        cursor = yield from db._async_conn.cursor(conn=db.locals.transaction_conn)
+    else:
+        cursor = yield from db._async_conn.cursor()
     try:
         yield from cursor.execute(operation, *args, **kwargs)
     except Exception as e:

@@ -84,6 +84,8 @@ def setUpModule():
     if 'max_connections' in db_cfg:
         db_cfg['max_connections'] = int(db_cfg['max_connections'])
         use_pool = db_cfg['max_connections'] > 1
+        if not use_pool:
+            db_cfg.pop('max_connections')
     else:
         use_pool = False
 
