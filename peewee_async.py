@@ -368,14 +368,14 @@ class AsyncConnection:
         self._loop = loop if loop else asyncio.get_event_loop()
         self.database = database
         self.timeout = timeout
-        self.dsn, self.connect_kwargs = _compose_dsn(self.database, **kwargs)
+        self.connect_kwargs = kwargs
 
     @asyncio.coroutine
     def connect(self):
         """Connect asynchronously.
         """
         self._conn = yield from aiopg.connect(
-            dsn=self.dsn, timeout=self.timeout, loop=self._loop,
+            timeout=self.timeout, loop=self._loop, database=self.database,
             **self.connect_kwargs)
 
     @asyncio.coroutine
@@ -401,16 +401,16 @@ class PooledAsyncConnection:
         self._loop = loop if loop else asyncio.get_event_loop()
         self.database = database
         self.timeout = timeout
-        self.dsn, self.connect_kwargs = _compose_dsn(self.database, **kwargs)
+        self.connect_kwargs = kwargs
 
     @asyncio.coroutine
     def connect(self):
         """Create connection pool asynchronously.
         """
         self._pool = yield from aiopg.create_pool(
-            dsn=self.dsn,
             loop=self._loop,
             timeout=self.timeout,
+            database=self.database,
             **self.connect_kwargs)
 
     @asyncio.coroutine
@@ -544,9 +544,10 @@ class AsyncPostgresqlMixin:
     """Mixin for peewee database class providing extra methods
     for managing async connection.
     """
-    def init_async(self, conn_cls=AsyncConnection, **kwargs):
+    def init_async(self, database, conn_cls=AsyncConnection, **kwargs):
         self.allow_sync = True
-
+        self.deferred = database is None
+        self.database = database
         self._loop = None
         self._async_conn = None
         self._async_conn_cls = conn_cls
@@ -561,6 +562,10 @@ class AsyncPostgresqlMixin:
         """Set up async connection on specified event loop or
         on default event loop.
         """
+        if self.deferred:
+            raise Exception('Error, database not properly initialized '
+                            'before opening connection')
+
         if not self._async_conn:
             self._loop = loop if loop else asyncio.get_event_loop()
             self._async_conn = self._async_conn_cls(
@@ -633,6 +638,13 @@ class AsyncPostgresqlMixin:
         return super().execute_sql(*args, **kwargs)
 
 
+class PooledAsyncPostgresqlMixin(AsyncPostgresqlMixin):
+    def init_async(self, database, conn_cls=PooledAsyncConnection, minsize=1, maxsize=20, **kwargs):
+        super(PooledAsyncPostgresqlMixin, self).init_async(database, conn_cls, **kwargs)
+        self._async_kwargs['minsize'] = minsize
+        self._async_kwargs['maxsize'] = maxsize
+
+
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
@@ -646,10 +658,10 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
                          fields=fields, ops=ops, autorollback=autorollback,
                          **kwargs)
 
-        self.init_async(**self.connect_kwargs)
+        self.init_async(database, **self.connect_kwargs)
 
 
-class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -665,7 +677,7 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
                          fields=fields, ops=ops, autorollback=autorollback,
                          **kwargs)
 
-        self.init_async(conn_cls=PooledAsyncConnection, minsize=1,
+        self.init_async(database, conn_cls=PooledAsyncConnection, minsize=1,
                         maxsize=max_connections, **self.connect_kwargs)
 
 
@@ -706,17 +718,3 @@ def _execute_query_async(query):
     """
     db = query.database
     return (yield from _run_sql(db, *query.sql()))
-
-
-def _compose_dsn(dbname, **kwargs):
-    """Compose DSN string by set of connection parameters.
-    Extract parameters: dbname, user, password, host, port.
-
-    Return DSN string and remain parameters dict.
-    """
-    dsn = 'dbname=%s' % dbname
-    for k in ('user', 'password', 'host', 'port'):
-        v = kwargs.pop(k, None)
-        if v:
-            dsn += ' %s=%s' % (k, v)
-    return dsn, kwargs
