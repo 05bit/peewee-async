@@ -313,8 +313,22 @@ def raw_query(query):
          "with wrong query class %s" % str(query))
 
     cursor = yield from _execute_query_async(query)
-    message = cursor.statusmessage
-    return message
+    # Perform *fake* query: we only need a result wrapper
+    # here, not the query result itself:
+    query._execute = lambda: None
+    result_wrapper = query.execute()
+
+    # Fetch result
+    result = AsyncQueryResult(result_wrapper=result_wrapper, cursor=cursor)
+    try:
+        while True:
+            yield from result.fetchone()
+    except GeneratorExit:
+        pass
+
+    # Release cursor and return
+    cursor.release()
+    return result
 
 
 class AsyncQueryResult:
