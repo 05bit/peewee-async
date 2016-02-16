@@ -374,6 +374,10 @@ class AsyncConnection:
         self.connect_kwargs = kwargs
 
     @asyncio.coroutine
+    def get_conn(self):
+        return self._conn
+
+    @asyncio.coroutine
     def connect(self):
         """Connect asynchronously.
         """
