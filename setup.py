@@ -18,6 +18,7 @@ setup(
     install_requires=(
         'peewee>=2.6.4',
         'aiopg>=0.7.0',
+        'tasklocals>=0.2',
     ),
     py_modules=[
         'peewee_async',

@@ -84,6 +84,8 @@ def setUpModule():
     if 'max_connections' in db_cfg:
         db_cfg['max_connections'] = int(db_cfg['max_connections'])
         use_pool = db_cfg['max_connections'] > 1
+        if not use_pool:
+            db_cfg.pop('max_connections')
     else:
         use_pool = False
 
@@ -189,6 +191,12 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
 
         # Close database
         database.close()
+        # Async connect
+        cls.loop = asyncio.get_event_loop()
+        @asyncio.coroutine
+        def close():
+            yield from database.close_async(loop=cls.loop)
+        cls.loop.run_until_complete(close())
 
     def run_until_complete(self, coroutine):
         result = self.loop.run_until_complete(coroutine)
