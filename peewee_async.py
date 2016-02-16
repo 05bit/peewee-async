@@ -396,6 +396,10 @@ class AsyncConnection:
         """
         self._conn.close()
 
+    @asyncio.coroutine
+    def close_async(self):
+        pass
+
 
 class PooledAsyncConnection:
     """
@@ -432,7 +436,6 @@ class PooledAsyncConnection:
 
             def releaser():
                 cursor.close()
-                conn.close()
                 self._pool.release(conn)
             cursor.release = releaser
         else:
@@ -444,6 +447,10 @@ class PooledAsyncConnection:
         """Terminate all pool connections.
         """
         self._pool.terminate()
+
+    @asyncio.coroutine
+    def close_async(self):
+        yield from self._pool.wait_closed()
 
 
 class transaction:
@@ -557,7 +564,6 @@ class atomic:
     @asyncio.coroutine
     def __aexit__(self, exc_type, exc_val, exc_tb):
         yield from self._helper.__aexit__(exc_type, exc_val, exc_tb)
-        self.db.locals.transaction_conn.close()
         self.db._async_conn._pool.release(self.db.locals.transaction_conn)
         self.db.locals.transaction_conn = None
 
@@ -626,6 +632,14 @@ class AsyncPostgresqlMixin:
             result = (yield from cursor.fetchone())[0]
             return result
 
+    @asyncio.coroutine
+    def close_async(self, loop=None):
+        self.close()
+        yield from self._async_conn.close_async()
+        if self._async_conn:
+            self._async_conn = None
+            self._loop = None
+
     def atomic_async(self):
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
@@ -651,8 +665,6 @@ class AsyncPostgresqlMixin:
 
         if self._async_conn:
             self._async_conn.close()
-            self._async_conn = None
-            self._loop = None
 
     def execute_sql(self, *args, **kwargs):
         """Sync execute SQL query. If this query is performing within

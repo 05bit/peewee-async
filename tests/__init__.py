@@ -191,6 +191,12 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
 
         # Close database
         database.close()
+        # Async connect
+        cls.loop = asyncio.get_event_loop()
+        @asyncio.coroutine
+        def close():
+            yield from database.close_async(loop=cls.loop)
+        cls.loop.run_until_complete(close())
 
     def run_until_complete(self, coroutine):
         result = self.loop.run_until_complete(coroutine)
