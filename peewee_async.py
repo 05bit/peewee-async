@@ -377,6 +377,9 @@ class AsyncConnection:
     def get_conn(self):
         return self._conn
 
+    def release(self, conn):
+        pass
+
     @asyncio.coroutine
     def connect(self):
         """Connect asynchronously.
@@ -419,6 +422,9 @@ class PooledAsyncConnection:
     @asyncio.coroutine
     def get_conn(self):
         return (yield from self._pool.acquire())
+
+    def release(self, conn):
+        self._pool.release(conn)
 
     @asyncio.coroutine
     def connect(self):
@@ -568,7 +574,7 @@ class atomic:
     @asyncio.coroutine
     def __aexit__(self, exc_type, exc_val, exc_tb):
         yield from self._helper.__aexit__(exc_type, exc_val, exc_tb)
-        self.db._async_conn._pool.release(self.db.locals.transaction_conn)
+        self.db._async_conn.release(self.db.locals.transaction_conn)
         self.db.locals.transaction_conn = None
 
 
