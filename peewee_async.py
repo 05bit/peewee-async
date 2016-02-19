@@ -403,48 +403,6 @@ class AsyncQueryResult:
         self._result.append(obj)
 
 
-class AsyncConnection:
-    """Asynchronous single database connection wrapper.
-    """
-    def __init__(self, loop, database, timeout, **kwargs):
-        self._conn = None
-        self._loop = loop if loop else asyncio.get_event_loop()
-        self.database = database
-        self.timeout = timeout
-        self.connect_kwargs = kwargs
-
-    @asyncio.coroutine
-    def get_conn(self):
-        return self._conn
-
-    def release(self, conn):
-        pass
-
-    @asyncio.coroutine
-    def connect(self):
-        """Connect asynchronously.
-        """
-        self._conn = yield from aiopg.connect(
-            timeout=self.timeout, loop=self._loop, database=self.database,
-            **self.connect_kwargs)
-
-    @asyncio.coroutine
-    def cursor(self, conn=None, *args, **kwargs):
-        """Get connection cursor asynchronously.
-        """
-        if conn is None:
-            conn = self._conn
-        cursor = yield from conn.cursor(*args, **kwargs)
-        cursor.release = lambda: None
-        return cursor
-
-    @asyncio.coroutine
-    def close(self):
-        """Close connection.
-        """
-        self._conn.close()
-
-
 class PooledAsyncConnection:
     """Asynchronous database connection pool wrapper.
     """
@@ -503,6 +461,15 @@ class PooledAsyncConnection:
         """
         self._pool.terminate()
         yield from self._pool.wait_closed()
+
+
+class AsyncConnection(PooledAsyncConnection):
+    """Asynchronous single database connection wrapper.
+    """
+    def __init__(self, loop, database, timeout, **kwargs):
+        kwargs['minsize'] = 1
+        kwargs['maxsize'] = 1
+        super().__init__(loop, database, timeout, **kwargs)
 
 
 class AsyncPostgresqlMixin:
