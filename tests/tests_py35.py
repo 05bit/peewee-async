@@ -6,6 +6,7 @@ These tests should be run only for Python 3.5+, older versions
 will just fail with `SyntaxError` while importing this module.
 
 """
+import asyncio
 import peewee_async
 from . import database,\
     BaseAsyncPostgresTestCase,\
@@ -68,3 +69,27 @@ class AsyncPostgresTransactionsTestCase(BaseAsyncPostgresTestCase):
                 self.assertEqual(res.text, 'FOO')
 
         self.run_until_complete(test())
+
+    def test_several_transactions(self):
+        """Run several transactions in parallel tasks.
+        """
+        async def t1():
+            async with database.atomic_async():
+                self.assertEqual(database.transaction_depth(), 1)
+                await asyncio.sleep(0.5)
+
+        async def t2():
+            async with database.atomic_async():
+                self.assertEqual(database.transaction_depth(), 1)
+                await asyncio.sleep(1.0)
+
+        async def t3():
+            async with database.atomic_async():
+                self.assertEqual(database.transaction_depth(), 1)
+                await asyncio.sleep(1.5)
+
+        self.run_until_complete(asyncio.wait([
+            self.loop.create_task(t1()),
+            self.loop.create_task(t2()),
+            self.loop.create_task(t3()),
+        ]))
