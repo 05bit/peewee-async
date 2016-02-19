@@ -50,21 +50,21 @@ update_object = peewee_async.update_object
 sync_unwanted = peewee_async.sync_unwanted
 
 # Globals
-config = {}
+db_params = {}
 database = ProxyDatabase()
 
 
 def setUpModule():
-    global config
+    global db_params
     global database
 
-    ini_config = configparser.ConfigParser()
-    ini_config.read(['tests.ini'])
+    ini = configparser.ConfigParser()
+    ini.read(['tests.ini'])
 
     try:
-        config = dict(**ini_config['tests'])
+        config = dict(**ini['tests'])
     except KeyError:
-        pass
+        config = {}
 
     config.setdefault('database', 'test')
     config.setdefault('host', '127.0.0.1')
@@ -78,16 +78,15 @@ def setUpModule():
         config['host'] = url.host or config['host']
         config['port'] = url.port or config['port']
 
-    db_cfg = config.copy()
-    use_ext = db_cfg.pop('use_ext', False)
+    db_params = config.copy()
+    use_ext = db_params.pop('use_ext', False)
+    use_pool = False
 
-    if 'max_connections' in db_cfg:
-        db_cfg['max_connections'] = int(db_cfg['max_connections'])
-        use_pool = db_cfg['max_connections'] > 1
+    if 'max_connections' in db_params:
+        db_params['max_connections'] = int(db_params['max_connections'])
+        use_pool = db_params['max_connections'] > 1
         if not use_pool:
-            db_cfg.pop('max_connections')
-    else:
-        use_pool = False
+            db_params.pop('max_connections')
 
     if use_pool:
         if use_ext:
@@ -100,7 +99,7 @@ def setUpModule():
         else:
             db_cls = peewee_async.PostgresqlDatabase
 
-    database.conn = db_cls(**db_cfg)
+    database.conn = db_cls(**db_params)
 
 
 class TestModel(peewee.Model):
@@ -141,8 +140,25 @@ class UUIDTestModel(peewee.Model):
         database = database
 
 
+class PostgresInitTestCase(unittest.TestCase):
+    def test_deferred_init(self):
+        db = peewee_async.PooledPostgresqlDatabase(None)
+        self.assertTrue(db.deferred)
+
+        db.init(**db_params)
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(db.connect_async(loop=loop))
+        # Should not fail connect again
+        loop.run_until_complete(db.connect_async(loop=loop))
+        loop.run_until_complete(db.close_async())
+        # Should not closing connect again
+        loop.run_until_complete(db.close_async())
+
+
 class BaseAsyncPostgresTestCase(unittest.TestCase):
-    db_tables = [TestModel, UUIDTestModel, TestModelAlpha, TestModelBeta, TestModelGamma]
+    db_tables = [TestModel, UUIDTestModel, TestModelAlpha,
+                 TestModelBeta, TestModelGamma]
 
     @classmethod
     def setUpClass(cls, *args, **kwargs):
@@ -151,17 +167,14 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
 
         # Async connect
         cls.loop = asyncio.get_event_loop()
-        @asyncio.coroutine
-        def test():
-            yield from database.connect_async(loop=cls.loop)
-        cls.loop.run_until_complete(test())
+        cls.loop.run_until_complete(database.connect_async(loop=cls.loop))
 
+        # Clean up after possible errors
         for table in reversed(cls.db_tables):
-            # Clean up after possible errors
             table.drop_table(True, cascade=True)
 
+        # Create tables with sync connection
         for table in cls.db_tables:
-            # Create table with sync connection
             table.create_table()
 
         # Create at least one object per model
@@ -182,21 +195,17 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
 
         cls.gamma_121 = TestModelGamma.create(text='Gamma 1', beta=cls.beta_12)
 
-
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
-        for table in reversed(cls.db_tables):
         # Finally, clean up
+        for table in reversed(cls.db_tables):
             table.drop_table()
 
         # Close database
         database.close()
-        # Async connect
-        cls.loop = asyncio.get_event_loop()
-        @asyncio.coroutine
-        def close():
-            yield from database.close_async(loop=cls.loop)
-        cls.loop.run_until_complete(close())
+
+        # Async disconnect
+        cls.loop.run_until_complete(database.close_async())
 
     def run_until_complete(self, coroutine):
         result = self.loop.run_until_complete(coroutine)

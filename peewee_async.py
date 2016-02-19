@@ -398,14 +398,11 @@ class AsyncConnection:
         cursor.release = lambda: None
         return cursor
 
+    @asyncio.coroutine
     def close(self):
         """Close connection.
         """
         self._conn.close()
-
-    @asyncio.coroutine
-    def close_async(self):
-        pass
 
 
 class PooledAsyncConnection:
@@ -453,13 +450,11 @@ class PooledAsyncConnection:
             cursor.release = lambda: cursor.close()
         return cursor
 
+    @asyncio.coroutine
     def close(self):
         """Terminate all pool connections.
         """
         self._pool.terminate()
-
-    @asyncio.coroutine
-    def close_async(self):
         yield from self._pool.wait_closed()
 
 
@@ -619,6 +614,13 @@ class AsyncPostgresqlMixin:
             yield from self._async_conn.connect()
 
     @asyncio.coroutine
+    def close_async(self):
+        if self._async_conn:
+            yield from self._async_conn.close()
+            self._async_conn = None
+            self._loop = None
+
+    @asyncio.coroutine
     def last_insert_id_async(self, cursor, model):
         """Get ID of last inserted row.
 
@@ -642,14 +644,6 @@ class AsyncPostgresqlMixin:
             result = (yield from cursor.fetchone())[0]
             return result
 
-    @asyncio.coroutine
-    def close_async(self, loop=None):
-        self.close()
-        yield from self._async_conn.close_async()
-        if self._async_conn:
-            self._async_conn = None
-            self._loop = None
-
     def atomic_async(self):
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
@@ -667,14 +661,6 @@ class AsyncPostgresqlMixin:
         asynchronous context manager.
         """
         return savepoint(self, sid=sid)
-
-    def close(self):
-        """Close both sync and async connections.
-        """
-        super().close()
-
-        if self._async_conn:
-            self._async_conn.close()
 
     def execute_sql(self, *args, **kwargs):
         """Sync execute SQL query. If this query is performing within
@@ -770,20 +756,6 @@ def _execute_query_async(query):
     """
     db = query.database
     return (yield from _run_sql(db, *query.sql()))
-
-
-def _compose_dsn(dbname, **kwargs):
-    """Compose DSN string by set of connection parameters.
-    Extract parameters: dbname, user, password, host, port.
-
-    Return DSN string and remain parameters dict.
-    """
-    dsn = 'dbname=%s' % dbname
-    for k in ('user', 'password', 'host', 'port'):
-        v = kwargs.pop(k, None)
-        if v:
-            dsn += ' %s=%s' % (k, v)
-    return dsn, kwargs
 
 
 @asyncio.coroutine

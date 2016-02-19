@@ -16,7 +16,7 @@ setup(
     license='MIT',
     zip_safe=False,
     install_requires=(
-        'peewee>=2.6.4',
+        'peewee>=2.8.0',
         'aiopg>=0.7.0',
         'tasklocals>=0.2',
     ),
