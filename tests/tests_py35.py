@@ -75,18 +75,18 @@ class AsyncPostgresTransactionsTestCase(BaseAsyncPostgresTestCase):
         """
         async def t1():
             async with database.atomic_async():
-                self.assertEqual(database.transaction_depth(), 1)
-                await asyncio.sleep(0.5)
+                self.assertEqual(database.transaction_depth_async(), 1)
+                await asyncio.sleep(0.75)
 
         async def t2():
             async with database.atomic_async():
-                self.assertEqual(database.transaction_depth(), 1)
-                await asyncio.sleep(1.0)
+                self.assertEqual(database.transaction_depth_async(), 1)
+                await asyncio.sleep(0.5)
 
         async def t3():
             async with database.atomic_async():
-                self.assertEqual(database.transaction_depth(), 1)
-                await asyncio.sleep(1.5)
+                self.assertEqual(database.transaction_depth_async(), 1)
+                await asyncio.sleep(0.25)
 
         self.run_until_complete(asyncio.wait([
             self.loop.create_task(t1()),

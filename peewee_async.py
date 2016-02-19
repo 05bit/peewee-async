@@ -20,8 +20,7 @@ import uuid
 import aiopg
 import peewee
 import contextlib
-
-from tasklocals import local
+import tasklocals
 
 __version__ = '0.4.0'
 
@@ -47,6 +46,11 @@ __all__ = [
     'count',
     'scalar',
 ]
+
+
+#################
+# Async queries #
+#################
 
 
 @asyncio.coroutine
@@ -320,6 +324,52 @@ def raw_query(query):
     return message
 
 
+@asyncio.coroutine
+def prefetch(sq, *subqueries):
+    """Asynchronous version of the prefetch function from peewee.
+
+    Returns Query that has already cached data.
+    """
+
+    # This code is copied from peewee.prefetch and adopted to use async execute
+
+    if not subqueries:
+        return sq
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
+
+    deps = {}
+    rel_map = {}
+    for prefetch_result in reversed(fixed_queries):
+        query_model = prefetch_result.model
+        if prefetch_result.fields:
+            for rel_model in prefetch_result.rel_models:
+                rel_map.setdefault(rel_model, [])
+                rel_map[rel_model].append(prefetch_result)
+
+        deps[query_model] = {}
+        id_map = deps[query_model]
+        has_relations = bool(rel_map.get(query_model))
+
+        # This is hack, because peewee async execute do a copy of query and do not change state of query
+        # comparing to what real peewee is doing when execute method is called
+        prefetch_result.query._qr = yield from execute(prefetch_result.query)
+        prefetch_result.query._dirty = False
+
+        for instance in prefetch_result.query._qr:
+            if prefetch_result.fields:
+                prefetch_result.store_instance(instance, id_map)
+            if has_relations:
+                for rel in rel_map[query_model]:
+                    rel.populate_instance(instance, deps[rel.model])
+
+    return prefetch_result.query
+
+
+###################
+# Result wrappers #
+###################
+
+
 class AsyncQueryResult:
     """Async query results wrapper for async `select()`. Internally uses
     results wrapper produced by sync peewee select query.
@@ -363,49 +413,12 @@ class AsyncQueryResult:
         self._result.append(obj)
 
 
-class AsyncConnection:
-    """Asynchronous single database connection wrapper.
-    """
-    def __init__(self, loop, database, timeout, **kwargs):
-        self._conn = None
-        self._loop = loop if loop else asyncio.get_event_loop()
-        self.database = database
-        self.timeout = timeout
-        self.connect_kwargs = kwargs
-
-    @asyncio.coroutine
-    def get_conn(self):
-        return self._conn
-
-    def release(self, conn):
-        pass
-
-    @asyncio.coroutine
-    def connect(self):
-        """Connect asynchronously.
-        """
-        self._conn = yield from aiopg.connect(
-            timeout=self.timeout, loop=self._loop, database=self.database,
-            **self.connect_kwargs)
-
-    @asyncio.coroutine
-    def cursor(self, conn=None, *args, **kwargs):
-        """Get connection cursor asynchronously.
-        """
-        if conn is None:
-            conn = self._conn
-        cursor = yield from conn.cursor(*args, **kwargs)
-        cursor.release = lambda: None
-        return cursor
-
-    @asyncio.coroutine
-    def close(self):
-        """Close connection.
-        """
-        self._conn.close()
+##############
+# PostgreSQL #
+##############
 
 
-class PooledAsyncConnection:
+class AsyncPooledPostgresqlConnection:
     """Asynchronous database connection pool wrapper.
     """
     def __init__(self, loop, database, timeout, **kwargs):
@@ -465,129 +478,22 @@ class PooledAsyncConnection:
         yield from self._pool.wait_closed()
 
 
-class transaction:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.transaction()`.
+class AsyncPostgresqlConnection(AsyncPooledPostgresqlConnection):
+    """Asynchronous single database connection wrapper.
     """
-    def __init__(self, db):
-        self.db = db
-
-    @asyncio.coroutine
-    def _begin(self):
-        return (yield from _run_sql(self.db, "BEGIN"))
-
-    @asyncio.coroutine
-    def commit(self, begin=True):
-        yield from _run_sql(self.db, "COMMIT")
-        if begin:
-            yield from self._begin()
-
-    @asyncio.coroutine
-    def rollback(self, begin=True):
-        yield from _run_sql(self.db, "ROLLBACK")
-        if begin:
-            yield from self._begin()
-
-    @asyncio.coroutine
-    def __aenter__(self):
-        self._orig = self.db.get_autocommit()
-        self.db.set_autocommit(False)
-        if self.db.transaction_depth() == 0:
-            yield from self._begin()
-        self.db.push_transaction(self)
-        return self
-
-    @asyncio.coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type:
-                yield from self.rollback(False)
-            elif self.db.transaction_depth() == 1:
-                try:
-                    yield from self.commit(False)
-                except:
-                    yield from self.rollback(False)
-                    raise
-        finally:
-            self.db.set_autocommit(self._orig)
-            self.db.pop_transaction()
-
-
-class savepoint:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.savepoint()`.
-    """
-    def __init__(self, db, sid=None):
-        self.db = db
-        _compiler = db.compiler()
-        self.sid = sid or 's' + uuid.uuid4().hex
-        self.quoted_sid = _compiler.quote(self.sid)
-
-    @asyncio.coroutine
-    def _execute(self, query):
-        yield from _run_sql(query)
-
-    @asyncio.coroutine
-    def commit(self):
-        yield from self._execute('RELEASE SAVEPOINT %s;' % self.quoted_sid)
-
-    @asyncio.coroutine
-    def rollback(self):
-        yield from self._execute('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
-
-    @asyncio.coroutine
-    def __aenter__(self):
-        self._orig_autocommit = self.db.get_autocommit()
-        self.db.set_autocommit(False)
-        yield from self._execute('SAVEPOINT %s;' % self.quoted_sid)
-        return self
-
-    @asyncio.coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type:
-                yield from self.rollback()
-            else:
-                try:
-                    yield from self.commit()
-                except:
-                    yield from self.rollback()
-                    raise
-        finally:
-            self.db.set_autocommit(self._orig_autocommit)
-
-
-class atomic:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.atomic()`.
-    """
-    def __init__(self, db):
-        self.db = db
-
-    @asyncio.coroutine
-    def __aenter__(self):
-        if self.db.transaction_depth() == 0:
-            self._helper = self.db.transaction_async()
-        else:
-            self._helper = self.db.savepoint_async()
-        self.db.locals.transaction_conn = yield from self.db._async_conn.get_conn()
-        return (yield from self._helper.__aenter__())
-
-    @asyncio.coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
-        yield from self._helper.__aexit__(exc_type, exc_val, exc_tb)
-        self.db._async_conn.release(self.db.locals.transaction_conn)
-        self.db.locals.transaction_conn = None
+    def __init__(self, loop, database, timeout, **kwargs):
+        kwargs['minsize'] = 1
+        kwargs['maxsize'] = 1
+        super().__init__(loop, database, timeout, **kwargs)
 
 
 class AsyncPostgresqlMixin:
-    """Mixin for peewee database class providing extra methods
+    """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
-    def init_async(self, conn_cls=AsyncConnection, enable_json=False,
+    def init_async(self, conn_cls=AsyncPostgresqlConnection, enable_json=False,
                    enable_hstore=False):
-        self.allow_sync = True
-        self.locals = local()
+        self.allow_sync = True        
         self._loop = None
         self._async_conn = None
         self._async_conn_cls = conn_cls
@@ -616,6 +522,7 @@ class AsyncPostgresqlMixin:
 
         if not self._async_conn:
             self._loop = loop if loop else asyncio.get_event_loop()
+            self._task_data = tasklocals.local(loop=self._loop)
             self._async_conn = self._async_conn_cls(
                 self._loop, self.database,
                 timeout if timeout else aiopg.DEFAULT_TIMEOUT,
@@ -653,17 +560,50 @@ class AsyncPostgresqlMixin:
             result = (yield from cursor.fetchone())[0]
             return result
 
-    def atomic_async(self):
-        """Similar to peewee `Database.atomic()` method, but returns
-        asynchronous context manager.
+    @asyncio.coroutine
+    def push_transaction_async(self):
+        """Increment async transaction depth.
         """
-        return atomic(self)
+        if not getattr(self._task_data, 'depth', 0):
+            self._task_data.depth = 0
+            self._task_data.conn = yield from self._async_conn.get_conn()
+
+        self._task_data.depth += 1
+
+    @asyncio.coroutine
+    def pop_transaction_async(self):
+        """Decrement async transaction depth.
+        """
+        if self._task_data.depth > 0:
+            self._task_data.depth -= 1
+
+            if self._task_data.depth == 0:
+                self._async_conn.release(self._task_data.conn)
+                self._task_data.conn = None
+        else:
+            raise ValueError("Invalid async transaction depth value")
+
+    def transaction_depth_async(self):
+        """Get async transaction depth.
+        """
+        return getattr(self._task_data, 'depth', 0)
+
+    def transaction_conn_async(self):
+        """Get async transaction connection.
+        """
+        return getattr(self._task_data, 'conn', None)
 
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
         asynchronous context manager.
         """
         return transaction(self)
+
+    def atomic_async(self):
+        """Similar to peewee `Database.atomic()` method, but returns
+        asynchronous context manager.
+        """
+        return atomic(self)
 
     def savepoint_async(self, sid=None):
         """Similar to peewee `Database.savepoint()` method, but returns
@@ -682,8 +622,11 @@ class AsyncPostgresqlMixin:
         return super().execute_sql(*args, **kwargs)
 
 
-class PooledAsyncPostgresqlMixin(AsyncPostgresqlMixin):
-    def init_async(self, conn_cls=PooledAsyncConnection, enable_json=False,
+class AsyncPooledPostgresqlMixin(AsyncPostgresqlMixin):
+    """Mixin for `peewee.PostgresqlDatabase` providing extra methods
+    for managing async connection pool.
+    """
+    def init_async(self, conn_cls=AsyncPooledPostgresqlConnection, enable_json=False,
                    enable_hstore=False, min_connections=0, max_connections=0):
         super().init_async(conn_cls=conn_cls, enable_json=enable_json,
                            enable_hstore=enable_hstore)
@@ -714,7 +657,7 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         self.init_async()
 
 
-class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(AsyncPooledPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -731,6 +674,11 @@ class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlData
 
         self.init_async(min_connections=min_connections,
                         max_connections=max_connections)
+
+
+##############
+# Sync utils #
+##############
 
 
 @contextlib.contextmanager
@@ -750,20 +698,131 @@ class UnwantedSyncQueryError(Exception):
     pass
 
 
+################
+# Transactions #
+################
+
+
+class transaction:
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.transaction()`.
+    """
+    def __init__(self, db):
+        self.db = db
+
+    @asyncio.coroutine
+    def commit(self, begin=True):
+        yield from _run_sql(self.db, 'COMMIT')
+        if begin:
+            yield from _run_sql(self.db, 'BEGIN')
+
+    @asyncio.coroutine
+    def rollback(self, begin=True):
+        yield from _run_sql(self.db, 'ROLLBACK')
+        if begin:
+            yield from _run_sql(self.db, 'BEGIN')
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        yield from self.db.push_transaction_async()
+
+        if self.db.transaction_depth_async() == 1:
+            yield from _run_sql(self.db, 'BEGIN')
+
+        return self
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type:
+                yield from self.rollback(False)
+            elif self.db.transaction_depth_async() == 1:
+                try:
+                    yield from self.commit(False)
+                except:
+                    yield from self.rollback(False)
+                    raise
+        finally:
+            yield from self.db.pop_transaction_async()
+
+
+class savepoint:
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.savepoint()`.
+    """
+    def __init__(self, db, sid=None):
+        self.db = db
+        self.sid = sid or 's' + uuid.uuid4().hex
+        self.quoted_sid = db.compiler().quote(self.sid)
+
+    @asyncio.coroutine
+    def commit(self):
+        yield from _run_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
+
+    @asyncio.coroutine
+    def rollback(self):
+        yield from _run_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        yield from _run_sql('SAVEPOINT %s;' % self.quoted_sid)
+        return self
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type:
+                yield from self.rollback()
+            else:
+                try:
+                    yield from self.commit()
+                except:
+                    yield from self.rollback()
+                    raise
+        finally:
+            pass
+
+
+class atomic:
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.atomic()`.
+    """
+    def __init__(self, db):
+        self.db = db
+
+    @asyncio.coroutine
+    def __aenter__(self):
+        if self.db.transaction_depth_async() == 0:
+            self._ctx = self.db.transaction_async()
+        else:
+            self._ctx = self.db.savepoint_async()
+
+        return (yield from self._ctx.__aenter__())
+
+    @asyncio.coroutine
+    def __aexit__(self, exc_type, exc_val, exc_tb):
+        yield from self._ctx.__aexit__(exc_type, exc_val, exc_tb)
+
+
+####################
+# Internal helpers #
+####################
+
+
 @asyncio.coroutine
 def _run_sql(db, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """    
     assert db._async_conn, "Error, no async database connection."
-    if getattr(db.locals, 'transaction_conn', None) is not None:
-        cursor = yield from db._async_conn.cursor(conn=db.locals.transaction_conn)
-    else:
-        cursor = yield from db._async_conn.cursor()
+
+    cursor = yield from db._async_conn.cursor(conn=db.transaction_conn_async())
+
     try:
         yield from cursor.execute(operation, *args, **kwargs)
-    except Exception as e:
+    except:
         cursor.release()
-        raise e
+        raise
+
     return cursor
 
 
@@ -773,44 +832,3 @@ def _execute_query_async(query):
     """
     db = query.database
     return (yield from _run_sql(db, *query.sql()))
-
-
-@asyncio.coroutine
-def prefetch(sq, *subqueries):
-    """Asynchronous version of the prefetch function from peewee.
-
-    Returns Query that has already cached data.
-    """
-
-    # This code is copied from peewee.prefetch and adopted to use async execute
-
-    if not subqueries:
-        return sq
-    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
-
-    deps = {}
-    rel_map = {}
-    for prefetch_result in reversed(fixed_queries):
-        query_model = prefetch_result.model
-        if prefetch_result.fields:
-            for rel_model in prefetch_result.rel_models:
-                rel_map.setdefault(rel_model, [])
-                rel_map[rel_model].append(prefetch_result)
-
-        deps[query_model] = {}
-        id_map = deps[query_model]
-        has_relations = bool(rel_map.get(query_model))
-
-        # This is hack, because peewee async execute do a copy of query and do not change state of query
-        # comparing to what real peewee is doing when execute method is called
-        prefetch_result.query._qr = yield from execute(prefetch_result.query)
-        prefetch_result.query._dirty = False
-
-        for instance in prefetch_result.query._qr:
-            if prefetch_result.fields:
-                prefetch_result.store_instance(instance, id_map)
-            if has_relations:
-                for rel in rel_map[query_model]:
-                    rel.populate_instance(instance, deps[rel.model])
-
-    return prefetch_result.query
