@@ -10,7 +10,7 @@ https://github.com/05bit/peewee-async
 
 Licensed under The MIT License (MIT)
 
-Copyright (c) 2014, Alexey Kinev <rudy@05bit.com>
+Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 import asyncio
@@ -406,8 +406,7 @@ class AsyncConnection:
 
 
 class PooledAsyncConnection:
-    """
-    Asynchronous database connection pool wrapper.
+    """Asynchronous database connection pool wrapper.
     """
     def __init__(self, loop, database, timeout, **kwargs):
         self._pool = None
@@ -438,16 +437,24 @@ class PooledAsyncConnection:
         """Get cursor for connection from pool.
         """
         if conn is None:
+            # Acquire connection with cursor, once cursor is released
+            # connection is also released to pool:
+
             conn = yield from self._pool.acquire()
             cursor = yield from conn.cursor(*args, **kwargs)
 
-            def releaser():
+            def release():
                 cursor.close()
                 self._pool.release(conn)
-            cursor.release = releaser
+            cursor.release = release
         else:
+            # Acquire cursor from provided connection, after cursor is
+            # released connection is NOT released to pool, i.e.
+            # for handling transactions:
+
             cursor = yield from conn.cursor(*args, **kwargs)
             cursor.release = lambda: cursor.close()
+
         return cursor
 
     @asyncio.coroutine
@@ -577,23 +584,26 @@ class AsyncPostgresqlMixin:
     """Mixin for peewee database class providing extra methods
     for managing async connection.
     """
-    def init_async(self, database, conn_cls=AsyncConnection, **kwargs):
+    def init_async(self, conn_cls=AsyncConnection, enable_json=False,
+                   enable_hstore=False):
         self.allow_sync = True
-        self.deferred = database is None
-        self.database = database
+        self.locals = local()
         self._loop = None
         self._async_conn = None
         self._async_conn_cls = conn_cls
-        self._async_kwargs = {
-            'enable_json': False,
-            'enable_hstore': False,
-        }
-        self._async_kwargs.update(kwargs)
-        self.connect_kwargs = kwargs.copy()
-        self.connect_kwargs.pop('enable_json', None)
-        self.connect_kwargs.pop('enable_hstore', None)
+        self._enable_json = enable_json
+        self._enable_hstore = enable_hstore
 
-        self.locals = local()
+    @property
+    def connect_kwargs_async(self):
+        """Connection parameters for `aiopg.Connection`
+        """
+        kwargs = self.connect_kwargs.copy()
+        kwargs.update({
+            'enable_json': self._enable_json,
+            'enable_hstore': self._enable_hstore,
+        })
+        return kwargs
 
     @asyncio.coroutine
     def connect_async(self, loop=None, timeout=None):
@@ -607,10 +617,9 @@ class AsyncPostgresqlMixin:
         if not self._async_conn:
             self._loop = loop if loop else asyncio.get_event_loop()
             self._async_conn = self._async_conn_cls(
-                self._loop,
-                self.database,
+                self._loop, self.database,
                 timeout if timeout else aiopg.DEFAULT_TIMEOUT,
-                **self._async_kwargs)
+                **self.connect_kwargs_async)
             yield from self._async_conn.connect()
 
     @asyncio.coroutine
@@ -674,10 +683,23 @@ class AsyncPostgresqlMixin:
 
 
 class PooledAsyncPostgresqlMixin(AsyncPostgresqlMixin):
-    def init_async(self, database, conn_cls=PooledAsyncConnection, minsize=1, maxsize=20, **kwargs):
-        super(PooledAsyncPostgresqlMixin, self).init_async(database, conn_cls, **kwargs)
-        self._async_kwargs['minsize'] = minsize
-        self._async_kwargs['maxsize'] = maxsize
+    def init_async(self, conn_cls=PooledAsyncConnection, enable_json=False,
+                   enable_hstore=False, min_connections=0, max_connections=0):
+        super().init_async(conn_cls=conn_cls, enable_json=enable_json,
+                           enable_hstore=enable_hstore)
+        self.min_connections = min_connections
+        self.max_connections = max_connections
+
+    @property
+    def connect_kwargs_async(self):
+        """Connection parameters for `aiopg.Pool`
+        """
+        kwargs = super().connect_kwargs_async
+        kwargs.update({
+            'minsize': self.min_connections,
+            'maxsize': self.max_connections,
+        })
+        return kwargs
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -687,13 +709,9 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
     """
-    def __init__(self, database, threadlocals=True, autocommit=True,
-                 fields=None, ops=None, autorollback=True, **kwargs):
-        super().__init__(database, threadlocals=True, autocommit=autocommit,
-                         fields=fields, ops=ops, autorollback=autorollback,
-                         **kwargs)
-
-        self.init_async(database, **self.connect_kwargs)
+    def init(self, database, **kwargs):
+        super().init(database, **kwargs)
+        self.init_async()
 
 
 class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -705,15 +723,14 @@ class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlData
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
     """
-    def __init__(self, database, threadlocals=True, autocommit=True,
-                 fields=None, ops=None, autorollback=True, max_connections=20,
-                 **kwargs):
-        super().__init__(database, threadlocals=True, autocommit=autocommit,
-                         fields=fields, ops=ops, autorollback=autorollback,
-                         **kwargs)
+    def init(self, database, **kwargs):
+        super().init(database, **kwargs)
 
-        self.init_async(database, conn_cls=PooledAsyncConnection, minsize=1,
-                        maxsize=max_connections, **self.connect_kwargs)
+        min_connections = self.connect_kwargs.pop('min_connections', 1)
+        max_connections = self.connect_kwargs.pop('max_connections', 20)
+
+        self.init_async(min_connections=min_connections,
+                        max_connections=max_connections)
 
 
 @contextlib.contextmanager

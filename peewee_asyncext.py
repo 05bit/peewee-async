@@ -10,10 +10,10 @@ https://github.com/05bit/peewee-async
 
 Licensed under The MIT License (MIT)
 
-Copyright (c) 2014, Alexey Kinev <rudy@05bit.com>
+Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
-from peewee_async import AsyncPostgresqlMixin, PooledAsyncConnection, PooledAsyncPostgresqlMixin
+from peewee_async import AsyncPostgresqlMixin, PooledAsyncPostgresqlMixin
 import playhouse.postgres_ext as ext
 
 
@@ -24,18 +24,9 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     See also:
     https://peewee.readthedocs.org/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
-    def __init__(self, database, threadlocals=True, autocommit=True,
-                 fields=None, ops=None, autorollback=True, **kwargs):
-        super().__init__(database, threadlocals=True, autocommit=autocommit,
-                         fields=fields, ops=ops, autorollback=autorollback,
-                         **kwargs)
-
-        async_kwargs = self.connect_kwargs.copy()
-        async_kwargs.update({
-            'enable_json': True,
-            'enable_hstore': self.register_hstore,
-        })
-        self.init_async(database, **async_kwargs)
+    def init(self, database, **kwargs):
+        super().init(database, **kwargs)
+        self.init_async(enable_json=True, enable_hstore=self.register_hstore)
 
 
 class PooledPostgresqlExtDatabase(PooledAsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
@@ -47,17 +38,13 @@ class PooledPostgresqlExtDatabase(PooledAsyncPostgresqlMixin, ext.PostgresqlExtD
     See also:
     https://peewee.readthedocs.org/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
-    def __init__(self, database, threadlocals=True, autocommit=True,
-                 fields=None, ops=None, autorollback=True, max_connections=20,
-                 **kwargs):
-        super().__init__(database, threadlocals=True, autocommit=autocommit,
-                         fields=fields, ops=ops, autorollback=autorollback,
-                         **kwargs)
+    def init(self, database, **kwargs):
+        super().init(database, **kwargs)
 
-        async_kwargs = self.connect_kwargs.copy()
-        async_kwargs.update({
-            'enable_json': True,
-            'enable_hstore': self.register_hstore,
-        })
-        self.init_async(database, conn_cls=PooledAsyncConnection, minsize=1,
-                        maxsize=max_connections, **async_kwargs)
+        min_connections = self.connect_kwargs.pop('min_connections', 1)
+        max_connections = self.connect_kwargs.pop('max_connections', 20)
+
+        self.init_async(enable_json=True,
+                        enable_hstore=self.register_hstore,
+                        min_connections=min_connections,
+                        max_connections=max_connections)
