@@ -48,6 +48,11 @@ __all__ = [
 ]
 
 
+#################
+# Async queries #
+#################
+
+
 @asyncio.coroutine
 def execute(query):
     """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
@@ -360,6 +365,11 @@ def prefetch(sq, *subqueries):
     return prefetch_result.query
 
 
+###################
+# Result wrappers #
+###################
+
+
 class AsyncQueryResult:
     """Async query results wrapper for async `select()`. Internally uses
     results wrapper produced by sync peewee select query.
@@ -403,7 +413,12 @@ class AsyncQueryResult:
         self._result.append(obj)
 
 
-class PooledAsyncConnection:
+##############
+# PostgreSQL #
+##############
+
+
+class AsyncPooledPostgresqlConnection:
     """Asynchronous database connection pool wrapper.
     """
     def __init__(self, loop, database, timeout, **kwargs):
@@ -463,7 +478,7 @@ class PooledAsyncConnection:
         yield from self._pool.wait_closed()
 
 
-class AsyncConnection(PooledAsyncConnection):
+class AsyncPostgresqlConnection(AsyncPooledPostgresqlConnection):
     """Asynchronous single database connection wrapper.
     """
     def __init__(self, loop, database, timeout, **kwargs):
@@ -473,10 +488,10 @@ class AsyncConnection(PooledAsyncConnection):
 
 
 class AsyncPostgresqlMixin:
-    """Mixin for peewee database class providing extra methods
+    """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
-    def init_async(self, conn_cls=AsyncConnection, enable_json=False,
+    def init_async(self, conn_cls=AsyncPostgresqlConnection, enable_json=False,
                    enable_hstore=False):
         self.allow_sync = True        
         self._loop = None
@@ -607,8 +622,11 @@ class AsyncPostgresqlMixin:
         return super().execute_sql(*args, **kwargs)
 
 
-class PooledAsyncPostgresqlMixin(AsyncPostgresqlMixin):
-    def init_async(self, conn_cls=PooledAsyncConnection, enable_json=False,
+class AsyncPooledPostgresqlMixin(AsyncPostgresqlMixin):
+    """Mixin for `peewee.PostgresqlDatabase` providing extra methods
+    for managing async connection pool.
+    """
+    def init_async(self, conn_cls=AsyncPooledPostgresqlConnection, enable_json=False,
                    enable_hstore=False, min_connections=0, max_connections=0):
         super().init_async(conn_cls=conn_cls, enable_json=enable_json,
                            enable_hstore=enable_hstore)
@@ -639,7 +657,7 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         self.init_async()
 
 
-class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(AsyncPooledPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -656,6 +674,11 @@ class PooledPostgresqlDatabase(PooledAsyncPostgresqlMixin, peewee.PostgresqlData
 
         self.init_async(min_connections=min_connections,
                         max_connections=max_connections)
+
+
+##############
+# Sync utils #
+##############
 
 
 @contextlib.contextmanager

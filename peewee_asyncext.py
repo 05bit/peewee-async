@@ -13,7 +13,7 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
-from peewee_async import AsyncPostgresqlMixin, PooledAsyncPostgresqlMixin
+from peewee_async import AsyncPostgresqlMixin, AsyncPooledPostgresqlMixin
 import playhouse.postgres_ext as ext
 
 
@@ -29,7 +29,7 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
         self.init_async(enable_json=True, enable_hstore=self.register_hstore)
 
 
-class PooledPostgresqlExtDatabase(PooledAsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
+class PooledPostgresqlExtDatabase(AsyncPooledPostgresqlMixin, ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
