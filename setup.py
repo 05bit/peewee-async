@@ -17,7 +17,7 @@ setup(
     zip_safe=False,
     install_requires=(
         'peewee>=2.8.0',
-        'aiopg>=0.7.0',
+        'aiopg>=0.9.2',
         'tasklocals>=0.2',
     ),
     py_modules=[

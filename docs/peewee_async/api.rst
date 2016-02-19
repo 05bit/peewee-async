@@ -16,7 +16,10 @@ Select, update, delete
 Transactions
 ------------
 
-**Warning** For some reason doesn't work with pooled connection yet! This is bug, of course.
+Transactions required Python 3.5+ to work, because their syntax is based on async context managers.
+
+**Important note** transactions rely on data isolation on `asyncio` per-task basis.
+That means, all queries for single transaction should be performed **within same task**.
 
 .. autofunction:: peewee_async.atomic
 .. autofunction:: peewee_async.savepoint

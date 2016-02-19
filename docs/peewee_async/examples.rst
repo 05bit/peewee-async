@@ -102,3 +102,31 @@ Using both sync and async calls
 
     loop.run_until_complete(database.connect_async(loop=loop))
     loop.run_until_complete(my_handler())
+
+
+Using transactions
+------------------
+
+.. code-block:: python
+
+    import asyncio
+    import peewee
+    import peewee_async
+
+    # ... some init code ...
+
+    async def test():
+        obj = await create_object(TestModel, text='FOO')
+        obj_id = obj.id
+
+        try:
+            async with database.atomic_async():
+                obj.text = 'BAR'
+                await update_object(obj)
+                raise Exception('Fake error')
+        except:
+            res = await get_object(TestModel, TestModel.id == obj_id)
+
+        print(res.text) # Should print 'FOO', not 'BAR'
+
+    loop.run_until_complete(test())

@@ -42,9 +42,14 @@ __all__ = [
     'sync_unwanted',
     'UnwantedSyncQueryError',
 
-    # Aggregation:
+    # Aggregation
     'count',
     'scalar',
+
+    # Transactions
+    'atomic',
+    'transaction',
+    'savepoint',
 ]
 
 
