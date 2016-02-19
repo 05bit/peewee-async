@@ -52,6 +52,12 @@ __all__ = [
     'savepoint',
 ]
 
+RESULTS_NAIVE = peewee.RESULTS_NAIVE
+RESULTS_MODELS = peewee.RESULTS_MODELS
+RESULTS_TUPLES = peewee.RESULTS_TUPLES
+RESULTS_DICTS = peewee.RESULTS_DICTS
+RESULTS_AGGREGATE_MODELS = peewee.RESULTS_AGGREGATE_MODELS
+
 
 #################
 # Async queries #
@@ -206,24 +212,14 @@ def select(query):
         ("Error, trying to run select coroutine"
          "with wrong query class %s" % str(query))
 
-    # Perform *real* async query
-    query = query.clone()
-    cursor = yield from _execute_query_async(query)
-
-    # Perform *fake* query: we only need a result wrapper
-    # here, not the query result itself:
-    query._execute = lambda: None
-    result_wrapper = query.execute()
-
-    # Fetch result
-    result = AsyncQueryResult(result_wrapper=result_wrapper, cursor=cursor)
+    result = AsyncQueryWrapper(query)
+    cursor = yield from result.execute()
     try:
         while True:
             yield from result.fetchone()
     except GeneratorExit:
         pass
 
-    # Release cursor and return
     cursor.release()
     return result
 
@@ -375,7 +371,7 @@ def prefetch(sq, *subqueries):
 ###################
 
 
-class AsyncQueryResult:
+class AsyncQueryWrapper:
     """Async query results wrapper for async `select()`. Internally uses
     results wrapper produced by sync peewee select query.
 
@@ -387,11 +383,12 @@ class AsyncQueryResult:
     To retrieve results after async fetching just iterate over this class
     instance, like you generally iterate over sync results wrapper.
     """
-    def __init__(self, result_wrapper=None, cursor=None):
-        self._result = []
+    def __init__(self, query):
         self._initialized = False
-        self._result_wrapper = result_wrapper
-        self._cursor = cursor
+        self._cursor = None
+        self._query = query
+        self._result = []
+        self._result_wrapper = self._get_result_wrapper(query)
 
     def __iter__(self):
         return iter(self._result)
@@ -401,6 +398,28 @@ class AsyncQueryResult:
 
     def __len__(self):
         return len(self._result)
+
+    @classmethod
+    def _get_result_wrapper(self, query):
+        """Get result wrapper class.
+        """
+        if query._tuples:
+            QR = query.database.get_result_wrapper(RESULTS_TUPLES)
+        elif query._dicts:
+            QR = query.database.get_result_wrapper(RESULTS_DICTS)
+        elif query._naive or not query._joins or query.verify_naive():
+            QR = query.database.get_result_wrapper(RESULTS_NAIVE)
+        elif query._aggregate_rows:
+            QR = query.database.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
+        else:
+            QR = query.database.get_result_wrapper(RESULTS_MODELS)
+
+        return QR(query.model_class, None, query.get_query_meta())
+
+    @asyncio.coroutine
+    def execute(self):
+        self._cursor = yield from _execute_query_async(self._query)
+        return self._cursor
 
     @asyncio.coroutine
     def fetchone(self):
