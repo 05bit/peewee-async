@@ -52,12 +52,6 @@ __all__ = [
     'savepoint',
 ]
 
-RESULTS_NAIVE = peewee.RESULTS_NAIVE
-RESULTS_MODELS = peewee.RESULTS_MODELS
-RESULTS_TUPLES = peewee.RESULTS_TUPLES
-RESULTS_DICTS = peewee.RESULTS_DICTS
-RESULTS_AGGREGATE_MODELS = peewee.RESULTS_AGGREGATE_MODELS
-
 
 #################
 # Async queries #
@@ -369,6 +363,12 @@ def prefetch(sq, *subqueries):
 ###################
 # Result wrappers #
 ###################
+
+RESULTS_NAIVE = peewee.RESULTS_NAIVE
+RESULTS_MODELS = peewee.RESULTS_MODELS
+RESULTS_TUPLES = peewee.RESULTS_TUPLES
+RESULTS_DICTS = peewee.RESULTS_DICTS
+RESULTS_AGGREGATE_MODELS = peewee.RESULTS_AGGREGATE_MODELS
 
 
 class AsyncQueryWrapper:
