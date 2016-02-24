@@ -781,15 +781,15 @@ class savepoint:
 
     @asyncio.coroutine
     def commit(self):
-        yield from _run_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
+        yield from _run_sql(self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
 
     @asyncio.coroutine
     def rollback(self):
-        yield from _run_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+        yield from _run_sql(self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
 
     @asyncio.coroutine
     def __aenter__(self):
-        yield from _run_sql('SAVEPOINT %s;' % self.quoted_sid)
+        yield from _run_sql(self.db, 'SAVEPOINT %s;' % self.quoted_sid)
         return self
 
     @asyncio.coroutine
