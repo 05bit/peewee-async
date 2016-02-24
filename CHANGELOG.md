@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Fixing critical transactions issues, see #12
+- Internal `SELECT` query executor rewritten, got rid of some hacks
+- Deferred database init is supported
+
 ## 0.4.0
 
 - Add `db.atomic_async()` context manager to support transactions. Thanks, @mrbox!
