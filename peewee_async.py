@@ -316,6 +316,7 @@ def raw_query(query):
 
     cursor = yield from _execute_query_async(query)
     message = cursor.statusmessage
+    cursor.release()
     return message
 
 
