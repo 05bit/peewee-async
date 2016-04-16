@@ -194,7 +194,14 @@ class Manager:
 
     @asyncio.coroutine
     def prefetch(self, query, *subqueries):
-        raise NotImplementedError
+        """Asynchronous version of the `prefetch()` from peewee.
+
+        :return: Query that has already cached data for subqueries
+        """
+        yield from self.connect()
+        return (yield from prefetch(
+            self._prepare_query(query),
+            *map(self._prepare_query, subqueries)))
 
     @asyncio.coroutine
     def count(self, query, clear_limit=False):
@@ -218,15 +225,15 @@ class Manager:
 
     @asyncio.coroutine
     def atomic(self):
-        raise NotImplementedError
+        return atomic(self.database)
 
     @asyncio.coroutine
     def transaction(self):
-        raise NotImplementedError
+        return transaction(self.database)
 
     @asyncio.coroutine
-    def savepoint(self):
-        raise NotImplementedError
+    def savepoint(self, sid=None):
+        return savepoint(self.database, sid=sid)
 
     @asyncio.coroutine
     def connect(self):
@@ -515,17 +522,19 @@ def raw_query(query):
 
 
 @asyncio.coroutine
-def prefetch(sq, *subqueries):
-    """Asynchronous version of the prefetch function from peewee.
+def prefetch(query, *subqueries):
+    """Asynchronous version of the `prefetch()` from peewee.
 
     Returns Query that has already cached data.
     """
     # This code is copied from peewee.prefetch and adopted
-    # to use async execute
+    # to use async execute. Also it's a bit hacky, consider
+    # it to be experimental!
 
     if not subqueries:
-        return sq
-    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
+        return query
+
+    fixed_queries = peewee.prefetch_add_subquery(query, subqueries)
 
     deps = {}
     rel_map = {}
@@ -540,9 +549,9 @@ def prefetch(sq, *subqueries):
         id_map = deps[query_model]
         has_relations = bool(rel_map.get(query_model))
 
-        # This is hack, because peewee async `execute()` do a copy of
-        # query and do not change state of query comparing to what
-        # real peewee is doing when execute method is called
+        # NOTE! This is hacky, we perform async `execute()` and substitute result
+        # to the initial query:
+
         prefetch_result.query._qr = yield from execute(prefetch_result.query)
         prefetch_result.query._dirty = False
 

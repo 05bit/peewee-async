@@ -228,9 +228,16 @@ class ManagerTestCase(unittest.TestCase):
         run = lambda c: self.loop.run_until_complete(c)
         for k in managers:
             objects = managers[k]
+
+            # Swap sync database
+            for model in self.models:
+                model._meta.database = objects.database
+
+            # Run async test
             if only is None or (k in only):
                 run(test(objects))
                 run(self.clean_up(objects))
+
             self.run_count += 1
 
     @asyncio.coroutine
@@ -403,6 +410,40 @@ class ManagerTestCase(unittest.TestCase):
             
         self.run_with_managers(test)
 
+    def test_prefetch(self):
+        @asyncio.coroutine
+        def test(objects):
+            alpha_1 = TestModelAlpha.create(text='Alpha 1')
+            alpha_2 = TestModelAlpha.create(text='Alpha 2')
+            beta_11 = TestModelBeta.create(text='Beta 1', alpha=alpha_1)
+            beta_12 = TestModelBeta.create(text='Beta 2', alpha=alpha_1)
+            beta_21 = TestModelBeta.create(text='Beta 1', alpha=alpha_2)
+            beta_22 = TestModelBeta.create(text='Beta 2', alpha=alpha_2)
+            gamma_111 = TestModelGamma.create(text='Gamma 1', beta=beta_11)
+            gamma_112 = TestModelGamma.create(text='Gamma 2', beta=beta_11)
+
+            objects.database.allow_sync = False
+
+            result = yield from objects.prefetch(
+                TestModelAlpha.select(),
+                TestModelBeta.select(),
+                TestModelGamma.select())
+
+            result = tuple(result)
+
+            self.assertEqual(result,
+                             (alpha_1, alpha_2))
+
+            self.assertEqual(tuple(result[0].betas_prefetch),
+                            (beta_11, beta_12))
+
+            self.assertEqual(tuple(result[0].betas_prefetch[0].gammas_prefetch),
+                             (gamma_111, gamma_112))
+
+            objects.database.allow_sync = True
+
+        self.run_with_managers(test)
+
 
 class PostgresInitTestCase(unittest.TestCase):
     def test_deferred_init(self):
@@ -511,29 +552,6 @@ class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
         self.assertEqual(sav1, 1)
         self.assertEqual(TestModel.get(id=obj1.id).text,
                          '[async] [test_save_obj]')
-
-    def test_prefetch(self):
-        # Async prefetch
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                result = yield from peewee_async.prefetch(TestModelAlpha.select(), TestModelBeta.select(),
-                                                          TestModelGamma.select())
-
-                result = list(result)   # this should NOT fire any call (will read it from query cache)
-
-                # Check if we have here both alpha items in specific order
-                self.assertEqual(result, [self.alpha_1, self.alpha_2])
-
-                alpha_1 = result[0]
-                self.assertEqual(alpha_1.betas_prefetch, [self.beta_11, self.beta_12])
-
-                beta_11 = alpha_1.betas_prefetch[0]
-                self.assertEqual(beta_11, self.beta_11)
-
-                self.assertEqual(beta_11.gammas_prefetch, [self.gamma_111, self.gamma_112])
-
-        self.run_until_complete(test())
 
 
 if sys.version_info >= (3, 5):
