@@ -70,57 +70,61 @@ __all__ = [
 class Manager:
     """Async peewee models manager.
 
-    Can handle multiple databases for single model.
-    Just create `Manager` instance per database.
-
-    :param model:       model class
-    :param database:    (optional) async database driver
+    :param database: (optional) async database driver
 
     Example::
 
-        users = Manager(User)
-        user0 = await users.create(username='test')
-        user1 = await users.get(id=user0.id)
-        user2 = await users.get(username='test')
+        class User(peewee.Model):
+            username = peewee.CharField(max_length=40, unique=True)
+
+        objects = Manager(PostgresqlDatabase('my_db'))
+
+        user0 = await objects.create(User, username='test')
+        user1 = await objects.get(User, id=user0.id)
+        user2 = await objects.get(User, username='test')
         # All should be the same
         print(user1, user2, user3)
+
+    Can also handle multiple databases for single model.
+    Just create `Manager` instance per database.
     """
-    model = None
+    # Async database driver
     database = None
 
-    def __init__(self, model, database=None):
-        if not self.model:
-            self.model = model
-
-        if not self.database:
-            self.database = database or model._meta.database
+    def __init__(self, database=None):
+        self.database = database or self.database
 
     @property
-    def allow_sync(self):
-        raise NotImplementedError
+    def is_connected(self):
+        """Check if database is connected.
+        """
+        return self.database._async_conn is not None
 
     @asyncio.coroutine
-    def get(self, *args, **kwargs):
+    def get(self, source, *args, **kwargs):
         """Get model instance.
+
+        :param source: model or base query for lookup
 
         Example::
 
-            obj1 = await self.get(id=1)
-            obj2 = await self.get(MyModel.id == 1)
+            obj1 = await self.get(MyModel, id=1)
+            obj2 = await self.get(MyModel, MyModel.id == 1)
             obj3 = await self.get(MyModel.select().where(MyModel.id == 1))
 
         All will return `MyModel` instance with `id = 1`
         """
-        if args and isinstance(args[0], peewee.Query):
-            query = args[0]
-            conditions = list(args[1:])
-        else:
-            query = self.model.select()
-            conditions = list(args)
+        yield from self.connect()
 
-        if kwargs:
-            conditions += [(getattr(self.model, k) == v)
-                for k, v in kwargs.items()]
+        if isinstance(source, peewee.Query):
+            query = source
+            model = query.model_class
+        else:
+            query = source.select()
+            model = source
+
+        conditions = list(args) + [(getattr(model, k) == v)
+            for k, v in kwargs.items()]
 
         if conditions:
             query = query.where(*conditions)
@@ -130,18 +134,31 @@ class Manager:
         try:
             return (yield from select(query))[0]
         except IndexError:
-            raise self.model.DoesNotExist
+            raise model.DoesNotExist
 
     @asyncio.coroutine
-    def get_or_create(self, *args, **kwargs):
-        raise NotImplementedError
+    def get_or_create(self, model, defaults=None, **kwargs):
+        """Try to get object or create it with specified defaults.
+
+        Return 2-tuple containing the model instance and a boolean
+        indicating whether the instance was created.
+        """
+        try:
+            return (yield from self.get(**kwargs)), False
+        except model.DoesNotExist:
+            data = defaults or {}
+            data.update({k: v for k, v in kwargs.items()
+                if not '__' in k})
+            return (yield from self.create(**data)), True
 
     @asyncio.coroutine
-    def create(self, **data):
+    def create(self, model, **data):
         """Create new object saved to database.
         """
-        inst = self.model(**data)
-        query = self.model.insert(**dict(inst._data))
+        yield from self.connect()
+
+        inst = model(**data)
+        query = model.insert(**dict(inst._data))
 
         pk = yield from insert(self._prepare_query(query))
         if pk is None:
@@ -152,12 +169,29 @@ class Manager:
         return inst
 
     @asyncio.coroutine
-    def create_or_get(self, **kwargs):
-        raise NotImplementedError
+    def create_or_get(self, model, **kwargs):
+        """Try to create new object with specified data. If object already
+        exists, then try to get it by unique fields.
+        """
+        try:
+            return (yield from self.create(**kwargs)), True
+        except peewee.IntegrityError:
+            query = []
+            for field_name, value in kwargs.items():
+                field = getattr(model, field_name)
+                if field.unique or field.primary_key:
+                    query.append(field == value)
+            return (yield from self.get(**kwargs)), False
 
     @asyncio.coroutine
     def execute(self, query):
-        raise NotImplementedError
+        """Execute query asyncronously.
+
+        NOTE! Query will always be executed against manager's
+        database even if it was created for another one.
+        """
+        yield from self.connect()
+        return (yield from execute(self._prepare_query(query)))
 
     @asyncio.coroutine
     def prefetch(self, query, *subqueries):
@@ -182,6 +216,18 @@ class Manager:
     @asyncio.coroutine
     def savepoint(self):
         raise NotImplementedError
+
+    @asyncio.coroutine
+    def connect(self):
+        """Connect to database if not connected.
+        """
+        yield from self.database.connect_async()
+
+    @asyncio.coroutine
+    def close(self):
+        """Close database connection if connected.
+        """
+        yield from self.database.close_async()
 
     def _prepare_query(self, query):
         """Prepare query for execution against manager's database.
@@ -463,8 +509,8 @@ def prefetch(sq, *subqueries):
 
     Returns Query that has already cached data.
     """
-
-    # This code is copied from peewee.prefetch and adopted to use async execute
+    # This code is copied from peewee.prefetch and adopted
+    # to use async execute
 
     if not subqueries:
         return sq
@@ -483,8 +529,9 @@ def prefetch(sq, *subqueries):
         id_map = deps[query_model]
         has_relations = bool(rel_map.get(query_model))
 
-        # This is hack, because peewee async execute do a copy of query and do not change state of query
-        # comparing to what real peewee is doing when execute method is called
+        # This is hack, because peewee async `execute()` do a copy of
+        # query and do not change state of query comparing to what
+        # real peewee is doing when execute method is called
         prefetch_result.query._qr = yield from execute(prefetch_result.query)
         prefetch_result.query._dirty = False
 
