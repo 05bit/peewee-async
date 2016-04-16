@@ -31,10 +31,7 @@ __version__ = '0.5.0a'
 __all__ = [
     ### High level API ###
 
-    # Manager
     'Manager',
-
-    # Database backends
     'PostgresqlDatabase',
     'PooledPostgresqlDatabase',
 
@@ -76,6 +73,16 @@ class Manager:
         user2 = await objects.get(User, username='test')
         # All should be the same
         print(user1, user2, user3)
+
+    If you don't pass database to constructor, you should define
+    `database` as a class member like that::
+
+        database = PostgresqlDatabase('my_db')
+
+        class MyManager(Manager):
+            database = database
+
+        objects = MyManager()
 
     Can also handle multiple databases for single model.
     Just create `Manager` instance per database.
