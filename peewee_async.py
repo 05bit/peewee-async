@@ -25,7 +25,7 @@ try:
 except ImportError:
     aiopg = None
 
-__version__ = '0.5.0'
+__version__ = '0.5.0a'
 
 __all__ = [
     ### High level API ###
