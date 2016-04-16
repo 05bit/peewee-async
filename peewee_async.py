@@ -19,6 +19,7 @@ import uuid
 import contextlib
 import tasklocals
 import peewee
+import warnings
 
 try:
     import aiopg
@@ -39,24 +40,15 @@ __all__ = [
 
     ### Low level API ###
 
-    # Queries
     'execute',
-
-    # Object actions
     'get_object',
     'create_object',
     'delete_object',
     'update_object',
-
-    # Sync calls helpers
     'sync_unwanted',
     'UnwantedSyncQueryError',
-
-    # Aggregation
     'count',
     'scalar',
-
-    # Transactions
     'atomic',
     'transaction',
     'savepoint',
@@ -199,11 +191,23 @@ class Manager:
 
     @asyncio.coroutine
     def count(self, query, clear_limit=False):
-        raise NotImplementedError
+        """Perform *COUNT* aggregated query asynchronously.
+
+        :return: number of objects in ``select()`` query
+        """
+        yield from self.connect()
+        query = self._prepare_query(query)
+        return (yield from count(query, clear_limit=clear_limit))
 
     @asyncio.coroutine
     def scalar(self, query, as_tuple=False):
-        raise NotImplementedError
+        """Get single value from ``select()`` query, i.e. for aggregation.
+
+        :return: result is the same as after sync ``query.scalar()`` call
+        """
+        yield from self.connect()
+        query = self._prepare_query(query)
+        return (yield from scalar(query, as_tuple=as_tuple))
 
     @asyncio.coroutine
     def atomic(self):
@@ -219,13 +223,13 @@ class Manager:
 
     @asyncio.coroutine
     def connect(self):
-        """Connect to database if not connected.
+        """Open database async connection if not connected.
         """
         yield from self.database.connect_async()
 
     @asyncio.coroutine
     def close(self):
-        """Close database connection if connected.
+        """Close database async connection if connected.
         """
         yield from self.database.close_async()
 
@@ -880,12 +884,9 @@ class PooledPostgresqlDatabase(AsyncPooledPostgresqlMixin, peewee.PostgresqlData
     """
     def init(self, database, **kwargs):
         super().init(database, **kwargs)
-
-        min_connections = self.connect_kwargs.pop('min_connections', 1)
-        max_connections = self.connect_kwargs.pop('max_connections', 20)
-
-        self.init_async(min_connections=min_connections,
-                        max_connections=max_connections)
+        self.init_async(
+            min_connections=self.connect_kwargs.pop('min_connections', 1),
+            max_connections=self.connect_kwargs.pop('max_connections', 20))
 
 
 ##############
@@ -898,6 +899,8 @@ def sync_unwanted(database):
     """Context manager for preventing unwanted sync queries.
     `UnwantedSyncQueryError` exception will raise on such query.
     """
+    warnings.warn("sync_unwanted() context manager is deprecated",
+                  DeprecationWarning)
     old_allow_sync = database.allow_sync
     database.allow_sync = False
     yield
@@ -907,7 +910,9 @@ def sync_unwanted(database):
 class UnwantedSyncQueryError(Exception):
     """Exception which is raised when performing unwanted sync query.
     """
-    pass
+    def __init__(self, *args, **kwargs):
+        warnings.warn("UnwantedSyncQueryError is deprecated",
+                      DeprecationWarning)
 
 
 ################
@@ -1024,10 +1029,13 @@ class atomic:
 @asyncio.coroutine
 def _run_sql(db, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
-    """    
-    assert db._async_conn, "Error, no async database connection."
+    """ 
+    if not db._async_conn:
+        raise peewee.DatabaseError("Error, async database connection "
+                                   "is not set up.")
 
-    cursor = yield from db._async_conn.cursor(conn=db.transaction_conn_async())
+    conn = db.transaction_conn_async()
+    cursor = yield from db._async_conn.cursor(conn=conn)
 
     try:
         yield from cursor.execute(operation, *args, **kwargs)
@@ -1042,5 +1050,4 @@ def _run_sql(db, operation, *args, **kwargs):
 def _execute_query_async(query):
     """Execute query and return cursor object.
     """
-    db = query.database
-    return (yield from _run_sql(db, *query.sql()))
+    return (yield from _run_sql(query.database, *query.sql()))

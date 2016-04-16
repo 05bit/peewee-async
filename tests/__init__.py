@@ -102,15 +102,21 @@ def setUpModule():
 
     database.conn = db_cls(**db_params)
 
-    setup_managers(ini)
+    init_managers(ini)
 
 
-def setup_managers(ini):
+def init_managers(ini):
     if managers:
         return
 
     config = {
         'postgres': {
+            'database': 'test',
+            'host': '127.0.0.1',
+            'port': 5432,
+            'user': 'postgres',
+        },
+        'postgres-ext': {
             'database': 'test',
             'host': '127.0.0.1',
             'port': 5432,
@@ -123,7 +129,7 @@ def setup_managers(ini):
             'user': 'postgres',
             'max_connections': 2,
         },
-        'postgres-poolext': {
+        'postgres-pool-ext': {
             'database': 'test',
             'host': '127.0.0.1',
             'port': 5432,
@@ -134,8 +140,9 @@ def setup_managers(ini):
 
     classes = {
         'postgres': peewee_async.PostgresqlDatabase,
+        'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
         'postgres-pool': peewee_async.PooledPostgresqlDatabase,
-        'postgres-poolext': peewee_asyncext.PooledPostgresqlExtDatabase,
+        'postgres-pool-ext': peewee_asyncext.PooledPostgresqlExtDatabase,
     }
 
     for k in list(config.keys()):
@@ -212,15 +219,24 @@ class ManagerTestCase(unittest.TestCase):
             managers[k].database.drop_tables(
                 self.models, safe=True, cascade=True)
 
-    def run_with_managers(self, coroutine):
+    def run_with_managers(self, test, only=None):
+        """Run test coroutine against available Manager instances.
+
+            test -- coroutine with single parameter, Manager instance
+            only -- list of keys to filter managers, e.g. ['postgres-ext']
+        """
+        run = lambda c: self.loop.run_until_complete(c)
         for k in managers:
             objects = managers[k]
-            self.loop.run_until_complete(coroutine(objects))
-            self.loop.run_until_complete(self.clean_up(objects))
+            if only is None or (k in only):
+                run(test(objects))
+                run(self.clean_up(objects))
             self.run_count += 1
 
     @asyncio.coroutine
     def clean_up(self, objects):
+        """Clean all tables against objects manager.
+        """
         for model in reversed(self.models):
             yield from objects.execute(model.delete())
 
@@ -327,6 +343,66 @@ class ManagerTestCase(unittest.TestCase):
 
         self.run_with_managers(test)
 
+    def test_update_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from objects.create(TestModel, text=text)
+
+            objects.database.allow_sync = False
+
+            query = TestModel.update(text="Test update async") \
+                             .where(TestModel.id == obj1.id)
+            
+            upd1 = yield from objects.execute(query)
+            self.assertEqual(upd1, 1)
+
+            obj2 = yield from objects.get(TestModel, id=obj1.id)
+            self.assertEqual(obj2.text, "Test update async")
+
+            objects.database.allow_sync = True
+
+        self.run_with_managers(test)
+
+    def test_scalar_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+            fn = peewee.fn.Count(TestModel.id)
+            count1 = TestModel.select(fn).scalar()
+            count2 = yield from objects.scalar(TestModel.select(fn))
+            self.assertEqual(count1, count2)
+
+        self.run_with_managers(test)
+
+    def test_count_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+            count0 = TestModel.select().count()
+
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+            count1 = TestModel.select().count()
+
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+            count2 = yield from objects.count(TestModel.select())
+
+            self.assertEqual(count0, 1)
+            self.assertEqual(count1, 2)
+            self.assertEqual(count2, 3)
+            
+        self.run_with_managers(test)
+
 
 class PostgresInitTestCase(unittest.TestCase):
     def test_deferred_init(self):
@@ -400,30 +476,6 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
 
 
 class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
-    def test_update_query(self):
-        # Sync create
-        obj1 = TestModel.create(text='[sync] [test_update_obj]')
-        self.assertEqual(obj1.text, '[sync] [test_update_obj]')
-
-        # Sync update
-        upd1 = (TestModel.update(text='[sync] [test_update_obj] [update]')
-                         .where(TestModel.id == obj1.id).execute())
-        self.assertEqual(upd1, 1)
-
-        # Async update
-        @asyncio.coroutine
-        def test():
-            query = (TestModel.update(text='[async] [test_update_obj] [update]')
-                              .where(TestModel.id == obj1.id))
-            with sync_unwanted(database):
-                result = yield from execute(query)
-            return result
-
-        upd2 = self.run_until_complete(test())
-        self.assertEqual(upd2, 1)
-        self.assertEqual(TestModel.get(id=obj1.id).text,
-                         '[async] [test_update_obj] [update]')
-
     def test_delete_obj(self):
         # Sync create
         obj1 = TestModel.create(text='[sync] [test_delete_obj]')
@@ -459,38 +511,6 @@ class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
         self.assertEqual(sav1, 1)
         self.assertEqual(TestModel.get(id=obj1.id).text,
                          '[async] [test_save_obj]')
-
-    def test_scalar_query(self):
-        # Async scalar query
-        @asyncio.coroutine
-        def test():
-            count1 = TestModel.select(peewee.fn.Count(TestModel.id)).scalar()
-            with sync_unwanted(database):
-                count2 = yield from scalar(TestModel.select(peewee.fn.Count(TestModel.id)))
-            self.assertEqual(count1, count2)
-            return True
-
-        self.run_until_complete(test())
-
-    def test_count_query(self):
-        # Async count query
-        @asyncio.coroutine
-        def test():
-            count0 = TestModel.select().count()
-            TestModel.create(text='[sync] [test_count_query]')
-            count1 = TestModel.select().count()
-
-            with sync_unwanted(database):
-                count2 = yield from count(TestModel.select())
-                self.assertEqual(count2, count1)
-                self.assertEqual(count2, count0 + 1)
-
-                count3 = yield from count(TestModel.select().limit(1))
-                self.assertEqual(count3, 1)
-            
-            return True
-
-        self.run_until_complete(test())
 
     def test_prefetch(self):
         # Async prefetch
