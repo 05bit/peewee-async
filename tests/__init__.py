@@ -52,6 +52,7 @@ sync_unwanted = peewee_async.sync_unwanted
 # Globals
 db_params = {}
 database = ProxyDatabase()
+managers = {}
 
 
 def setUpModule():
@@ -101,6 +102,52 @@ def setUpModule():
 
     database.conn = db_cls(**db_params)
 
+    setup_managers(ini)
+
+
+def setup_managers(ini):
+    if managers:
+        return
+
+    config = {
+        'postgres': {
+            'database': 'test',
+            'host': '127.0.0.1',
+            'port': 5432,
+            'user': 'postgres',
+        },
+        'postgres-pool': {
+            'database': 'test',
+            'host': '127.0.0.1',
+            'port': 5432,
+            'user': 'postgres',
+            'max_connections': 2,
+        },
+        'postgres-poolext': {
+            'database': 'test',
+            'host': '127.0.0.1',
+            'port': 5432,
+            'user': 'postgres',
+            'max_connections': 2,
+        }
+    }
+
+    classes = {
+        'postgres': peewee_async.PostgresqlDatabase,
+        'postgres-pool': peewee_async.PooledPostgresqlDatabase,
+        'postgres-poolext': peewee_asyncext.PooledPostgresqlExtDatabase,
+    }
+
+    for k in list(config.keys()):
+        try:
+            config.update(dict(**ini[k]))
+        except KeyError:
+            pass
+
+        db_cls = classes[k]
+        db = db_cls(**config[k])
+        managers[k] = peewee_async.Manager(db)
+
 
 class TestModel(peewee.Model):
     text = peewee.CharField()
@@ -140,20 +187,162 @@ class UUIDTestModel(peewee.Model):
         database = database
 
 
+class ManagerTestCase(unittest.TestCase):
+    models = [TestModel, UUIDTestModel, TestModelAlpha,
+              TestModelBeta, TestModelGamma]
+
+    @classmethod
+    def setUpClass(cls, *args, **kwargs):
+        cls.loop = asyncio.get_event_loop()
+
+    @classmethod
+    def tearDownClass(cls, *args, **kwargs):
+        for k in managers:
+            cls.loop.run_until_complete(managers[k].close())
+
+    def setUp(self):
+        self.run_count = 0
+        for k in managers:
+            for model in self.models:
+                managers[k].database.create_table(model, safe=True)
+
+    def tearDown(self):
+        self.assertTrue(len(managers) == self.run_count)
+        for k in managers:
+            managers[k].database.drop_tables(
+                self.models, safe=True, cascade=True)
+
+    def run_with_managers(self, coroutine):
+        for k in managers:
+            objects = managers[k]
+            self.loop.run_until_complete(coroutine(objects))
+            self.loop.run_until_complete(self.clean_up(objects))
+            self.run_count += 1
+
+    @asyncio.coroutine
+    def clean_up(self, objects):
+        for model in reversed(self.models):
+            yield from objects.execute(model.delete())
+
+    def test_create_obj(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj = yield from objects.create(TestModel, text=text)
+            self.assertTrue(obj is not None)
+
+        self.run_with_managers(test)
+
+    def test_create_uuid_obj(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj = yield from objects.create(UUIDTestModel, text=text)
+            self.assertEqual(len(str(obj.id)), 36)
+
+        self.run_with_managers(test)
+
+    def test_get_obj_by_id(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from objects.create(TestModel, text=text)
+            obj2 = yield from objects.get(TestModel, id=obj1.id)
+            self.assertEqual(obj1, obj2)
+            self.assertEqual(obj1.id, obj2.id)
+
+        self.run_with_managers(test)
+
+    def test_get_obj_by_uuid(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from objects.create(UUIDTestModel, text=text)
+            obj2 = yield from objects.get(UUIDTestModel, id=obj1.id)
+            self.assertEqual(obj1, obj2)
+            self.assertEqual(len(str(obj1.id)), 36)
+
+        self.run_with_managers(test)
+
+    def test_select_many_objects(self):
+        @asyncio.coroutine
+        def test(objects):
+            TestModel.create(text="Test %s" % uuid.uuid4())
+            TestModel.create(text="Test %s" % uuid.uuid4())
+
+            # Reference sync select
+            select1 = TestModel.select()
+            len1 = len([o for o in select1])
+
+            # Async select
+            objects.database.allow_sync = False
+            select2 = yield from objects.execute(TestModel.select())
+            len2 = len([o for o in select2])
+
+            # Should be identical
+            self.assertTrue(len2 > 0)
+            self.assertEqual(len1, len2)
+            for o1, o2 in zip(select1, select2):
+                self.assertEqual(o1, o2)
+
+            objects.database.allow_sync = True
+
+        self.run_with_managers(test)
+
+    def test_insert_many_rows_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            select1 = yield from objects.execute(TestModel.select())
+            self.assertEqual(len(select1), 0)
+
+            query = TestModel.insert_many([
+                {'text': "Test %s" % uuid.uuid4()},
+                {'text': "Test %s" % uuid.uuid4()},
+            ])
+            last_id = yield from objects.execute(query)
+            self.assertTrue(last_id is not None)
+
+            select2 = yield from objects.execute(TestModel.select())
+            self.assertEqual(len(select2), 2)
+
+        self.run_with_managers(test)
+
+    def test_insert_one_row_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            query = TestModel.insert(text="Test %s" % uuid.uuid4())
+            last_id = yield from objects.execute(query)
+            self.assertTrue(last_id is not None)
+            select1 = yield from objects.execute(TestModel.select())
+            self.assertEqual(len(select1), 1)
+
+        self.run_with_managers(test)
+
+    def test_insert_one_row_uuid_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            query = UUIDTestModel.insert(text="Test %s" % uuid.uuid4())
+            last_id = yield from objects.execute(query)
+            self.assertEqual(len(str(last_id)), 36)
+
+        self.run_with_managers(test)
+
+
 class PostgresInitTestCase(unittest.TestCase):
     def test_deferred_init(self):
         db = peewee_async.PooledPostgresqlDatabase(None)
         self.assertTrue(db.deferred)
 
         db.init(**db_params)
+        self.assertTrue(not db.deferred)
 
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(db.connect_async(loop=loop))
-        # Should not fail connect again
-        loop.run_until_complete(db.connect_async(loop=loop))
-        loop.run_until_complete(db.close_async())
-        # Should not closing connect again
-        loop.run_until_complete(db.close_async())
+        run = lambda coroutine: loop.run_until_complete(coroutine)
+
+        run(db.connect_async(loop=loop))
+        run(db.connect_async(loop=loop)) # Should not fail connect again
+        run(db.close_async())
+        run(db.close_async())# Should not fail closing again
 
 
 class BaseAsyncPostgresTestCase(unittest.TestCase):
@@ -193,8 +382,6 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
         cls.gamma_111 = TestModelGamma.create(text='Gamma 1', beta=cls.beta_11)
         cls.gamma_112 = TestModelGamma.create(text='Gamma 2', beta=cls.beta_11)
 
-        cls.gamma_121 = TestModelGamma.create(text='Gamma 1', beta=cls.beta_12)
-
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
         # Finally, clean up
@@ -213,110 +400,6 @@ class BaseAsyncPostgresTestCase(unittest.TestCase):
 
 
 class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
-    def test_get_obj(self):
-        # Async get
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                obj = yield from get_object(TestModel, TestModel.id == self.obj.id)
-            self.assertEqual(obj.text, self.obj.text)
-            return obj
-
-        obj = self.run_until_complete(test())
-        self.assertTrue(obj is not None)
-
-    def test_get_uuid_obj(self):
-        # Async get
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                obj = yield from get_object(UUIDTestModel, UUIDTestModel.id == self.uuid_obj.id)
-            self.assertEqual(obj.text, self.obj.text)
-            return obj
-
-        obj = self.run_until_complete(test())
-        self.assertTrue(obj is not None)
-
-    def test_create_obj(self):
-        # Async create
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                obj = yield from create_object(TestModel, text='[async] [test_create_obj]')
-            self.assertTrue(obj.id is not None)
-            return obj
-
-        self.run_until_complete(test())
-
-    def test_create_uuid_obj(self):
-        # Async create
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                obj = yield from create_object(UUIDTestModel, text='[async] [test_create_uuid_obj]')
-            self.assertTrue(obj.id is not None)
-            return obj
-
-        self.run_until_complete(test())
-
-    def test_select_query(self):
-        # Sync select
-        q1 = TestModel.select()
-        len1 = len([o for o in q1])
-        self.assertTrue(len1 > 0)
-
-        # Async select
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                result = yield from execute(TestModel.select())
-            return result
-
-        q2 = self.run_until_complete(test())
-        len2 = len([o for o in q2])
-        self.assertTrue(len2 > 0)
-
-        # Results should be the same
-        self.assertEqual(len1, len2)
-        for o1, o2 in zip(q1, q2):
-            self.assertEqual(o1, o2)
-
-    def test_insert_many_rows_query(self):
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                query = TestModel.insert_many([
-                    {'text': '[async] [test_insert_many_1]'},
-                    {'text': '[async] [test_insert_many_2]'}
-                ])
-                result = yield from execute(query)
-            return result
-
-        last_id = self.run_until_complete(test())
-        self.assertTrue(last_id is not None)
-
-    def test_insert_one_row_query(self):
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                query = TestModel.insert(text='[async] [test_insert_one_query]')
-                result = yield from execute(query)
-            return result
-
-        last_id = self.run_until_complete(test())
-        self.assertTrue(last_id is not None)
-
-    def test_insert_one_row_uuid_query(self):
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                query = UUIDTestModel.insert(text='[async] [test_insert_uuid_query]')
-                result = yield from execute(query)
-            return result
-
-        last_id = self.run_until_complete(test())
-        self.assertTrue(last_id is not None)
-
     def test_update_query(self):
         # Sync create
         obj1 = TestModel.create(text='[sync] [test_update_obj]')
