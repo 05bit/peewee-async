@@ -16,15 +16,29 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 import asyncio
 import datetime
 import uuid
-
-import aiopg
-import peewee
 import contextlib
 import tasklocals
+import peewee
 
-__version__ = '0.4.0'
+try:
+    import aiopg
+except ImportError:
+    aiopg = None
+
+__version__ = '0.5.0'
 
 __all__ = [
+    ### High level API ###
+
+    # Manager
+    'Manager',
+
+    # Database backends
+    'PostgresqlDatabase',
+    'PooledPostgresqlDatabase',
+
+    ### Low level API ###
+
     # Queries
     'execute',
 
@@ -33,10 +47,6 @@ __all__ = [
     'create_object',
     'delete_object',
     'update_object',
-
-    # Database backends
-    'PostgresqlDatabase',
-    'PooledPostgresqlDatabase',
 
     # Sync calls helpers
     'sync_unwanted',
@@ -51,6 +61,135 @@ __all__ = [
     'transaction',
     'savepoint',
 ]
+
+################
+# Aync manager #
+################
+
+
+class Manager:
+    """Async peewee models manager.
+
+    Can handle multiple databases for single model.
+    Just create `Manager` instance per database.
+
+    :param model:       model class
+    :param database:    (optional) async database driver
+
+    Example::
+
+        users = Manager(User)
+        user0 = await users.create(username='test')
+        user1 = await users.get(id=user0.id)
+        user2 = await users.get(username='test')
+        # All should be the same
+        print(user1, user2, user3)
+    """
+    model = None
+    database = None
+
+    def __init__(self, model, database=None):
+        if not self.model:
+            self.model = model
+
+        if not self.database:
+            self.database = database or model._meta.database
+
+    @property
+    def allow_sync(self):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def get(self, *args, **kwargs):
+        """Get model instance.
+
+        Example::
+
+            obj1 = await self.get(id=1)
+            obj2 = await self.get(MyModel.id == 1)
+            obj3 = await self.get(MyModel.select().where(MyModel.id == 1))
+
+        All will return `MyModel` instance with `id = 1`
+        """
+        if args and isinstance(args[0], peewee.Query):
+            query = args[0]
+            conditions = list(args[1:])
+        else:
+            query = self.model.select()
+            conditions = list(args)
+
+        if kwargs:
+            conditions += [(getattr(self.model, k) == v)
+                for k, v in kwargs.items()]
+
+        if conditions:
+            query = query.where(*conditions)
+
+        query = self._prepare_query(query.limit(1))
+
+        try:
+            return (yield from select(query))[0]
+        except IndexError:
+            raise self.model.DoesNotExist
+
+    @asyncio.coroutine
+    def get_or_create(self, *args, **kwargs):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def create(self, **data):
+        """Create new object saved to database.
+        """
+        inst = self.model(**data)
+        query = self.model.insert(**dict(inst._data))
+
+        pk = yield from insert(self._prepare_query(query))
+        if pk is None:
+            pk = inst._get_pk_value()
+        inst._set_pk_value(pk)
+
+        inst._prepare_instance()
+        return inst
+
+    @asyncio.coroutine
+    def create_or_get(self, **kwargs):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def execute(self, query):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def prefetch(self, query, *subqueries):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def count(self, query, clear_limit=False):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def scalar(self, query, as_tuple=False):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def atomic(self):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def transaction(self):
+        raise NotImplementedError
+
+    @asyncio.coroutine
+    def savepoint(self):
+        raise NotImplementedError
+
+    def _prepare_query(self, query):
+        """Prepare query for execution against manager's database.
+        """
+        if query.database != self.database:
+            query = query.clone()
+            query.database = self.database
+        return query
 
 
 #################
@@ -87,24 +226,22 @@ def create_object(model, **data):
     :param data: data for initializing object
     :return: new object saved to database
     """
-    obj = model(**data)
-
     # NOTE! Here are internals involved:
     #
     # - obj._data
-    # - obj._dirty
     # - obj._get_pk_value()
     # - obj._set_pk_value()
+    # - obj._prepare_instance()
     #
-    field_dict = dict(obj._data)
-    pk = obj._get_pk_value()
-    pk_from_cursor = yield from insert(obj.insert(**field_dict))
-    if pk_from_cursor is not None:
-        pk = pk_from_cursor
-    obj._set_pk_value(pk)  # Do not overwrite current ID with None.
+    obj = model(**data)
+
+    pk = yield from insert(model.insert(**dict(obj._data)))
+
+    if pk is None:
+        pk = obj._get_pk_value()
+    obj._set_pk_value(pk)
     
-    obj._dirty.clear()
-    obj.prepared()
+    obj._prepare_instance()
 
     return obj
 
@@ -118,14 +255,14 @@ def get_object(source, *args):
     :return: model instance or raises ``peewee.DoesNotExist`` if object not found
     """
     if isinstance(source, peewee.Query):
-        base_query = source
-        model = base_query.model_class
+        query = source
+        model = query.model_class
     else:
-        base_query = source.select()
+        query = source.select()
         model = source
 
     # Return first object from query
-    for obj in (yield from select(base_query.where(*args).limit(1))):
+    for obj in (yield from select(query.where(*args).limit(1))):
         return obj
 
     # No objects found
@@ -208,6 +345,7 @@ def select(query):
 
     result = AsyncQueryWrapper(query)
     cursor = yield from result.execute()
+
     try:
         while True:
             yield from result.fetchone()
@@ -517,6 +655,9 @@ class AsyncPostgresqlMixin:
     """
     def init_async(self, conn_cls=AsyncPostgresqlConnection, enable_json=False,
                    enable_hstore=False):
+        if not aiopg:
+            raise Exception("Error, aiopg is not installed!")
+
         self.allow_sync = True        
         self._loop = None
         self._async_conn = None
@@ -541,8 +682,8 @@ class AsyncPostgresqlMixin:
         on default event loop.
         """
         if self.deferred:
-            raise Exception('Error, database not properly initialized '
-                            'before opening connection')
+            raise Exception("Error, database not properly initialized "
+                            "before opening connection")
 
         if not self._async_conn:
             self._loop = loop if loop else asyncio.get_event_loop()
