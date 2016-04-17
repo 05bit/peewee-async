@@ -17,7 +17,6 @@ import peewee_async
 import peewee_asyncext
 
 ini = configparser.ConfigParser()
-database = peewee.Proxy()
 
 
 def setUpModule():
@@ -76,14 +75,14 @@ class TestModel(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = database
+        database = peewee_async.AutoDatabase
 
 
 class TestModelAlpha(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = database
+        database = peewee_async.AutoDatabase
 
 
 class TestModelBeta(peewee.Model):
@@ -91,7 +90,7 @@ class TestModelBeta(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = database
+        database = peewee_async.AutoDatabase
 
 
 class TestModelGamma(peewee.Model):
@@ -99,7 +98,7 @@ class TestModelGamma(peewee.Model):
     beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
 
     class Meta:
-        database = database
+        database = peewee_async.AutoDatabase
 
 
 class UUIDTestModel(peewee.Model):
@@ -107,7 +106,7 @@ class UUIDTestModel(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = database
+        database = peewee_async.AutoDatabase
 
 
 class ManagerTestCase(unittest.TestCase):
@@ -129,15 +128,22 @@ class ManagerTestCase(unittest.TestCase):
 
     def setUp(self):
         self.run_count = 0
+
         for k, objects in self.managers.items():
             for model in self.models:
-                objects.database.create_table(model, safe=True)
+                with objects.allow_sync():
+                    objects.database.drop_table(
+                        model, fail_silently=True, cascade=True)
+                    objects.database.create_table(model)
 
     def tearDown(self):
         self.assertTrue(len(self.managers) == self.run_count)
+
         for k, objects in self.managers.items():
-            objects.database.drop_tables(
-                self.models, safe=True, cascade=True)
+            for model in self.models:
+                with objects.allow_sync():
+                    objects.database.drop_table(
+                        model, fail_silently=True, cascade=True)
 
     def run_with_managers(self, test, only=None):
         """Run test coroutine against available Manager instances.
@@ -147,11 +153,6 @@ class ManagerTestCase(unittest.TestCase):
         """
         run = lambda c: self.loop.run_until_complete(c)
         for k, objects in self.managers.items():
-            # Swap sync database
-            for model in self.models:
-                model._meta.database = objects.database
-
-            # Run async test
             if only is None or (k in only):
                 run(test(objects))
                 run(self.clean_up(objects))
@@ -188,6 +189,7 @@ class ManagerTestCase(unittest.TestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             obj1 = yield from objects.create(TestModel, text=text)
+
             obj2 = yield from objects.get(TestModel, id=obj1.id)
             self.assertEqual(obj1, obj2)
             self.assertEqual(obj1.id, obj2.id)
@@ -199,6 +201,7 @@ class ManagerTestCase(unittest.TestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             obj1 = yield from objects.create(UUIDTestModel, text=text)
+
             obj2 = yield from objects.get(UUIDTestModel, id=obj1.id)
             self.assertEqual(obj1, obj2)
             self.assertEqual(len(str(obj1.id)), 36)
@@ -208,25 +211,21 @@ class ManagerTestCase(unittest.TestCase):
     def test_select_many_objects(self):
         @asyncio.coroutine
         def test(objects):
-            TestModel.create(text="Test %s" % uuid.uuid4())
-            TestModel.create(text="Test %s" % uuid.uuid4())
+            text = "Test 1"
+            obj1 = yield from objects.create(TestModel, text=text)
+            text = "Test 2"
+            obj2 = yield from objects.create(TestModel, text=text)
 
-            # Reference sync select
-            select1 = TestModel.select()
-            len1 = len([o for o in select1])
+            select1 = [obj1, obj2]
+            len1 = len(select1)
 
-            # Async select
-            objects.database.allow_sync = False
-            select2 = yield from objects.execute(TestModel.select())
+            select2 = yield from objects.execute(
+                TestModel.select().order_by(TestModel.text))
             len2 = len([o for o in select2])
 
-            # Should be identical
-            self.assertTrue(len2 > 0)
             self.assertEqual(len1, len2)
             for o1, o2 in zip(select1, select2):
                 self.assertEqual(o1, o2)
-
-            objects.database.allow_sync = True
 
         self.run_with_managers(test)
 
@@ -274,8 +273,6 @@ class ManagerTestCase(unittest.TestCase):
             text = "Test %s" % uuid.uuid4()
             obj1 = yield from objects.create(TestModel, text=text)
 
-            objects.database.allow_sync = False
-
             query = TestModel.update(text="Test update query") \
                              .where(TestModel.id == obj1.id)
             
@@ -284,8 +281,6 @@ class ManagerTestCase(unittest.TestCase):
 
             obj2 = yield from objects.get(TestModel, id=obj1.id)
             self.assertEqual(obj2.text, "Test update query")
-
-            objects.database.allow_sync = True
 
         self.run_with_managers(test)
 
@@ -308,11 +303,12 @@ class ManagerTestCase(unittest.TestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             obj1 = yield from objects.create(TestModel, text=text)
+
             obj2 = yield from objects.get(TestModel, id=obj1.id)
 
             yield from objects.delete(obj2)
             try:
-                obj3 = TestModel.get(id=obj1.id)
+                obj3 = yield from objects.get(TestModel, id=obj1.id)
             except TestModel.DoesNotExist:
                 obj3 = None
             self.assertTrue(obj3 is None, "Error, object wasn't deleted")
@@ -328,9 +324,8 @@ class ManagerTestCase(unittest.TestCase):
             yield from objects.create(TestModel, text=text)
 
             fn = peewee.fn.Count(TestModel.id)
-            count1 = TestModel.select(fn).scalar()
-            count2 = yield from objects.scalar(TestModel.select(fn))
-            self.assertEqual(count1, count2)
+            count = yield from objects.scalar(TestModel.select(fn))
+            self.assertEqual(count, 2)
 
         self.run_with_managers(test)
 
@@ -339,39 +334,44 @@ class ManagerTestCase(unittest.TestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             yield from objects.create(TestModel, text=text)
-
-            count0 = TestModel.select().count()
-
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
             text = "Test %s" % uuid.uuid4()
             yield from objects.create(TestModel, text=text)
 
-            count1 = TestModel.select().count()
-
-            text = "Test %s" % uuid.uuid4()
-            yield from objects.create(TestModel, text=text)
-
-            count2 = yield from objects.count(TestModel.select())
-
-            self.assertEqual(count0, 1)
-            self.assertEqual(count1, 2)
-            self.assertEqual(count2, 3)
+            count = yield from objects.count(TestModel.select())
+            self.assertEqual(count, 3)
             
         self.run_with_managers(test)
 
     def test_prefetch(self):
         @asyncio.coroutine
         def test(objects):
-            alpha_1 = TestModelAlpha.create(text='Alpha 1')
-            alpha_2 = TestModelAlpha.create(text='Alpha 2')
-            beta_11 = TestModelBeta.create(text='Beta 1', alpha=alpha_1)
-            beta_12 = TestModelBeta.create(text='Beta 2', alpha=alpha_1)
-            beta_21 = TestModelBeta.create(text='Beta 1', alpha=alpha_2)
-            beta_22 = TestModelBeta.create(text='Beta 2', alpha=alpha_2)
-            gamma_111 = TestModelGamma.create(text='Gamma 1', beta=beta_11)
-            gamma_112 = TestModelGamma.create(text='Gamma 2', beta=beta_11)
+            alpha_1 = yield from objects.create(TestModelAlpha,
+                                                text='Alpha 1')
+            alpha_2 = yield from objects.create(TestModelAlpha,
+                                                text='Alpha 2')
 
-            objects.database.allow_sync = False
+            beta_11 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha_1,
+                                                text='Beta 11')
+            beta_12 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha_1,
+                                                text='Beta 12')
+            beta_21 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha_2,
+                                                text='Beta 21')
+            beta_22 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha_2,
+                                                text='Beta 22')
 
+            gamma_111 = yield from objects.create(TestModelGamma,
+                                                  beta=beta_11,
+                                                  text='Gamma 111')
+            gamma_112 = yield from objects.create(TestModelGamma,
+                                                  beta=beta_11,
+                                                  text='Gamma 112')
+            
             result = yield from objects.prefetch(
                 TestModelAlpha.select(),
                 TestModelBeta.select(),
@@ -387,8 +387,6 @@ class ManagerTestCase(unittest.TestCase):
 
             self.assertEqual(tuple(result[0].betas_prefetch[0].gammas_prefetch),
                              (gamma_111, gamma_112))
-
-            objects.database.allow_sync = True
 
         self.run_with_managers(test)
 

@@ -31,6 +31,7 @@ __all__ = [
     ### High level API ###
 
     'Manager',
+    'AutoDatabase',
 
     ### Low level API ###
 
@@ -93,10 +94,12 @@ class Manager:
     database = None
 
     def __init__(self, database=None, *, loop=None):
+        assert database or self.database, \
+               ("Error, database should be provided via "
+                "argument or class member.")
         self.loop = loop or asyncio.get_event_loop()
         self.database = database or self.database
-        assert self.database, ("Error, database should be provided via "
-                               "argument or class member.")
+        self.database.allow_sync = False
 
     @property
     def is_connected(self):
@@ -173,10 +176,6 @@ class Manager:
         """Update object in database. Optionally, update only specified
         fields. For creating new object use `create()`.
         """
-        if obj._meta.database and (obj._meta.database != self.database):
-            raise Exception("Error, object's database and manager's "
-                            " database are different: %s" % obj)
-
         field_dict = dict(obj._data)
         pk_field = obj._meta.primary_key
 
@@ -201,10 +200,6 @@ class Manager:
     def delete(self, obj, recursive=False, delete_nullable=False):
         """Delete object from database.
         """
-        if obj._meta.database and (obj._meta.database != self.database):
-            raise Exception("Error, object's database and manager's "
-                            " database are different: %s" % obj)
-
         if recursive:
             dependencies = obj.dependencies(delete_nullable)
             for cond, fk in reversed(list(dependencies)):
@@ -247,11 +242,8 @@ class Manager:
         :return: Query that has already cached data for subqueries
         """
         query = yield from self._prepare_query(query)
-        new_subqueries = []
-        for sq in subqueries:
-            new_sq = yield from self._prepare_query(sq, connect=False)
-            new_subqueries.append(new_sq)
-        return (yield from prefetch(query, *new_subqueries))
+        subqueries = map(self._swap_database, subqueries)
+        return (yield from prefetch(query, *subqueries))
 
     @asyncio.coroutine
     def count(self, query, clear_limit=False):
@@ -298,29 +290,65 @@ class Manager:
         """
         yield from self.database.close_async()
 
-    @asyncio.coroutine
-    def _prepare_query(self, query, connect=True):
-        """Prepare query for execution against manager's database.
+    @contextlib.contextmanager
+    def allow_sync(self, allow=True):
+        """Allow sync queries within context.
         """
-        if query.database != self.database:
+        old_allow = self.database.allow_sync
+        self.database.allow_sync = allow
+        yield
+        self.database.allow_sync = old_allow
+
+    @asyncio.coroutine
+    def _prepare_query(self, query):
+        """Connect to database if not connected and swap database
+        for query to execute against manager's database.
+        """
+        yield from self.connect()
+        return self._swap_database(query)
+
+    def _swap_database(self, query):
+        """Swap database for query if swappable. Return **new query**
+        with swapped database.
+
+        Check manager database and model database match. If model
+        database is `auto`, manager's one will be used.
+
+        If query database can't be swapped and differs from manager's
+        database, it's **WRONG AND DANGEROUS**, so assertion is raised.
+        """
+        model = query.model_class
+        if model._meta.database == AutoDatabase:
             query = query.clone()
             query.database = self.database
-        if connect:
-            yield from self.connect()
-        return query
+            return query
+        elif model._meta.database == self.database:
+            return query
+        else:
+            assert False, ("Error, models's database and manager's "
+                           "database are different: %s" % model)
 
-    def _prune_fields(self, field_dict, only):
+    @staticmethod
+    def _prune_fields(field_dict, only):
         """Filter fields data in place with `only` list.
 
         Example::
 
             self._prune_fields(field_dict, ['slug', 'text'])
+            self._prune_fields(field_dict, [MyModel.slug])
         """
         fields = [(isinstance(f, str) and f or f.name) for f in only]
         for f in list(field_dict.keys()):
             if not f in fields:
                 field_dict.pop(f)
         return field_dict
+
+
+class AutoDatabase:
+    """Swappable database placeholder. Doesn't contain any implementation.
+    """
+    # Both PostgreSQL and MySQL requires SELECT commit
+    commit_select = True
 
 
 #################
