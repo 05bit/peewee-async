@@ -22,47 +22,49 @@ import peewee_asyncext
 
 ini = configparser.ConfigParser()
 
+deafults = {
+    'postgres': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        'port': 5432,
+        'user': 'postgres',
+    },
+    'postgres-ext': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        'port': 5432,
+        'user': 'postgres',
+    },
+    'postgres-pool': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        'port': 5432,
+        'user': 'postgres',
+        'max_connections': 2,
+    },
+    'postgres-pool-ext': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        'port': 5432,
+        'user': 'postgres',
+        'max_connections': 2,
+    }
+}
+
+db_classes = {
+    'postgres': peewee_async.PostgresqlDatabase,
+    'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
+    'postgres-pool': peewee_async.PooledPostgresqlDatabase,
+    'postgres-pool-ext': peewee_asyncext.PooledPostgresqlExtDatabase,
+}
+
 
 def setUpModule():
     ini.read(['tests.ini'])
 
 
 def load_managers(*, managers=None, loop=None):
-    config = {
-        'postgres': {
-            'database': 'test',
-            'host': '127.0.0.1',
-            'port': 5432,
-            'user': 'postgres',
-        },
-        'postgres-ext': {
-            'database': 'test',
-            'host': '127.0.0.1',
-            'port': 5432,
-            'user': 'postgres',
-        },
-        'postgres-pool': {
-            'database': 'test',
-            'host': '127.0.0.1',
-            'port': 5432,
-            'user': 'postgres',
-            'max_connections': 2,
-        },
-        'postgres-pool-ext': {
-            'database': 'test',
-            'host': '127.0.0.1',
-            'port': 5432,
-            'user': 'postgres',
-            'max_connections': 2,
-        }
-    }
-
-    classes = {
-        'postgres': peewee_async.PostgresqlDatabase,
-        'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
-        'postgres-pool': peewee_async.PooledPostgresqlDatabase,
-        'postgres-pool-ext': peewee_asyncext.PooledPostgresqlExtDatabase,
-    }
+    config = dict(deafults)
 
     for k in list(config.keys()):
         try:
@@ -70,8 +72,8 @@ def load_managers(*, managers=None, loop=None):
         except KeyError:
             pass
 
-        database_cls = classes[k]
-        database = database_cls(**config[k])
+        db_class = db_classes[k]
+        database = db_class(**config[k])
         managers[k] = peewee_async.Manager(database, loop=loop)
 
 
@@ -186,6 +188,20 @@ class BaseManagerTestCase(unittest.TestCase):
 
 
 class ManagerTestCase(BaseManagerTestCase):
+    def test_connect_close(self):
+        @asyncio.coroutine
+        def test(objects):
+            yield from objects.connect()
+            self.assertTrue(objects.is_connected)
+            yield from objects.connect()
+            self.assertTrue(objects.is_connected)
+            yield from objects.close()
+            self.assertTrue(not objects.is_connected)
+            yield from objects.close()
+            self.assertTrue(not objects.is_connected)
+
+        self.run_with_managers(test)
+
     def test_create_obj(self):
         @asyncio.coroutine
         def test(objects):
@@ -411,21 +427,22 @@ class ManagerTestCase(BaseManagerTestCase):
         self.run_with_managers(test)
 
 
-# class PostgresInitTestCase(unittest.TestCase):
-#     def test_deferred_init(self):
-#         db = peewee_async.PooledPostgresqlDatabase(None)
-#         self.assertTrue(db.deferred)
+class PostgresInitTestCase(unittest.TestCase):
+    def test_deferred_init(self):
+        config = dict(deafults)
 
-#         db.init(**db_params)
-#         self.assertTrue(not db.deferred)
+        for k in list(config.keys()):
+            try:
+                config.update(dict(**ini[k]))
+            except KeyError:
+                pass
 
-#         loop = asyncio.get_event_loop()
-#         run = lambda coroutine: loop.run_until_complete(coroutine)
+            db_class = db_classes[k]
+            database = db_class(None)
+            self.assertTrue(database.deferred)
 
-#         run(db.connect_async(loop=loop))
-#         run(db.connect_async(loop=loop)) # Should not fail connect again
-#         run(db.close_async())
-#         run(db.close_async()) # Should not fail closing again
+            database.init(**config[k])
+            self.assertTrue(not database.deferred)
 
 
 #####################

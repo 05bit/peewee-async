@@ -866,9 +866,10 @@ class AsyncPostgresqlMixin:
     @asyncio.coroutine
     def close_async(self):
         if self._async_conn:
-            yield from self._async_conn.close()
+            conn = self._async_conn
             self._async_conn = None
             self._loop = None
+            yield from conn.close()
 
     @asyncio.coroutine
     def last_insert_id_async(self, cursor, model):
