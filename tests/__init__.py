@@ -122,9 +122,8 @@ class ManagerTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
-        # for k, objects in cls.managers.items():
-        #     cls.loop.run_until_complete(objects.close())
-        pass
+        for k, objects in cls.managers.items():
+            cls.loop.run_until_complete(objects.close())
 
     def setUp(self):
         self.run_count = 0

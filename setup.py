@@ -9,7 +9,7 @@ __version__ = ''
 with open('peewee_async.py') as file:
     for line in file:
         if line.startswith('__version__'):
-            __version__ = line.split('=')[1].strip()
+            __version__ = line.split('=')[1].strip().strip("'").strip('"')
             break
 
 setup(

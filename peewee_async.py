@@ -14,6 +14,7 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 import asyncio
+import logging
 import uuid
 import contextlib
 import tasklocals
@@ -53,6 +54,8 @@ __all__ = [
     'sync_unwanted',
     'UnwantedSyncQueryError',
 ]
+
+log = logging.getLogger('peewee.async')
 
 #################
 # Async manager #
@@ -753,7 +756,7 @@ class AsyncPooledPostgresqlConnection:
         self.connect_kwargs = kwargs
 
     @asyncio.coroutine
-    def get_conn(self):
+    def acquire(self):
         return (yield from self._pool.acquire())
 
     def release(self, conn):
@@ -777,7 +780,7 @@ class AsyncPooledPostgresqlConnection:
             # Acquire connection with cursor, once cursor is released
             # connection is also released to pool:
 
-            conn = yield from self._pool.acquire()
+            conn = yield from self.acquire()
             cursor = yield from conn.cursor(*args, **kwargs)
 
             def release():
@@ -848,13 +851,17 @@ class AsyncPostgresqlMixin:
                             "before opening connection")
 
         if not self._async_conn:
-            self._loop = loop if loop else asyncio.get_event_loop()
-            self._task_data = tasklocals.local(loop=self._loop)
-            self._async_conn = self._async_conn_cls(
-                self._loop, self.database,
+            loop = loop or asyncio.get_event_loop()
+            conn = self._async_conn_cls(
+                loop, self.database,
                 timeout if timeout else aiopg.DEFAULT_TIMEOUT,
                 **self.connect_kwargs_async)
-            yield from self._async_conn.connect()
+
+            yield from conn.connect()
+
+            self._loop = loop
+            self._task_data = tasklocals.local(loop=loop)
+            self._async_conn = conn
 
     @asyncio.coroutine
     def close_async(self):
@@ -893,7 +900,7 @@ class AsyncPostgresqlMixin:
         """
         if not getattr(self._task_data, 'depth', 0):
             self._task_data.depth = 0
-            self._task_data.conn = yield from self._async_conn.get_conn()
+            self._task_data.conn = yield from self._async_conn.acquire()
 
         self._task_data.depth += 1
 
@@ -1142,8 +1149,16 @@ def _run_sql(db, operation, *args, **kwargs):
         raise peewee.DatabaseError("Error, async database connection "
                                    "is not set up.")
 
-    conn = db.transaction_conn_async()
-    cursor = yield from db._async_conn.cursor(conn=conn)
+    if db.transaction_depth_async() > 0:
+        conn = db.transaction_conn_async()
+    else:
+        conn = None
+
+    try:
+        cursor = yield from db._async_conn.cursor(conn=conn)
+    except:
+        yield from db.close_async()
+        raise
 
     try:
         yield from cursor.execute(operation, *args, **kwargs)
