@@ -266,9 +266,9 @@ class Manager:
         query = yield from self._prepare_query(query)
         return (yield from scalar(query, as_tuple=as_tuple))
 
-    @asyncio.coroutine
+    # @asyncio.coroutine
     def atomic(self):
-        yield from self.connect()
+        # yield from self.connect()
         return atomic(self.database)
 
     @asyncio.coroutine
@@ -350,7 +350,7 @@ class Manager:
 class AutoDatabase:
     """Swappable database placeholder. Doesn't contain any implementation.
     """
-    # Both PostgreSQL and MySQL requires SELECT commit
+    # Both PostgreSQL and MySQL need commiting SELECT
     commit_select = True
 
 

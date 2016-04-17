@@ -16,6 +16,10 @@ import peewee
 import peewee_async
 import peewee_asyncext
 
+##########
+# Config #
+##########
+
 ini = configparser.ConfigParser()
 
 
@@ -71,6 +75,11 @@ def load_managers(*, managers=None, loop=None):
         managers[k] = peewee_async.Manager(database, loop=loop)
 
 
+##########
+# Models #
+##########
+
+
 class TestModel(peewee.Model):
     text = peewee.CharField()
 
@@ -109,7 +118,12 @@ class UUIDTestModel(peewee.Model):
         database = peewee_async.AutoDatabase
 
 
-class ManagerTestCase(unittest.TestCase):
+####################
+# Base tests class #
+####################
+
+
+class BaseManagerTestCase(unittest.TestCase):
     managers = {}
 
     models = [TestModel, UUIDTestModel, TestModelAlpha,
@@ -165,6 +179,13 @@ class ManagerTestCase(unittest.TestCase):
         for model in reversed(self.models):
             yield from objects.execute(model.delete())
 
+
+################
+# Common tests #
+################
+
+
+class ManagerTestCase(BaseManagerTestCase):
     def test_create_obj(self):
         @asyncio.coroutine
         def test(objects):
@@ -407,5 +428,9 @@ class ManagerTestCase(unittest.TestCase):
 #         run(db.close_async()) # Should not fail closing again
 
 
-# if sys.version_info >= (3, 5):
-#     from .tests_py35 import *
+#####################
+# Python 3.5+ tests #
+#####################
+
+if sys.version_info >= (3, 5):
+    from .tests_py35 import *

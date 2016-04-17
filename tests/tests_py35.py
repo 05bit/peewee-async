@@ -7,21 +7,8 @@ will just fail with `SyntaxError` while importing this module.
 
 """
 import asyncio
-import peewee_async
-from . import database,\
-    BaseAsyncPostgresTestCase,\
-    TestModel,\
-    UUIDTestModel
-
-# Shortcuts
-execute = peewee_async.execute
-count = peewee_async.count
-scalar = peewee_async.scalar
-get_object = peewee_async.get_object
-create_object = peewee_async.create_object
-delete_object = peewee_async.delete_object
-update_object = peewee_async.update_object
-sync_unwanted = peewee_async.sync_unwanted
+from . import TestModel
+from . import BaseManagerTestCase
 
 
 class FakeUpdateError(Exception):
@@ -30,66 +17,74 @@ class FakeUpdateError(Exception):
     pass
 
 
-class AsyncPostgresTransactionsTestCase(BaseAsyncPostgresTestCase):
+class ManagerTransactionsTestCase(BaseManagerTestCase):
     def test_atomic_success(self):
         """Successful update in transaction.
         """
-        async def test():
-            with sync_unwanted(database):
-                obj = await create_object(TestModel, text='FOO')
-                obj_id = obj.id
+        async def test(objects):
+            obj = await objects.create(TestModel, text='FOO')
+            obj_id = obj.id
 
-                async with database.atomic_async():
-                    obj.text = 'BAR'
-                    await update_object(obj)
+            async with objects.atomic():
+                obj.text = 'BAR'
+                await objects.update(obj)
 
-                res = await get_object(TestModel, TestModel.id == obj_id)
-                self.assertEqual(res.text, 'BAR')
+            res = await objects.get(TestModel, id=obj_id)
+            self.assertEqual(res.text, 'BAR')
 
-        self.run_until_complete(test())
+        self.run_with_managers(test)
 
     def test_atomic_failed(self):
         """Failed update in transaction.
         """
-        async def test():
-            with sync_unwanted(database):
-                obj = await create_object(TestModel, text='FOO')
-                obj_id = obj.id
+        async def test(objects):
+            obj = await objects.create(TestModel, text='FOO')
+            obj_id = obj.id
 
-                try:
-                    async with database.atomic_async():
-                        obj.text = 'BAR'
-                        await update_object(obj)
-                        raise FakeUpdateError()
-                except FakeUpdateError as e:
-                    update_error = True
-                    res = await get_object(TestModel, TestModel.id == obj_id)
-                
-                self.assertTrue(update_error)
-                self.assertEqual(res.text, 'FOO')
+            try:
+                async with objects.atomic():
+                    obj.text = 'BAR'
+                    await objects.update(obj)
+                    raise FakeUpdateError()
+            except FakeUpdateError as e:
+                error = True
+                res = await objects.get(TestModel, id=obj_id)
+            
+            self.assertTrue(error)
+            self.assertEqual(res.text, 'FOO')
 
-        self.run_until_complete(test())
+        self.run_with_managers(test)
 
     def test_several_transactions(self):
         """Run several transactions in parallel tasks.
         """
-        async def t1():
-            async with database.atomic_async():
-                self.assertEqual(database.transaction_depth_async(), 1)
-                await asyncio.sleep(0.75)
+        run = lambda c: self.loop.run_until_complete(c)
 
-        async def t2():
-            async with database.atomic_async():
-                self.assertEqual(database.transaction_depth_async(), 1)
-                await asyncio.sleep(0.5)
+        wait = lambda tasks: run(asyncio.wait([self.loop.create_task(t)
+            for t in tasks], loop=self.loop))
 
-        async def t3():
-            async with database.atomic_async():
-                self.assertEqual(database.transaction_depth_async(), 1)
-                await asyncio.sleep(0.25)
+        async def t1(objects):
+            async with objects.atomic():
+                self.assertEqual(objects.database.transaction_depth_async(), 1)
+                await asyncio.sleep(0.25, loop=self.loop)
 
-        self.run_until_complete(asyncio.wait([
-            self.loop.create_task(t1()),
-            self.loop.create_task(t2()),
-            self.loop.create_task(t3()),
-        ]))
+        async def t2(objects):
+            async with objects.atomic():
+                self.assertEqual(objects.database.transaction_depth_async(), 1)
+                await asyncio.sleep(0.0625, loop=self.loop)
+
+        async def t3(objects):
+            async with objects.atomic():
+                self.assertEqual(objects.database.transaction_depth_async(), 1)
+                await asyncio.sleep(0.125, loop=self.loop)
+
+        for k, objects in self.managers.items():
+            wait([
+                t1(objects),
+                t2(objects),
+                t3(objects),
+            ])
+
+            run(self.clean_up(objects))
+
+            self.run_count += 1
