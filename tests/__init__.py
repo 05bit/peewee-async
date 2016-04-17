@@ -86,14 +86,14 @@ class TestModel(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = peewee_async.AutoDatabase
+        database = peewee_async._AutoDatabase
 
 
 class TestModelAlpha(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = peewee_async.AutoDatabase
+        database = peewee_async._AutoDatabase
 
 
 class TestModelBeta(peewee.Model):
@@ -101,7 +101,7 @@ class TestModelBeta(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = peewee_async.AutoDatabase
+        database = peewee_async._AutoDatabase
 
 
 class TestModelGamma(peewee.Model):
@@ -109,7 +109,7 @@ class TestModelGamma(peewee.Model):
     beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
 
     class Meta:
-        database = peewee_async.AutoDatabase
+        database = peewee_async._AutoDatabase
 
 
 class UUIDTestModel(peewee.Model):
@@ -117,7 +117,7 @@ class UUIDTestModel(peewee.Model):
     text = peewee.CharField()
 
     class Meta:
-        database = peewee_async.AutoDatabase
+        database = peewee_async._AutoDatabase
 
 
 ####################
