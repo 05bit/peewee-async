@@ -16,99 +16,15 @@ import peewee
 import peewee_async
 import peewee_asyncext
 
-# import logging
-# logging.basicConfig(level=logging.DEBUG)
-
-
-class ProxyDatabase(object):
-    """Proxy database for deferred initialization.
-    """
-    def __init__(self):
-        self.conn = None
-
-    def __getattr__(self, attr):
-        if self.conn is None:
-            raise AttributeError('Cannot use uninitialized Proxy.')
-        return getattr(self.conn, attr)
-
-    def __setattr__(self, attr, value):
-        if attr == 'conn':
-            return super(ProxyDatabase, self).__setattr__(attr, value)
-        elif (self.conn is None) and (attr != 'conn'):
-            raise AttributeError('Cannot use uninitialized Proxy.')
-        else:
-            return setattr(self.conn, attr, value)        
-
-# Shortcuts
-execute = peewee_async.execute
-count = peewee_async.count
-scalar = peewee_async.scalar
-get_object = peewee_async.get_object
-create_object = peewee_async.create_object
-delete_object = peewee_async.delete_object
-update_object = peewee_async.update_object
-sync_unwanted = peewee_async.sync_unwanted
-
-# Globals
-db_params = {}
-database = ProxyDatabase()
-managers = {}
+ini = configparser.ConfigParser()
+database = peewee.Proxy()
 
 
 def setUpModule():
-    global db_params
-    global database
-
-    ini = configparser.ConfigParser()
     ini.read(['tests.ini'])
 
-    try:
-        config = dict(**ini['tests'])
-    except KeyError:
-        config = {}
 
-    config.setdefault('database', 'test')
-    config.setdefault('host', '127.0.0.1')
-    config.setdefault('port', None)
-    config.setdefault('user', 'postgres')
-    config.setdefault('password', '')
-
-    if 'DATABASE_URL' in os.environ:
-        url = urllib.parse.urlparse(os.environ['DATABASE_URL'])
-        config['user'] = url.username or config['user']
-        config['host'] = url.host or config['host']
-        config['port'] = url.port or config['port']
-
-    db_params = config.copy()
-    use_ext = db_params.pop('use_ext', False)
-    use_pool = False
-
-    if 'max_connections' in db_params:
-        db_params['max_connections'] = int(db_params['max_connections'])
-        use_pool = db_params['max_connections'] > 1
-        if not use_pool:
-            db_params.pop('max_connections')
-
-    if use_pool:
-        if use_ext:
-            db_cls = peewee_asyncext.PooledPostgresqlExtDatabase
-        else:
-            db_cls = peewee_async.PooledPostgresqlDatabase
-    else:
-        if use_ext:
-            db_cls = peewee_asyncext.PostgresqlExtDatabase
-        else:
-            db_cls = peewee_async.PostgresqlDatabase
-
-    database.conn = db_cls(**db_params)
-
-    init_managers(ini)
-
-
-def init_managers(ini):
-    if managers:
-        return
-
+def load_managers(*, managers=None, loop=None):
     config = {
         'postgres': {
             'database': 'test',
@@ -151,9 +67,9 @@ def init_managers(ini):
         except KeyError:
             pass
 
-        db_cls = classes[k]
-        db = db_cls(**config[k])
-        managers[k] = peewee_async.Manager(db)
+        database_cls = classes[k]
+        database = database_cls(**config[k])
+        managers[k] = peewee_async.Manager(database, loop=loop)
 
 
 class TestModel(peewee.Model):
@@ -195,28 +111,32 @@ class UUIDTestModel(peewee.Model):
 
 
 class ManagerTestCase(unittest.TestCase):
+    managers = {}
+
     models = [TestModel, UUIDTestModel, TestModelAlpha,
               TestModelBeta, TestModelGamma]
 
     @classmethod
     def setUpClass(cls, *args, **kwargs):
-        cls.loop = asyncio.get_event_loop()
+        cls.loop = asyncio.new_event_loop()
+        load_managers(managers=cls.managers, loop=cls.loop)
 
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
-        for k in managers:
-            cls.loop.run_until_complete(managers[k].close())
+        # for k, objects in cls.managers.items():
+        #     cls.loop.run_until_complete(objects.close())
+        pass
 
     def setUp(self):
         self.run_count = 0
-        for k in managers:
+        for k, objects in self.managers.items():
             for model in self.models:
-                managers[k].database.create_table(model, safe=True)
+                objects.database.create_table(model, safe=True)
 
     def tearDown(self):
-        self.assertTrue(len(managers) == self.run_count)
-        for k in managers:
-            managers[k].database.drop_tables(
+        self.assertTrue(len(self.managers) == self.run_count)
+        for k, objects in self.managers.items():
+            objects.database.drop_tables(
                 self.models, safe=True, cascade=True)
 
     def run_with_managers(self, test, only=None):
@@ -226,9 +146,7 @@ class ManagerTestCase(unittest.TestCase):
             only -- list of keys to filter managers, e.g. ['postgres-ext']
         """
         run = lambda c: self.loop.run_until_complete(c)
-        for k in managers:
-            objects = managers[k]
-
+        for k, objects in self.managers.items():
             # Swap sync database
             for model in self.models:
                 model._meta.database = objects.database
@@ -358,16 +276,46 @@ class ManagerTestCase(unittest.TestCase):
 
             objects.database.allow_sync = False
 
-            query = TestModel.update(text="Test update async") \
+            query = TestModel.update(text="Test update query") \
                              .where(TestModel.id == obj1.id)
             
             upd1 = yield from objects.execute(query)
             self.assertEqual(upd1, 1)
 
             obj2 = yield from objects.get(TestModel, id=obj1.id)
-            self.assertEqual(obj2.text, "Test update async")
+            self.assertEqual(obj2.text, "Test update query")
 
             objects.database.allow_sync = True
+
+        self.run_with_managers(test)
+
+    def test_update_obj(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from objects.create(TestModel, text=text)
+
+            obj1.text = "Test update object"
+            yield from objects.update(obj1)
+
+            obj2 = yield from objects.get(TestModel, id=obj1.id)
+            self.assertEqual(obj2.text, "Test update object")
+
+        self.run_with_managers(test)
+
+    def test_delete_obj(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from objects.create(TestModel, text=text)
+            obj2 = yield from objects.get(TestModel, id=obj1.id)
+
+            yield from objects.delete(obj2)
+            try:
+                obj3 = TestModel.get(id=obj1.id)
+            except TestModel.DoesNotExist:
+                obj3 = None
+            self.assertTrue(obj3 is None, "Error, object wasn't deleted")
 
         self.run_with_managers(test)
 
@@ -445,114 +393,22 @@ class ManagerTestCase(unittest.TestCase):
         self.run_with_managers(test)
 
 
-class PostgresInitTestCase(unittest.TestCase):
-    def test_deferred_init(self):
-        db = peewee_async.PooledPostgresqlDatabase(None)
-        self.assertTrue(db.deferred)
+# class PostgresInitTestCase(unittest.TestCase):
+#     def test_deferred_init(self):
+#         db = peewee_async.PooledPostgresqlDatabase(None)
+#         self.assertTrue(db.deferred)
 
-        db.init(**db_params)
-        self.assertTrue(not db.deferred)
+#         db.init(**db_params)
+#         self.assertTrue(not db.deferred)
 
-        loop = asyncio.get_event_loop()
-        run = lambda coroutine: loop.run_until_complete(coroutine)
+#         loop = asyncio.get_event_loop()
+#         run = lambda coroutine: loop.run_until_complete(coroutine)
 
-        run(db.connect_async(loop=loop))
-        run(db.connect_async(loop=loop)) # Should not fail connect again
-        run(db.close_async())
-        run(db.close_async())# Should not fail closing again
-
-
-class BaseAsyncPostgresTestCase(unittest.TestCase):
-    db_tables = [TestModel, UUIDTestModel, TestModelAlpha,
-                 TestModelBeta, TestModelGamma]
-
-    @classmethod
-    def setUpClass(cls, *args, **kwargs):
-        # Sync connect 
-        database.connect()
-
-        # Async connect
-        cls.loop = asyncio.get_event_loop()
-        cls.loop.run_until_complete(database.connect_async(loop=cls.loop))
-
-        # Clean up after possible errors
-        for table in reversed(cls.db_tables):
-            table.drop_table(True, cascade=True)
-
-        # Create tables with sync connection
-        for table in cls.db_tables:
-            table.create_table()
-
-        # Create at least one object per model
-        cls.obj = TestModel.create(text='[sync] Hello!')
-        cls.uuid_obj = UUIDTestModel.create(text='[sync] Hello!')
-
-        cls.alpha_1 = TestModelAlpha.create(text='Alpha 1')
-        cls.alpha_2 = TestModelAlpha.create(text='Alpha 2')
-
-        cls.beta_11 = TestModelBeta.create(text='Beta 1', alpha=cls.alpha_1)
-        cls.beta_12 = TestModelBeta.create(text='Beta 2', alpha=cls.alpha_1)
-
-        cls.beta_21 = TestModelBeta.create(text='Beta 1', alpha=cls.alpha_2)
-        cls.beta_22 = TestModelBeta.create(text='Beta 2', alpha=cls.alpha_2)
-
-        cls.gamma_111 = TestModelGamma.create(text='Gamma 1', beta=cls.beta_11)
-        cls.gamma_112 = TestModelGamma.create(text='Gamma 2', beta=cls.beta_11)
-
-    @classmethod
-    def tearDownClass(cls, *args, **kwargs):
-        # Finally, clean up
-        for table in reversed(cls.db_tables):
-            table.drop_table()
-
-        # Close database
-        database.close()
-
-        # Async disconnect
-        cls.loop.run_until_complete(database.close_async())
-
-    def run_until_complete(self, coroutine):
-        result = self.loop.run_until_complete(coroutine)
-        return result
+#         run(db.connect_async(loop=loop))
+#         run(db.connect_async(loop=loop)) # Should not fail connect again
+#         run(db.close_async())
+#         run(db.close_async()) # Should not fail closing again
 
 
-class AsyncPostgresTestCase(BaseAsyncPostgresTestCase):
-    def test_delete_obj(self):
-        # Sync create
-        obj1 = TestModel.create(text='[sync] [test_delete_obj]')
-
-        # Async delete
-        @asyncio.coroutine
-        def test():
-            with sync_unwanted(database):
-                result = yield from delete_object(obj1)
-            return result
-
-        del1 = self.run_until_complete(test())
-        self.assertEqual(del1, 1)
-        try:
-            TestModel.get(id=obj1.id)
-            self.assertTrue(False, "Error, object wasn't deleted")
-        except TestModel.DoesNotExist:
-            pass
-
-    def test_update_obj(self):
-        # Sync create
-        obj1 = TestModel.create(text='[sync] [test_save_obj]')
-
-        # Async save
-        @asyncio.coroutine
-        def test():
-            obj1.text = '[async] [test_save_obj]'
-            with sync_unwanted(database):
-                result = yield from update_object(obj1)
-            return result
-
-        sav1 = self.run_until_complete(test())
-        self.assertEqual(sav1, 1)
-        self.assertEqual(TestModel.get(id=obj1.id).text,
-                         '[async] [test_save_obj]')
-
-
-if sys.version_info >= (3, 5):
-    from .tests_py35 import *
+# if sys.version_info >= (3, 5):
+#     from .tests_py35 import *

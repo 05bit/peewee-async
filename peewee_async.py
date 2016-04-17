@@ -14,7 +14,6 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 import asyncio
-import datetime
 import uuid
 import contextlib
 import tasklocals
@@ -26,39 +25,43 @@ try:
 except ImportError:
     aiopg = None
 
-__version__ = '0.5.0a'
+__version__ = '0.5a1'
 
 __all__ = [
     ### High level API ###
 
     'Manager',
-    'PostgresqlDatabase',
-    'PooledPostgresqlDatabase',
 
     ### Low level API ###
 
+    'PostgresqlDatabase',
+    'PooledPostgresqlDatabase',
     'execute',
     'get_object',
     'create_object',
     'delete_object',
     'update_object',
-    'sync_unwanted',
-    'UnwantedSyncQueryError',
     'count',
     'scalar',
     'atomic',
     'transaction',
     'savepoint',
+
+    ### Deprecated ###
+
+    'sync_unwanted',
+    'UnwantedSyncQueryError',
 ]
 
-################
-# Aync manager #
-################
+#################
+# Async manager #
+#################
 
 
 class Manager:
     """Async peewee models manager.
 
+    :param loop: (optional) asyncio event loop
     :param database: (optional) async database driver
 
     Example::
@@ -87,11 +90,13 @@ class Manager:
     Can also handle multiple databases for single model.
     Just create `Manager` instance per database.
     """
-    # Async database driver
     database = None
 
-    def __init__(self, database=None):
+    def __init__(self, database=None, *, loop=None):
+        self.loop = loop or asyncio.get_event_loop()
         self.database = database or self.database
+        assert self.database, ("Error, database should be provided via "
+                               "argument or class member.")
 
     @property
     def is_connected(self):
@@ -128,12 +133,25 @@ class Manager:
         if conditions:
             query = query.where(*conditions)
 
-        query = self._prepare_query(query.limit(1))
-
         try:
-            return (yield from select(query))[0]
+            return (yield from self.execute(query.limit(1)))[0]
         except IndexError:
             raise model.DoesNotExist
+
+    @asyncio.coroutine
+    def create(self, model, **data):
+        """Create new object saved to database.
+        """
+        inst = model(**data)
+        query = model.insert(**dict(inst._data))
+
+        pk = yield from self.execute(query)
+        if pk is None:
+            pk = inst._get_pk_value()
+        inst._set_pk_value(pk)
+
+        inst._prepare_instance()
+        return inst
 
     @asyncio.coroutine
     def get_or_create(self, model, defaults=None, **kwargs):
@@ -151,21 +169,54 @@ class Manager:
             return (yield from self.create(**data)), True
 
     @asyncio.coroutine
-    def create(self, model, **data):
-        """Create new object saved to database.
+    def update(self, obj, only=None):
+        """Update object in database. Optionally, update only specified
+        fields. For creating new object use `create()`.
         """
-        yield from self.connect()
+        if obj._meta.database and (obj._meta.database != self.database):
+            raise Exception("Error, object's database and manager's "
+                            " database are different: %s" % obj)
 
-        inst = model(**data)
-        query = model.insert(**dict(inst._data))
+        field_dict = dict(obj._data)
+        pk_field = obj._meta.primary_key
 
-        pk = yield from insert(self._prepare_query(query))
-        if pk is None:
-            pk = inst._get_pk_value()
-        inst._set_pk_value(pk)
+        if only:
+            self._prune_fields(field_dict, only)
 
-        inst._prepare_instance()
-        return inst
+        if obj._meta.only_save_dirty:
+            self._prune_fields(field_dict, obj.dirty_fields)
+
+        if obj._meta.composite_key:
+            for pk_part_name in pk_field.field_names:
+                field_dict.pop(pk_part_name, None)
+        else:
+            field_dict.pop(pk_field.name, None)
+
+        query = obj.update(**field_dict).where(obj._pk_expr())
+        result = yield from self.execute(query)
+        obj._dirty.clear()
+        return result
+
+    @asyncio.coroutine
+    def delete(self, obj, recursive=False, delete_nullable=False):
+        """Delete object from database.
+        """
+        if obj._meta.database and (obj._meta.database != self.database):
+            raise Exception("Error, object's database and manager's "
+                            " database are different: %s" % obj)
+
+        if recursive:
+            dependencies = obj.dependencies(delete_nullable)
+            for cond, fk in reversed(list(dependencies)):
+                model = fk.model_class
+                if fk.null and not delete_nullable:
+                    sq = model.update(**{fk.name: None}).where(cond)
+                else:
+                    sq = model.delete().where(cond)
+                yield from self.execute(sq)
+
+        query = obj.delete().where(obj._pk_expr())
+        return (yield from self.execute(query))
 
     @asyncio.coroutine
     def create_or_get(self, model, **kwargs):
@@ -185,12 +236,9 @@ class Manager:
     @asyncio.coroutine
     def execute(self, query):
         """Execute query asyncronously.
-
-        NOTE! Query will always be executed against manager's
-        database even if it was created for another one.
         """
-        yield from self.connect()
-        return (yield from execute(self._prepare_query(query)))
+        query = yield from self._prepare_query(query)
+        return (yield from execute(query))
 
     @asyncio.coroutine
     def prefetch(self, query, *subqueries):
@@ -198,10 +246,12 @@ class Manager:
 
         :return: Query that has already cached data for subqueries
         """
-        yield from self.connect()
-        return (yield from prefetch(
-            self._prepare_query(query),
-            *map(self._prepare_query, subqueries)))
+        query = yield from self._prepare_query(query)
+        new_subqueries = []
+        for sq in subqueries:
+            new_sq = yield from self._prepare_query(sq, connect=False)
+            new_subqueries.append(new_sq)
+        return (yield from prefetch(query, *new_subqueries))
 
     @asyncio.coroutine
     def count(self, query, clear_limit=False):
@@ -209,8 +259,7 @@ class Manager:
 
         :return: number of objects in ``select()`` query
         """
-        yield from self.connect()
-        query = self._prepare_query(query)
+        query = yield from self._prepare_query(query)
         return (yield from count(query, clear_limit=clear_limit))
 
     @asyncio.coroutine
@@ -219,27 +268,29 @@ class Manager:
 
         :return: result is the same as after sync ``query.scalar()`` call
         """
-        yield from self.connect()
-        query = self._prepare_query(query)
+        query = yield from self._prepare_query(query)
         return (yield from scalar(query, as_tuple=as_tuple))
 
     @asyncio.coroutine
     def atomic(self):
+        yield from self.connect()
         return atomic(self.database)
 
     @asyncio.coroutine
     def transaction(self):
+        yield from self.connect()
         return transaction(self.database)
 
     @asyncio.coroutine
     def savepoint(self, sid=None):
+        yield from self.connect()
         return savepoint(self.database, sid=sid)
 
     @asyncio.coroutine
     def connect(self):
         """Open database async connection if not connected.
         """
-        yield from self.database.connect_async()
+        yield from self.database.connect_async(loop=self.loop)
 
     @asyncio.coroutine
     def close(self):
@@ -247,13 +298,29 @@ class Manager:
         """
         yield from self.database.close_async()
 
-    def _prepare_query(self, query):
+    @asyncio.coroutine
+    def _prepare_query(self, query, connect=True):
         """Prepare query for execution against manager's database.
         """
         if query.database != self.database:
             query = query.clone()
             query.database = self.database
+        if connect:
+            yield from self.connect()
         return query
+
+    def _prune_fields(self, field_dict, only):
+        """Filter fields data in place with `only` list.
+
+        Example::
+
+            self._prune_fields(field_dict, ['slug', 'text'])
+        """
+        fields = [(isinstance(f, str) and f or f.name) for f in only]
+        for f in list(field_dict.keys()):
+            if not f in fields:
+                field_dict.pop(f)
+        return field_dict
 
 
 #################
@@ -844,13 +911,10 @@ class AsyncPostgresqlMixin:
         return savepoint(self, sid=sid)
 
     def execute_sql(self, *args, **kwargs):
-        """Sync execute SQL query. If this query is performing within
-        `sync_unwanted()` context, then `UnwantedSyncQueryError` exception
-        is raised.
+        """Sync execute SQL query, `allow_sync` must be set to True.
         """
-        if not self.allow_sync:
-            raise UnwantedSyncQueryError("Error, unwanted sync query",
-                                         args, kwargs)
+        assert self.allow_sync, ("Error, sync query is not allowed: "
+                                 "allow_sync is False")
         return super().execute_sql(*args, **kwargs)
 
 

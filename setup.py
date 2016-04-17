@@ -1,9 +1,16 @@
 """
 Asynchronous interface for peewee ORM powered by asyncio.
 """
+import os
 from setuptools import setup
 
-__version__ = '0.5.0a'
+__version__ = ''
+
+with open('peewee_async.py') as file:
+    for line in file:
+        if line.startswith('__version__'):
+            __version__ = line.split('=')[1].strip()
+            break
 
 setup(
     name="peewee-async",
