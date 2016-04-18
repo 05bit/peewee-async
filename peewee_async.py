@@ -143,7 +143,8 @@ class Manager:
             query = query.where(*conditions)
 
         try:
-            return (yield from self.execute(query.limit(1)))[0]
+            result = yield from self.execute(query.limit(1))
+            return list(result)[0]
         except IndexError:
             raise model.DoesNotExist
 
@@ -309,10 +310,18 @@ class Manager:
         If query database can't be swapped and differs from manager's
         database, it's **WRONG AND DANGEROUS**, so assertion is raised.
         """
-        model = query.model_class
-        if model._meta.database == self.database:
+        if query.database == self.database:
             return query
-        elif model._meta.database == _AutoDatabase:
+        elif self._subclassed(peewee.PostgresqlDatabase,
+                              query.database,
+                              self.database):
+            can_swap = True
+        elif self._subclassed(peewee.MySQLDatabase,
+                              query.database,
+                              self.database):
+            can_swap = True
+
+        if can_swap:
             # **Experimental** database swapping!
             query = query.clone()
             query.database = self.database
@@ -320,6 +329,12 @@ class Manager:
         else:
             assert False, ("Error, models's database and manager's "
                            "database are different: %s" % model)
+
+    @staticmethod
+    def _subclassed(base, *classes):
+        """Check if all classes are subclassed from base.
+        """
+        return all(map(lambda obj, base: isinstance(obj, base), classes))
 
     @staticmethod
     def _prune_fields(field_dict, only):
@@ -497,6 +512,7 @@ def select(query):
     cursor = yield from _execute_query_async(query)
 
     result = AsyncQueryWrapper(cursor=cursor, query=query)
+
     try:
         while True:
             yield from result.fetchone()
@@ -1037,6 +1053,110 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
             'maxsize': self.max_connections,
         })
         return kwargs
+
+
+#########
+# MySQL #
+#########
+
+
+class AsyncMySQLConnection:
+    """Asynchronous database connection pool.
+    """
+    def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
+        self.pool = None
+        self.loop = loop
+        self.database = database
+        self.timeout = timeout
+        self.connect_kwargs = kwargs
+
+    @asyncio.coroutine
+    def acquire(self):
+        """Acquire connection from pool.
+        """
+        return (yield from self.pool.acquire())
+
+    def release(self, conn):
+        """Release connection to pool.
+        """
+        self.pool.release(conn)
+
+    @asyncio.coroutine
+    def connect(self):
+        """Create connection pool asynchronously.
+        """
+        self.pool = yield from aiomysql.create_pool(
+            loop=self.loop,
+            db=self.database,
+            connect_timeout=self.timeout,
+            **self.connect_kwargs)
+
+    @asyncio.coroutine
+    def cursor(self, conn=None, *args, **kwargs):
+        """Get cursor for connection from pool.
+        """
+        if conn is None:
+            # Acquire connection with cursor, once cursor is released
+            # connection is also released to pool:
+
+            conn = yield from self.acquire()
+            cursor = yield from conn.cursor(*args, **kwargs)
+
+            def release():
+                cursor.close()
+                self.pool.release(conn)
+            cursor.release = release
+        else:
+            # Acquire cursor from provided connection, after cursor is
+            # released connection is NOT released to pool, i.e.
+            # for handling transactions:
+
+            cursor = yield from conn.cursor(*args, **kwargs)
+            cursor.release = lambda: cursor.close()
+
+        return cursor
+
+    @asyncio.coroutine
+    def close(self):
+        """Terminate all pool connections.
+        """
+        self.pool.terminate()
+        yield from self.pool.wait_closed()
+
+
+class AsyncMySQLMixin(AsyncDatabase):
+    """Mixin for `peewee.MySQL Database` providing extra methods
+    for managing async connection.
+    """
+    def init_mysql_async(self, conn_cls=AsyncMySQLConnection):
+        if not aiomysql:
+            raise Exception("Error, aiomysql is not installed!")
+        self._async_conn_cls = conn_cls
+
+    @property
+    def connect_kwargs_async(self):
+        """Connection parameters for `aiomysql.Connection`
+        """
+        return self.connect_kwargs
+
+    @asyncio.coroutine
+    def last_insert_id_async(self, cursor, model):
+        """Get ID of last inserted row.
+        """
+        if model._meta.auto_increment:
+            return cursor.lastrowid
+
+
+class MySQLDatabase(AsyncMySQLMixin, peewee.MySQLDatabase):
+    """MySQL database driver providing **single drop-in sync** connection
+    and **single async connection** interface.
+
+    See also:
+    http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
+    """
+    def init(self, database, **kwargs):
+        super().init(database, **kwargs)
+        self.init_mysql_async()
 
 
 ##############

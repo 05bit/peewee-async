@@ -18,6 +18,8 @@ class FakeUpdateError(Exception):
 
 
 class ManagerTransactionsTestCase(BaseManagerTestCase):
+    only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+
     def test_atomic_success(self):
         """Successful update in transaction.
         """
@@ -85,6 +87,8 @@ class ManagerTransactionsTestCase(BaseManagerTestCase):
                 t3(objects),
             ])
 
-            run(self.clean_up(objects))
+            with self.manager(objects, allow_sync=True):
+                for model in reversed(self.models):
+                    model.delete().execute()
 
             self.run_count += 1

@@ -6,7 +6,9 @@ Create tests.ini file to configure tests.
 
 """
 import os
+import logging
 import asyncio
+import contextlib
 import configparser
 import sys
 import urllib.parse
@@ -20,6 +22,7 @@ import peewee_asyncext
 # Config #
 ##########
 
+# logging.basicConfig(level=logging.DEBUG)
 ini = configparser.ConfigParser()
 
 deafults = {
@@ -48,6 +51,12 @@ deafults = {
         'port': 5432,
         'user': 'postgres',
         'max_connections': 4,
+    },
+    'mysql': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        'port': 3306,
+        'user': 'root',
     }
 }
 
@@ -56,6 +65,7 @@ db_classes = {
     'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
     'postgres-pool': peewee_async.PooledPostgresqlDatabase,
     'postgres-pool-ext': peewee_asyncext.PooledPostgresqlExtDatabase,
+    'mysql': peewee_async.MySQLDatabase,
 }
 
 
@@ -63,10 +73,13 @@ def setUpModule():
     ini.read(['tests.ini'])
 
 
-def load_managers(*, managers=None, loop=None):
+def load_managers(*, managers=None, loop=None, only=None):
     config = dict(deafults)
 
     for k in list(config.keys()):
+        if only and not k in only:
+            continue
+
         try:
             config.update(dict(**ini[k]))
         except KeyError:
@@ -126,39 +139,63 @@ class UUIDTestModel(peewee.Model):
 
 
 class BaseManagerTestCase(unittest.TestCase):
-    managers = {}
+    only = None
 
     models = [TestModel, UUIDTestModel, TestModelAlpha,
               TestModelBeta, TestModelGamma]
 
     @classmethod
+    @contextlib.contextmanager
+    def manager(cls, objects, allow_sync=False):
+        old_allow_sync = objects.database.allow_sync
+        objects.database.allow_sync = allow_sync
+        for model in cls.models:
+            model._meta.database = objects.database
+        yield
+        objects.database.allow_sync = old_allow_sync
+
+    @classmethod
     def setUpClass(cls, *args, **kwargs):
+        """Configure database managers, create test tables.
+        """
+        cls.managers = {}
         cls.loop = asyncio.new_event_loop()
-        load_managers(managers=cls.managers, loop=cls.loop)
+        # cls.loop.set_debug(True)
+
+        load_managers(managers=cls.managers, loop=cls.loop, only=cls.only)
+
+        for k, objects in cls.managers.items():
+            with cls.manager(objects, allow_sync=True):
+                for model in cls.models:
+                    model.create_table(True)
 
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
+        """Remove all test tables and close connections.
+        """
         for k, objects in cls.managers.items():
             cls.loop.run_until_complete(objects.close())
 
-    def setUp(self):
-        self.run_count = 0
+        for k, objects in cls.managers.items():
+            with cls.manager(objects, allow_sync=True):
+                for model in reversed(cls.models):
+                    model.drop_table(fail_silently=True, cascade=True)
 
+        cls.managers = None
+
+    def setUp(self):
+        """Reset all data.
+        """
+        self.run_count = 0
         for k, objects in self.managers.items():
-            for model in self.models:
-                with objects.allow_sync():
-                    objects.database.drop_table(
-                        model, fail_silently=True, cascade=True)
-                    objects.database.create_table(model)
+            with self.manager(objects, allow_sync=True):
+                for model in reversed(self.models):
+                    model.delete().execute()
 
     def tearDown(self):
-        self.assertTrue(len(self.managers) == self.run_count)
-
-        for k, objects in self.managers.items():
-            for model in self.models:
-                with objects.allow_sync():
-                    objects.database.drop_table(
-                        model, fail_silently=True, cascade=True)
+        """Check if test was actually passed by counter.
+        """
+        self.assertEqual(len(self.managers), self.run_count)
 
     def run_with_managers(self, test, only=None):
         """Run test coroutine against available Manager instances.
@@ -166,20 +203,14 @@ class BaseManagerTestCase(unittest.TestCase):
             test -- coroutine with single parameter, Manager instance
             only -- list of keys to filter managers, e.g. ['postgres-ext']
         """
-        run = lambda c: self.loop.run_until_complete(c)
         for k, objects in self.managers.items():
             if only is None or (k in only):
-                run(test(objects))
-                run(self.clean_up(objects))
-
+                with self.manager(objects):
+                    self.loop.run_until_complete(test(objects))
+                with self.manager(objects, allow_sync=True):
+                    for model in reversed(self.models):
+                        model.delete().execute()
             self.run_count += 1
-
-    @asyncio.coroutine
-    def clean_up(self, objects):
-        """Clean all tables against objects manager.
-        """
-        for model in reversed(self.models):
-            yield from objects.execute(model.delete())
 
 
 ################
@@ -187,7 +218,37 @@ class BaseManagerTestCase(unittest.TestCase):
 ################
 
 
+class MySQLManagerTestCase(BaseManagerTestCase):
+    only = ['mysql']
+
+    def setUp(self):
+        """Reset all data.
+        """
+        for model in self.models:
+            model._meta.database = self.managers['mysql'].database
+        super().setUp()
+
+    def test_get_obj_by_id(self):
+        import aiomysql
+
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from objects.create(TestModel, text=text)
+
+            with objects.allow_sync():
+                obj1 = TestModel.create(text=text)
+
+            obj2 = yield from objects.get(TestModel, id=obj1.id)
+            self.assertEqual(obj1, obj2)
+            self.assertEqual(obj1.id, obj2.id)
+
+        self.run_with_managers(test)
+
+
 class ManagerTestCase(BaseManagerTestCase):
+    only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+
     def test_connect_close(self):
         @asyncio.coroutine
         def test(objects):
