@@ -489,9 +489,9 @@ def select(query):
         ("Error, trying to run select coroutine"
          "with wrong query class %s" % str(query))
 
-    result = AsyncQueryWrapper(query)
-    cursor = yield from result.execute()
+    cursor = yield from _execute_query_async(query)
 
+    result = AsyncQueryWrapper(cursor=cursor, query=query)
     try:
         while True:
             yield from result.fetchone()
@@ -585,7 +585,6 @@ def scalar(query, as_tuple=False):
     row = yield from cursor.fetchone()
 
     cursor.release()
-
     if row and not as_tuple:
         return row[0]
     else:
@@ -598,9 +597,9 @@ def raw_query(query):
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
 
-    result = AsyncRawQueryWrapper(query)
-    cursor = yield from result.execute()
+    cursor = yield from _execute_query_async(query)
 
+    result = AsyncRawQueryWrapper(cursor=cursor, query=query)
     try:
         while True:
             yield from result.fetchone()
@@ -678,10 +677,9 @@ class AsyncQueryWrapper:
     To retrieve results after async fetching just iterate over this class
     instance, like you generally iterate over sync results wrapper.
     """
-    def __init__(self, query):
+    def __init__(self, *, cursor=None, query=None):
         self._initialized = False
-        self._cursor = None
-        self._query = query
+        self._cursor = cursor
         self._result = []
         self._result_wrapper = self._get_result_wrapper(query)
 
@@ -710,11 +708,6 @@ class AsyncQueryWrapper:
             QRW = query.database.get_result_wrapper(RESULTS_MODELS)
 
         return QRW(query.model_class, None, query.get_query_meta())
-
-    @asyncio.coroutine
-    def execute(self):
-        self._cursor = yield from _execute_query_async(self._query)
-        return self._cursor
 
     @asyncio.coroutine
     def fetchone(self):
