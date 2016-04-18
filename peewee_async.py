@@ -732,14 +732,14 @@ class AsyncQueryWrapper:
 ##############
 
 
-class AsyncPooledPostgresqlConnection:
-    """Asynchronous database connection pool wrapper.
+class AsyncPostgresqlConnectionPool:
+    """Asynchronous database connection pool.
     """
     def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
         self.pool = None
         self.loop = loop
         self.database = database
-        self.timeout = timeout
+        self.timeout = timeout or aiopg.DEFAULT_TIMEOUT
         self.connect_kwargs = kwargs
 
     @asyncio.coroutine
@@ -796,8 +796,8 @@ class AsyncPooledPostgresqlConnection:
         yield from self.pool.wait_closed()
 
 
-class AsyncPostgresqlConnection(AsyncPooledPostgresqlConnection):
-    """Asynchronous single database connection wrapper.
+class AsyncPostgresqlConnection(AsyncPostgresqlConnectionPool):
+    """Asynchronous single database connection.
     """
     def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
         kwargs['minsize'] = 1
@@ -852,7 +852,7 @@ class AsyncPostgresqlMixin:
             conn = self._async_conn_cls(
                 database=self.database,
                 loop=self.loop,
-                timeout=(timeout or aiopg.DEFAULT_TIMEOUT),
+                timeout=timeout,
                 **self.connect_kwargs_async)
 
             yield from conn.connect()
@@ -998,7 +998,7 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """
     def init(self, database, **kwargs):
         super().init(database, **kwargs)
-        self.init_async(conn_cls=AsyncPooledPostgresqlConnection)
+        self.init_async(conn_cls=AsyncPostgresqlConnectionPool)
         self.min_connections = self.connect_kwargs.pop('min_connections', 1)
         self.max_connections = self.connect_kwargs.pop('max_connections', 20)
 
