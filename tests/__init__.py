@@ -244,6 +244,29 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_raw_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+            result1 = yield from objects.execute(TestModel.raw(
+                'select id, text from testmodel'))
+            self.assertEqual(len(list(result1)), 1)
+            self.assertTrue(isinstance(result1[0], TestModel))
+
+            result2 = yield from objects.execute(TestModel.raw(
+                'select id, text from testmodel').tuples())
+            self.assertEqual(len(list(result2)), 1)
+            self.assertTrue(isinstance(result2[0], tuple))
+
+            result3 = yield from objects.execute(TestModel.raw(
+                'select id, text from testmodel').dicts())
+            self.assertEqual(len(list(result3)), 1)
+            self.assertTrue(isinstance(result3[0], dict))
+
+        self.run_with_managers(test)
+
     def test_select_many_objects(self):
         @asyncio.coroutine
         def test(objects):

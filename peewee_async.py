@@ -78,7 +78,7 @@ class Manager:
         user1 = await objects.get(User, id=user0.id)
         user2 = await objects.get(User, username='test')
         # All should be the same
-        print(user1, user2, user3)
+        print(user1.id, user2.id, user3.id)
 
     If you don't pass database to constructor, you should define
     `database` as a class member like that::
@@ -90,8 +90,6 @@ class Manager:
 
         objects = MyManager()
 
-    Can also handle multiple databases for single model.
-    Just create `Manager` instance per database.
     """
     database = None
 
@@ -307,11 +305,12 @@ class Manager:
         database, it's **WRONG AND DANGEROUS**, so assertion is raised.
         """
         model = query.model_class
-        if model._meta.database == _AutoDatabase:
+        if model._meta.database == self.database:
+            return query
+        elif model._meta.database == _AutoDatabase:
+            # **Experimental** database swapping!
             query = query.clone()
             query.database = self.database
-            return query
-        elif model._meta.database == self.database:
             return query
         else:
             assert False, ("Error, models's database and manager's "
@@ -354,16 +353,17 @@ def execute(query):
                   ``Model.update()`` etc.
     :return: result depends on query type, it's the same as for sync ``query.execute()``
     """
-    if isinstance(query, peewee.UpdateQuery):
+    if isinstance(query, peewee.SelectQuery):
+        coroutine = select
+    elif isinstance(query, peewee.UpdateQuery):
         coroutine = update
     elif isinstance(query, peewee.InsertQuery):
         coroutine = insert
     elif isinstance(query, peewee.DeleteQuery):
         coroutine = delete
-    elif isinstance(query, peewee.RawQuery):
-        coroutine = raw_query
     else:
-        coroutine = select
+        coroutine = raw_query
+
     return (yield from coroutine(query))
 
 
@@ -484,9 +484,6 @@ def update_object(obj, only=None):
 @asyncio.coroutine
 def select(query):
     """Perform SELECT query asynchronously.
-
-    NOTE! It relies on internal peewee logic for generating
-    results from queries and well, a bit hacky.
     """
     assert isinstance(query, peewee.SelectQuery),\
         ("Error, trying to run select coroutine"
@@ -601,9 +598,17 @@ def raw_query(query):
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from _execute_query_async(query)
-    message = cursor.statusmessage
-    return message
+    result = AsyncRawQueryWrapper(query)
+    cursor = yield from result.execute()
+
+    try:
+        while True:
+            yield from result.fetchone()
+    except GeneratorExit:
+        pass
+
+    cursor.release()
+    return result
 
 
 @asyncio.coroutine
@@ -694,17 +699,17 @@ class AsyncQueryWrapper:
         """Get result wrapper class.
         """
         if query._tuples:
-            QR = query.database.get_result_wrapper(RESULTS_TUPLES)
+            QRW = query.database.get_result_wrapper(RESULTS_TUPLES)
         elif query._dicts:
-            QR = query.database.get_result_wrapper(RESULTS_DICTS)
+            QRW = query.database.get_result_wrapper(RESULTS_DICTS)
         elif query._naive or not query._joins or query.verify_naive():
-            QR = query.database.get_result_wrapper(RESULTS_NAIVE)
+            QRW = query.database.get_result_wrapper(RESULTS_NAIVE)
         elif query._aggregate_rows:
-            QR = query.database.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
+            QRW = query.database.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
         else:
-            QR = query.database.get_result_wrapper(RESULTS_MODELS)
+            QRW = query.database.get_result_wrapper(RESULTS_MODELS)
 
-        return QR(query.model_class, None, query.get_query_meta())
+        return QRW(query.model_class, None, query.get_query_meta())
 
     @asyncio.coroutine
     def execute(self):
@@ -725,6 +730,21 @@ class AsyncQueryWrapper:
 
         obj = self._result_wrapper.process_row(row)
         self._result.append(obj)
+
+
+class AsyncRawQueryWrapper(AsyncQueryWrapper):
+    @classmethod
+    def _get_result_wrapper(self, query):
+        """Get raw query result wrapper class.
+        """
+        if query._tuples:
+            QRW = query.database.get_result_wrapper(RESULTS_TUPLES)
+        elif query._dicts:
+            QRW = query.database.get_result_wrapper(RESULTS_DICTS)
+        else:
+            QRW = query.database.get_result_wrapper(RESULTS_NAIVE)
+
+        return QRW(query.model_class, None, None)
 
 
 ##############
