@@ -13,7 +13,7 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
-from peewee_async import AsyncPostgresqlMixin, AsyncPooledPostgresqlMixin
+from peewee_async import AsyncPostgresqlMixin
 import playhouse.postgres_ext as ext
 
 
@@ -26,10 +26,11 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     """
     def init(self, database, **kwargs):
         super().init(database, **kwargs)
-        self.init_async(enable_json=True, enable_hstore=self.register_hstore)
+        self.init_async(enable_json=True,
+                        enable_hstore=self.register_hstore)
 
 
-class PooledPostgresqlExtDatabase(AsyncPooledPostgresqlMixin, ext.PostgresqlExtDatabase):
+class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -40,11 +41,18 @@ class PooledPostgresqlExtDatabase(AsyncPooledPostgresqlMixin, ext.PostgresqlExtD
     """
     def init(self, database, **kwargs):
         super().init(database, **kwargs)
-
-        min_connections = self.connect_kwargs.pop('min_connections', 1)
-        max_connections = self.connect_kwargs.pop('max_connections', 20)
-
         self.init_async(enable_json=True,
-                        enable_hstore=self.register_hstore,
-                        min_connections=min_connections,
-                        max_connections=max_connections)
+                        enable_hstore=self.register_hstore)
+        self.min_connections = self.connect_kwargs.pop('min_connections', 1)
+        self.max_connections = self.connect_kwargs.pop('max_connections', 20)
+
+    @property
+    def connect_kwargs_async(self):
+        """Connection parameters for `aiopg.Pool`
+        """
+        kwargs = super().connect_kwargs_async
+        kwargs.update({
+            'minsize': self.min_connections,
+            'maxsize': self.max_connections,
+        })
+        return kwargs

@@ -40,14 +40,14 @@ deafults = {
         'host': '127.0.0.1',
         'port': 5432,
         'user': 'postgres',
-        'max_connections': 2,
+        'max_connections': 4,
     },
     'postgres-pool-ext': {
         'database': 'test',
         'host': '127.0.0.1',
         'port': 5432,
         'user': 'postgres',
-        'max_connections': 2,
+        'max_connections': 4,
     }
 }
 
@@ -72,8 +72,8 @@ def load_managers(*, managers=None, loop=None):
         except KeyError:
             pass
 
-        db_class = db_classes[k]
-        database = db_class(**config[k])
+        database = db_classes[k](**config[k])
+        database.allow_sync = False
         managers[k] = peewee_async.Manager(database, loop=loop)
 
 

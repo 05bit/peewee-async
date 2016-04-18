@@ -974,28 +974,6 @@ class AsyncPostgresqlMixin:
         return super().execute_sql(*args, **kwargs)
 
 
-class AsyncPooledPostgresqlMixin(AsyncPostgresqlMixin):
-    """Mixin for `peewee.PostgresqlDatabase` providing extra methods
-    for managing async connection pool.
-    """
-    def init_async(self, conn_cls=AsyncPooledPostgresqlConnection, enable_json=False,
-                   enable_hstore=False, min_connections=0, max_connections=0):
-        super().init_async(conn_cls=conn_cls, enable_json=enable_json,
-                           enable_hstore=enable_hstore)
-        self.min_connections = min_connections
-        self.max_connections = max_connections
-
-    @property
-    def connect_kwargs_async(self):
-        """Connection parameters for `aiopg.Pool`
-        """
-        kwargs = super().connect_kwargs_async
-        kwargs.update({
-            'minsize': self.min_connections,
-            'maxsize': self.max_connections,
-        })
-        return kwargs
-
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync** connection
@@ -1009,7 +987,7 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         self.init_async()
 
 
-class PooledPostgresqlDatabase(AsyncPooledPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -1020,9 +998,20 @@ class PooledPostgresqlDatabase(AsyncPooledPostgresqlMixin, peewee.PostgresqlData
     """
     def init(self, database, **kwargs):
         super().init(database, **kwargs)
-        self.init_async(
-            min_connections=self.connect_kwargs.pop('min_connections', 1),
-            max_connections=self.connect_kwargs.pop('max_connections', 20))
+        self.init_async(conn_cls=AsyncPooledPostgresqlConnection)
+        self.min_connections = self.connect_kwargs.pop('min_connections', 1)
+        self.max_connections = self.connect_kwargs.pop('max_connections', 20)
+
+    @property
+    def connect_kwargs_async(self):
+        """Connection parameters for `aiopg.Pool`
+        """
+        kwargs = super().connect_kwargs_async
+        kwargs.update({
+            'minsize': self.min_connections,
+            'maxsize': self.max_connections,
+        })
+        return kwargs
 
 
 ##############
