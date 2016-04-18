@@ -1124,20 +1124,30 @@ class AsyncMySQLConnection:
         yield from self.pool.wait_closed()
 
 
-class AsyncMySQLMixin(AsyncDatabase):
-    """Mixin for `peewee.MySQL Database` providing extra methods
-    for managing async connection.
+class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
+    """MySQL database driver providing **single drop-in sync** connection
+    and **single async connection** interface.
+
+    See also:
+    http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
     """
-    def init_mysql_async(self, conn_cls=AsyncMySQLConnection):
+    def init(self, database, **kwargs):
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
-        self._async_conn_cls = conn_cls
+        self._async_conn_cls = kwargs.pop('async_conn', AsyncMySQLConnection)
+        super().init(database, **kwargs)
 
     @property
     def connect_kwargs_async(self):
         """Connection parameters for `aiomysql.Connection`
         """
-        return self.connect_kwargs
+        kwargs = self.connect_kwargs.copy()
+        kwargs.update({
+            'minsize': 1,
+            'maxsize': 1,
+            'autocommit': True,
+        })
+        return kwargs
 
     @asyncio.coroutine
     def last_insert_id_async(self, cursor, model):
@@ -1147,16 +1157,31 @@ class AsyncMySQLMixin(AsyncDatabase):
             return cursor.lastrowid
 
 
-class MySQLDatabase(AsyncMySQLMixin, peewee.MySQLDatabase):
-    """MySQL database driver providing **single drop-in sync** connection
-    and **single async connection** interface.
+class PooledMySQLDatabase(MySQLDatabase):
+    """MySQL database driver providing **single drop-in sync**
+    connection and **async connections pool** interface.
+
+    :param max_connections: connections pool size
 
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
     """
     def init(self, database, **kwargs):
+        self.min_connections = self.connect_kwargs.pop('min_connections', 1)
+        self.max_connections = self.connect_kwargs.pop('max_connections', 10)
         super().init(database, **kwargs)
-        self.init_mysql_async()
+
+    @property
+    def connect_kwargs_async(self):
+        """Connection parameters for `aiomysql.Connection`
+        """
+        kwargs = self.connect_kwargs.copy()
+        kwargs.update({
+            'minsize': self.min_connections,
+            'maxsize': self.max_connections,
+            'autocommit': True,
+        })
+        return kwargs
 
 
 ##############

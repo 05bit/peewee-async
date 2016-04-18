@@ -57,6 +57,12 @@ deafults = {
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
+    },
+    'mysql-pool': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        'port': 3306,
+        'user': 'root',
     }
 }
 
@@ -66,6 +72,7 @@ db_classes = {
     'postgres-pool': peewee_async.PooledPostgresqlDatabase,
     'postgres-pool-ext': peewee_asyncext.PooledPostgresqlExtDatabase,
     'mysql': peewee_async.MySQLDatabase,
+    'mysql-pool': peewee_async.PooledMySQLDatabase
 }
 
 
@@ -197,14 +204,22 @@ class BaseManagerTestCase(unittest.TestCase):
         """
         self.assertEqual(len(self.managers), self.run_count)
 
-    def run_with_managers(self, test, only=None):
+    def run_with_managers(self, test, exclude=None):
         """Run test coroutine against available Manager instances.
 
             test -- coroutine with single parameter, Manager instance
-            only -- list of keys to filter managers, e.g. ['postgres-ext']
+            exclude -- exclude list or string for manager key
+
+        Example:
+
+            @asyncio.coroutine
+            def test(objects):
+                # ...
+
+            run_with_managers(test, exclude=['mysql', 'mysql-pool'])
         """
         for k, objects in self.managers.items():
-            if only is None or (k in only):
+            if exclude is None or (not k in exclude):
                 with self.manager(objects):
                     self.loop.run_until_complete(test(objects))
                 with self.manager(objects, allow_sync=True):
@@ -218,36 +233,9 @@ class BaseManagerTestCase(unittest.TestCase):
 ################
 
 
-class MySQLManagerTestCase(BaseManagerTestCase):
-    only = ['mysql']
-
-    def setUp(self):
-        """Reset all data.
-        """
-        for model in self.models:
-            model._meta.database = self.managers['mysql'].database
-        super().setUp()
-
-    def test_get_obj_by_id(self):
-        import aiomysql
-
-        @asyncio.coroutine
-        def test(objects):
-            text = "Test %s" % uuid.uuid4()
-            obj1 = yield from objects.create(TestModel, text=text)
-
-            with objects.allow_sync():
-                obj1 = TestModel.create(text=text)
-
-            obj2 = yield from objects.get(TestModel, id=obj1.id)
-            self.assertEqual(obj1, obj2)
-            self.assertEqual(obj1.id, obj2.id)
-
-        self.run_with_managers(test)
-
-
 class ManagerTestCase(BaseManagerTestCase):
-    only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+    # only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+    only = None
 
     def test_connect_close(self):
         @asyncio.coroutine
@@ -279,7 +267,7 @@ class ManagerTestCase(BaseManagerTestCase):
             obj = yield from objects.create(UUIDTestModel, text=text)
             self.assertEqual(len(str(obj.id)), 36)
 
-        self.run_with_managers(test)
+        self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
 
     def test_get_obj_by_id(self):
         @asyncio.coroutine
@@ -385,7 +373,7 @@ class ManagerTestCase(BaseManagerTestCase):
             last_id = yield from objects.execute(query)
             self.assertEqual(len(str(last_id)), 36)
 
-        self.run_with_managers(test)
+        self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
 
     def test_update_query(self):
         @asyncio.coroutine
