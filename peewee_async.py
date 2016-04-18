@@ -26,6 +26,11 @@ try:
 except ImportError:
     aiopg = None
 
+try:
+    import aiomysql
+except ImportError:
+    aiomysql = None
+
 __version__ = '0.5a1'
 
 __all__ = [
@@ -318,7 +323,7 @@ class Manager:
 
     @staticmethod
     def _prune_fields(field_dict, only):
-        """Filter fields data in place with `only` list.
+        """Filter fields data **in place** with `only` list.
 
         Example::
 
@@ -740,6 +745,132 @@ class AsyncRawQueryWrapper(AsyncQueryWrapper):
         return QRW(query.model_class, None, None)
 
 
+############
+# Database #
+############
+
+class AsyncDatabase:
+    allow_sync = True   # whether sync queries allowed
+    loop = None         # asyncio event loop
+    _async_conn = None  # async connection
+    _async_wait = None  # connection waiter
+
+    @asyncio.coroutine
+    def connect_async(self, loop=None, timeout=None):
+        """Set up async connection on specified event loop or
+        on default event loop.
+        """
+        if self.deferred:
+            raise Exception("Error, database not properly initialized "
+                            "before opening connection")
+
+        if self._async_wait:
+            yield from self._async_wait
+        else:
+            self.loop = loop or asyncio.get_event_loop()
+            self._async_wait = asyncio.Future(loop=self.loop)
+
+            conn = self._async_conn_cls(
+                database=self.database,
+                loop=self.loop,
+                timeout=timeout,
+                **self.connect_kwargs_async)
+
+            yield from conn.connect()
+
+            self._task_data = tasklocals.local(loop=self.loop)
+            self._async_conn = conn
+            self._async_wait.set_result(True)
+
+    @asyncio.coroutine
+    def cursor_async(self):
+        """Acquire async cursor.
+        """
+        if not self._async_conn:
+            yield from self.connect_async(loop=self.loop)
+
+        if self.transaction_depth_async() > 0:
+            conn = self.transaction_conn_async()
+        else:
+            conn = None
+
+        try:
+            return (yield from self._async_conn.cursor(conn=conn))
+        except:
+            yield from self.close_async()
+            raise
+
+    @asyncio.coroutine
+    def close_async(self):
+        """Close async connection.
+        """
+        if self._async_wait:
+            yield from self._async_wait
+        if self._async_conn:
+            conn = self._async_conn
+            self._async_conn = None
+            self._async_wait = None
+            yield from conn.close()
+
+    @asyncio.coroutine
+    def push_transaction_async(self):
+        """Increment async transaction depth.
+        """
+        if not self._async_conn:
+            yield from self.connect_async(loop=self.loop)
+        if not getattr(self._task_data, 'depth', 0):
+            self._task_data.depth = 0
+            self._task_data.conn = yield from self._async_conn.acquire()
+        self._task_data.depth += 1
+
+    @asyncio.coroutine
+    def pop_transaction_async(self):
+        """Decrement async transaction depth.
+        """
+        if self._task_data.depth > 0:
+            self._task_data.depth -= 1
+            if self._task_data.depth == 0:
+                self._async_conn.release(self._task_data.conn)
+                self._task_data.conn = None
+        else:
+            raise ValueError("Invalid async transaction depth value")
+
+    def transaction_depth_async(self):
+        """Get async transaction depth.
+        """
+        return getattr(self._task_data, 'depth', 0)
+
+    def transaction_conn_async(self):
+        """Get async transaction connection.
+        """
+        return getattr(self._task_data, 'conn', None)
+
+    def transaction_async(self):
+        """Similar to peewee `Database.transaction()` method, but returns
+        asynchronous context manager.
+        """
+        return transaction(self)
+
+    def atomic_async(self):
+        """Similar to peewee `Database.atomic()` method, but returns
+        asynchronous context manager.
+        """
+        return atomic(self)
+
+    def savepoint_async(self, sid=None):
+        """Similar to peewee `Database.savepoint()` method, but returns
+        asynchronous context manager.
+        """
+        return savepoint(self, sid=sid)
+
+    def execute_sql(self, *args, **kwargs):
+        """Sync execute SQL query, `allow_sync` must be set to True.
+        """
+        assert self.allow_sync, ("Error, sync query is not allowed: "
+                                 "allow_sync is False")
+        return super().execute_sql(*args, **kwargs)
+
+
 ##############
 # PostgreSQL #
 ##############
@@ -819,20 +950,17 @@ class AsyncPostgresqlConnection(AsyncPostgresqlConnectionPool):
                          **kwargs)
 
 
-class AsyncPostgresqlMixin:
+class AsyncPostgresqlMixin(AsyncDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
-    def init_async(self, conn_cls=AsyncPostgresqlConnection, enable_json=False,
+    def init_async(self, conn_cls=AsyncPostgresqlConnection,
+                   enable_json=False,
                    enable_hstore=False):
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
 
-        self.allow_sync = True
-        self.loop = None
-        self._async_conn = None
         self._async_conn_cls = conn_cls
-        self._async_wait = None
         self._enable_json = enable_json
         self._enable_hstore = enable_hstore
 
@@ -846,63 +974,6 @@ class AsyncPostgresqlMixin:
             'enable_hstore': self._enable_hstore,
         })
         return kwargs
-
-    @asyncio.coroutine
-    def connect_async(self, loop=None, timeout=None):
-        """Set up async connection on specified event loop or
-        on default event loop.
-        """
-        if self.deferred:
-            raise Exception("Error, database not properly initialized "
-                            "before opening connection")
-
-        if self._async_wait:
-            yield from self._async_wait
-        else:
-            self.loop = loop or asyncio.get_event_loop()
-            self._async_wait = asyncio.Future(loop=self.loop)
-
-            conn = self._async_conn_cls(
-                database=self.database,
-                loop=self.loop,
-                timeout=timeout,
-                **self.connect_kwargs_async)
-
-            yield from conn.connect()
-
-            self._task_data = tasklocals.local(loop=self.loop)
-            self._async_conn = conn
-            self._async_wait.set_result(True)
-
-    @asyncio.coroutine
-    def cursor_async(self):
-        """Acquire async cursor.
-        """
-        if not self._async_conn:
-            yield from self.connect_async(loop=self.loop)
-
-        if self.transaction_depth_async() > 0:
-            conn = self.transaction_conn_async()
-        else:
-            conn = None
-
-        try:
-            return (yield from self._async_conn.cursor(conn=conn))
-        except:
-            yield from self.close_async()
-            raise
-
-    @asyncio.coroutine
-    def close_async(self):
-        """Close async connection.
-        """
-        if self._async_wait:
-            yield from self._async_wait
-        if self._async_conn:
-            conn = self._async_conn
-            self._async_conn = None
-            self._async_wait = None
-            yield from conn.close()
 
     @asyncio.coroutine
     def last_insert_id_async(self, cursor, model):
@@ -927,65 +998,6 @@ class AsyncPostgresqlMixin:
             yield from cursor.execute("SELECT CURRVAL('%s\"%s\"')" % (schema, seq))
             result = (yield from cursor.fetchone())[0]
             return result
-
-    @asyncio.coroutine
-    def push_transaction_async(self):
-        """Increment async transaction depth.
-        """
-        if not self._async_conn:
-            yield from self.connect_async(loop=self.loop)
-        if not getattr(self._task_data, 'depth', 0):
-            self._task_data.depth = 0
-            self._task_data.conn = yield from self._async_conn.acquire()
-        self._task_data.depth += 1
-
-    @asyncio.coroutine
-    def pop_transaction_async(self):
-        """Decrement async transaction depth.
-        """
-        if self._task_data.depth > 0:
-            self._task_data.depth -= 1
-            if self._task_data.depth == 0:
-                self._async_conn.release(self._task_data.conn)
-                self._task_data.conn = None
-        else:
-            raise ValueError("Invalid async transaction depth value")
-
-    def transaction_depth_async(self):
-        """Get async transaction depth.
-        """
-        return getattr(self._task_data, 'depth', 0)
-
-    def transaction_conn_async(self):
-        """Get async transaction connection.
-        """
-        return getattr(self._task_data, 'conn', None)
-
-    def transaction_async(self):
-        """Similar to peewee `Database.transaction()` method, but returns
-        asynchronous context manager.
-        """
-        return transaction(self)
-
-    def atomic_async(self):
-        """Similar to peewee `Database.atomic()` method, but returns
-        asynchronous context manager.
-        """
-        return atomic(self)
-
-    def savepoint_async(self, sid=None):
-        """Similar to peewee `Database.savepoint()` method, but returns
-        asynchronous context manager.
-        """
-        return savepoint(self, sid=sid)
-
-    def execute_sql(self, *args, **kwargs):
-        """Sync execute SQL query, `allow_sync` must be set to True.
-        """
-        assert self.allow_sync, ("Error, sync query is not allowed: "
-                                 "allow_sync is False")
-        return super().execute_sql(*args, **kwargs)
-
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
