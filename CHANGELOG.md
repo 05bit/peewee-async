@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Add high-level API via Manager class
+- Add support for MySQL
+- Auto-connect is performed for async queries if database is initialized, so no need to call `connect_async()` manually! And no worries, nothing will happen on duplicate calls
+
 ## 0.4.1
 
 - Fixing critical transactions issues, see #12

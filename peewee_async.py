@@ -357,14 +357,6 @@ class Manager:
         return field_dict
 
 
-class _AutoDatabase:
-    """Experimental swappable database placeholder.
-    Doesn't contain any implementation details.
-    """
-    # Both PostgreSQL and MySQL need commiting SELECT
-    commit_select = True
-
-
 #################
 # Async queries #
 #################
@@ -785,7 +777,9 @@ class AsyncDatabase:
             raise Exception("Error, database not properly initialized "
                             "before opening connection")
 
-        if self._async_wait:
+        if self._async_conn:
+            return
+        elif self._async_wait:
             yield from self._async_wait
         else:
             self.loop = loop or asyncio.get_event_loop()
@@ -807,8 +801,7 @@ class AsyncDatabase:
     def cursor_async(self):
         """Acquire async cursor.
         """
-        if not self._async_conn:
-            yield from self.connect_async(loop=self.loop)
+        yield from self.connect_async(loop=self.loop)
 
         if self.transaction_depth_async() > 0:
             conn = self.transaction_conn_async()
@@ -837,8 +830,7 @@ class AsyncDatabase:
     def push_transaction_async(self):
         """Increment async transaction depth.
         """
-        if not self._async_conn:
-            yield from self.connect_async(loop=self.loop)
+        yield from self.connect_async(loop=self.loop)
         if not getattr(self._task_data, 'depth', 0):
             self._task_data.depth = 0
             self._task_data.conn = yield from self._async_conn.acquire()

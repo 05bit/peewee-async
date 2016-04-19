@@ -122,39 +122,24 @@ def load_managers(*, managers=None, loop=None, only=None):
 class TestModel(peewee.Model):
     text = peewee.CharField()
 
-    class Meta:
-        database = peewee_async._AutoDatabase
-
 
 class TestModelAlpha(peewee.Model):
     text = peewee.CharField()
-
-    class Meta:
-        database = peewee_async._AutoDatabase
 
 
 class TestModelBeta(peewee.Model):
     alpha = peewee.ForeignKeyField(TestModelAlpha, related_name='betas')
     text = peewee.CharField()
 
-    class Meta:
-        database = peewee_async._AutoDatabase
-
 
 class TestModelGamma(peewee.Model):
     text = peewee.CharField()
     beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
 
-    class Meta:
-        database = peewee_async._AutoDatabase
-
 
 class UUIDTestModel(peewee.Model):
     id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
     text = peewee.CharField()
-
-    class Meta:
-        database = peewee_async._AutoDatabase
 
 
 ####################

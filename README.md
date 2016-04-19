@@ -11,8 +11,8 @@ Overview
 --------
 
 - Works on Python 3.4+
-- Has support PostgreSQL via `aiopg`
-- Has support MySQL via `aiomysql`
+- Has support for PostgreSQL via `aiopg`
+- Has support for MySQL via `aiomysql`
 - Single point high level async API
 - Drop-in replacement for sync code, sync will remain sync
 - Basic operations are supported
