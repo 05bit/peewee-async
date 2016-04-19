@@ -11,8 +11,8 @@ Overview
 --------
 
 * Works on Python 3.4+
-* Has support for PostgreSQL via `aiopg`
-* Has support for MySQL via `aiomysql`
+* Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
+* Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Single point high level async API
 * Drop-in replacement for sync code, sync will remain sync
 * Basic operations are supported
@@ -88,7 +88,7 @@ loop.close()
 with objects.allow_sync():
     TestModel.drop_table(True)
 
-# Expected output:"
+# Expected output:
 # Yo, I can do it sync!
 # Not bad. Watch this, I'm async!
 ```
