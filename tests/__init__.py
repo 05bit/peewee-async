@@ -112,6 +112,16 @@ def load_managers(*, managers=None, loop=None, only=None):
         managers[k] = peewee_async.Manager(database, loop=loop)
 
 
+def load_databases(*, databases=None, loop=None, only=None):
+    config = dict(defaults)
+    for k in list(config.keys()):
+        if only and not k in only:
+            continue
+        config[k].update(overrides.get(k, {}))
+        databases[k] = db_classes[k](**config[k])
+        databases[k].loop = loop
+
+
 ##########
 # Models #
 ##########
@@ -256,6 +266,133 @@ class DatabaseTestCase(unittest.TestCase):
             TestModel.drop_table(True)
 
 
+class OlderTestCase(unittest.TestCase):
+    only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+    # only = None
+
+    models = [TestModel, UUIDTestModel, TestModelAlpha,
+              TestModelBeta, TestModelGamma]
+
+    @classmethod
+    @contextlib.contextmanager
+    def current_database(cls, database, allow_sync=False):
+        for model in cls.models:
+            model._meta.database = database
+        yield
+
+    @classmethod
+    def setUpClass(cls, *args, **kwargs):
+        """Configure database managers, create test tables.
+        """
+        cls.databases = {}
+        cls.loop = asyncio.new_event_loop()
+        # cls.loop.set_debug(True)
+
+        load_databases(databases=cls.databases,
+                       loop=cls.loop,
+                       only=cls.only)
+
+        for k, database in cls.databases.items():
+            database.allow_sync = True
+            with cls.current_database(database):
+                for model in cls.models:
+                    model.create_table(True)
+            database.allow_sync = False
+
+    @classmethod
+    def tearDownClass(cls, *args, **kwargs):
+        """Remove all test tables and close connections.
+        """
+        for k, database in cls.databases.items():
+            cls.loop.run_until_complete(database.close_async())
+        cls.loop.close()
+
+        for k, database in cls.databases.items():
+            database.allow_sync = True
+            with cls.current_database(database):
+                for model in reversed(cls.models):
+                    model.drop_table(fail_silently=True, cascade=True)
+            database.allow_sync = False
+        cls.databases = None
+
+    def setUp(self):
+        """Reset all data.
+        """
+        self.run_count = 0
+        for k, database in self.databases.items():
+            with self.current_database(database):
+                database.allow_sync = True
+                for model in reversed(self.models):
+                    model.delete().execute()
+                database.allow_sync = False
+
+    def tearDown(self):
+        """Check if test was actually passed by counter.
+        """
+        self.assertEqual(len(self.databases), self.run_count)
+
+    def run_with_databases(self, test, exclude=None):
+        """Run test coroutine against available databases.
+        """
+        for k, database in self.databases.items():
+            if exclude is None or (not k in exclude):
+                with self.current_database(database):
+                    database.allow_sync = False
+                    self.loop.run_until_complete(test(database))
+                    database.allow_sync = True
+                    for model in reversed(self.models):
+                        model.delete().execute()
+                    database.allow_sync = False
+            self.run_count += 1
+
+    def test_create_obj(self):
+        @asyncio.coroutine
+        def test(database):
+            text = "Test %s" % uuid.uuid4()
+            obj = yield from peewee_async.create_object(TestModel, text=text)
+            self.assertTrue(obj is not None)
+            self.assertEqual(obj.text, text)
+
+        self.run_with_databases(test)
+
+    def test_get_and_delete_obj(self):
+        @asyncio.coroutine
+        def test(database):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from peewee_async.create_object(
+                TestModel, text=text)
+
+            obj2 = yield from peewee_async.get_object(
+                TestModel, TestModel.id == obj1.id)
+
+            yield from peewee_async.delete_object(obj2)
+
+            try:
+                obj3 = yield from peewee_async.get_object(
+                    TestModel, TestModel.id == obj1.id)
+            except TestModel.DoesNotExist:
+                obj3 = None
+            self.assertTrue(obj3 is None, "Error, object wasn't deleted")
+
+        self.run_with_databases(test)
+
+    def test_get_and_update_obj(self):
+        @asyncio.coroutine
+        def test(database):
+            text = "Test %s" % uuid.uuid4()
+            obj1 = yield from peewee_async.create_object(
+                TestModel, text=text)
+
+            obj1.text = "Test update object"
+            yield from peewee_async.update_object(obj1)
+
+            obj2 = yield from peewee_async.get_object(
+                TestModel, TestModel.id == obj1.id)
+            self.assertEqual(obj2.text, "Test update object")
+
+        self.run_with_databases(test)
+
+
 class ManagerTestCase(BaseManagerTestCase):
     # only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
     only = None
@@ -280,6 +417,7 @@ class ManagerTestCase(BaseManagerTestCase):
             text = "Test %s" % uuid.uuid4()
             obj = yield from objects.create(TestModel, text=text)
             self.assertTrue(obj is not None)
+            self.assertEqual(obj.text, text)
 
         self.run_with_managers(test)
 

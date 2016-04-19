@@ -432,7 +432,7 @@ def create_object(model, **data):
     # - obj._set_pk_value()
     # - obj._prepare_instance()
     #
-    warnings.warn("delete_object() is deprecated, Manager.create() "
+    warnings.warn("create_object() is deprecated, Manager.create() "
                   "should be used instead",
                   DeprecationWarning)
 
@@ -527,7 +527,7 @@ def update_object(obj, only=None):
     # - obj._pk_expr()
     # - obj._dirty.clear()
     #
-    warnings.warn("delete_object() is deprecated, Manager.update() "
+    warnings.warn("update_object() is deprecated, Manager.update() "
                   "should be used instead",
                   DeprecationWarning)
 
