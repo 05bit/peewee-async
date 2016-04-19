@@ -31,12 +31,12 @@ defaults = {
         # 'port': 5432,
         'user': 'postgres',
     },
-    # 'postgres-ext': {
-    #     'database': 'test',
-    #     'host': '127.0.0.1',
-    #     # 'port': 5432,
-    #     'user': 'postgres',
-    # },
+    'postgres-ext': {
+        'database': 'test',
+        'host': '127.0.0.1',
+        # 'port': 5432,
+        'user': 'postgres',
+    },
     'postgres-pool': {
         'database': 'test',
         'host': '127.0.0.1',
