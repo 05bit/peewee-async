@@ -6,10 +6,10 @@ Create tests.ini file to configure tests.
 
 """
 import os
+import json
 import logging
 import asyncio
 import contextlib
-import configparser
 import sys
 import urllib.parse
 import unittest
@@ -23,21 +23,20 @@ import peewee_asyncext
 ##########
 
 # logging.basicConfig(level=logging.DEBUG)
-ini = configparser.ConfigParser()
 
-deafults = {
+defaults = {
     'postgres': {
         'database': 'test',
         'host': '127.0.0.1',
         # 'port': 5432,
         'user': 'postgres',
     },
-    'postgres-ext': {
-        'database': 'test',
-        'host': '127.0.0.1',
-        # 'port': 5432,
-        'user': 'postgres',
-    },
+    # 'postgres-ext': {
+    #     'database': 'test',
+    #     'host': '127.0.0.1',
+    #     # 'port': 5432,
+    #     'user': 'postgres',
+    # },
     'postgres-pool': {
         'database': 'test',
         'host': '127.0.0.1',
@@ -66,22 +65,24 @@ deafults = {
     }
 }
 
+overrides = {}
+
 try:
     import aiopg
 except ImportError:
     print("aiopg is not installed, ignoring PostgreSQL tests")
-    for k in list(deafults.keys()):
+    for k in list(defaults.keys()):
         if k.startswith('postgres'):
-            deafults.pop(k)
+            defaults.pop(k)
 
 
 try:
     import aiomysql
 except ImportError:
     print("aiomysql is not installed, ignoring MySQL tests")
-    for k in list(deafults.keys()):
+    for k in list(defaults.keys()):
         if k.startswith('mysql'):
-            deafults.pop(k)
+            defaults.pop(k)
 
 
 db_classes = {
@@ -95,21 +96,19 @@ db_classes = {
 
 
 def setUpModule():
-    ini.read(['tests.ini'])
+    try:
+        with open('tests.json', 'r') as f:
+            overrides.update(json.load(f))
+    except:
+        print("'tests.json' file not found, will use defaults")
 
 
 def load_managers(*, managers=None, loop=None, only=None):
-    config = dict(deafults)
-
+    config = dict(defaults)
     for k in list(config.keys()):
         if only and not k in only:
             continue
-
-        try:
-            config.update(dict(**ini[k]))
-        except KeyError:
-            pass
-
+        config[k].update(overrides.get(k, {}))
         database = db_classes[k](**config[k])
         managers[k] = peewee_async.Manager(database, loop=loop)
 
@@ -238,6 +237,23 @@ class BaseManagerTestCase(unittest.TestCase):
 ################
 # Common tests #
 ################
+
+
+class DatabaseTestCase(unittest.TestCase):
+    def test_deferred_init(self):
+        config = dict(defaults)
+        for k in list(config.keys()):
+            config[k].update(overrides.get(k, {}))
+
+            database = db_classes[k](None)
+            self.assertTrue(database.deferred)
+
+            database.init(**config[k])
+            self.assertTrue(not database.deferred)
+
+            TestModel._meta.database = database
+            TestModel.create_table(True)
+            TestModel.drop_table(True)
 
 
 class ManagerTestCase(BaseManagerTestCase):
@@ -504,24 +520,6 @@ class ManagerTestCase(BaseManagerTestCase):
                              (gamma_111, gamma_112))
 
         self.run_with_managers(test)
-
-
-class PostgresInitTestCase(unittest.TestCase):
-    def test_deferred_init(self):
-        config = dict(deafults)
-
-        for k in list(config.keys()):
-            try:
-                config.update(dict(**ini[k]))
-            except KeyError:
-                pass
-
-            db_class = db_classes[k]
-            database = db_class(None)
-            self.assertTrue(database.deferred)
-
-            database.init(**config[k])
-            self.assertTrue(not database.deferred)
 
 
 #####################

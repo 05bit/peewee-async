@@ -1190,8 +1190,8 @@ class PooledMySQLDatabase(MySQLDatabase):
     http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
     """
     def init(self, database, **kwargs):
-        self.min_connections = self.connect_kwargs.pop('min_connections', 1)
-        self.max_connections = self.connect_kwargs.pop('max_connections', 10)
+        self.min_connections = kwargs.pop('min_connections', 1)
+        self.max_connections = kwargs.pop('max_connections', 10)
         super().init(database, **kwargs)
 
     @property

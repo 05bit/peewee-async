@@ -1,5 +1,0 @@
-[tests]
-database = test
-max_connections = 4
-port = 5432
-use_ext =

@@ -1,0 +1,44 @@
+{
+  "postgres": {
+    "database": "test",
+    "user": "postgres",
+    "port": 5432,
+    "host": "127.0.0.1"
+  },
+
+  "postgres-ext": {
+    "database": "test2",
+    "user": "postgres",
+    "port": 5432,
+    "host": "127.0.0.1"
+  },
+
+  "postgres-pool": {
+    "database": "test",
+    "user": "postgres",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "max_connections": 4
+  },
+
+  "postgres-pool-ext": {
+    "database": "test",
+    "user": "postgres",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "max_connections": 4
+  },
+
+  "mysql": {
+    "database": "test",
+    "user": "root",
+    "host": "127.0.0.1"
+  },
+
+  "mysql-pool": {
+    "database": "test",
+    "user": "root",
+    "host": "127.0.0.1",
+    "max_connections": 4
+  }
+}
