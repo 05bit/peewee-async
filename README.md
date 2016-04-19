@@ -13,7 +13,7 @@ Overview
 * Works on Python 3.4+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
-* Single point high level async API
+* Single point for high-level async API
 * Drop-in replacement for sync code, sync will remain sync
 * Basic operations are supported
 * Transactions support is present, yet not heavily tested
