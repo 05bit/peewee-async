@@ -18,7 +18,8 @@ class FakeUpdateError(Exception):
 
 
 class ManagerTransactionsTestCase(BaseManagerTestCase):
-    only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+    # only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+    only = None
 
     def test_atomic_success(self):
         """Successful update in transaction.
