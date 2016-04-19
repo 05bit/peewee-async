@@ -1185,6 +1185,8 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
     def init(self, database, **kwargs):
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
+        self.min_connections = 1
+        self.max_connections = 1
         self._async_conn_cls = kwargs.pop('async_conn', AsyncMySQLConnection)
         super().init(database, **kwargs)
 
@@ -1194,8 +1196,8 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         """
         kwargs = self.connect_kwargs.copy()
         kwargs.update({
-            'minsize': 1,
-            'maxsize': 1,
+            'minsize': self.min_connections,
+            'maxsize': self.max_connections,
             'autocommit': True,
         })
         return kwargs
@@ -1225,18 +1227,6 @@ class PooledMySQLDatabase(MySQLDatabase):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 10)
         super().init(database, **kwargs)
-
-    @property
-    def connect_kwargs_async(self):
-        """Connection parameters for `aiomysql.Connection`
-        """
-        kwargs = self.connect_kwargs.copy()
-        kwargs.update({
-            'minsize': self.min_connections,
-            'maxsize': self.max_connections,
-            'autocommit': True,
-        })
-        return kwargs
 
 
 ##############
