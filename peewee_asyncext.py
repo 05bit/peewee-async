@@ -21,6 +21,13 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **single async connection** interface.
 
+    JSON fields support is always enabled, HStore supports is enabled by default,
+    but can be disabled with ``register_hstore=False`` argument.
+
+    Example::
+
+        database = PostgresqlExtDatabase('test', register_hstore=False)
+
     See also:
     https://peewee.readthedocs.org/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
@@ -34,7 +41,15 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabas
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
+    JSON fields support is always enabled, HStore supports is enabled by default,
+    but can be disabled with ``register_hstore=False`` argument.
+
     :param max_connections: connections pool size
+
+    Example::
+
+        database = PooledPostgresqlExtDatabase('test', register_hstore=False,
+                                               max_connections=20)
 
     See also:
     https://peewee.readthedocs.org/en/latest/peewee/playhouse.html#PostgresqlExtDatabase

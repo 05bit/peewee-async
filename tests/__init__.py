@@ -6,12 +6,11 @@ Create tests.ini file to configure tests.
 
 """
 import os
+import sys
 import json
 import logging
 import asyncio
 import contextlib
-import sys
-import urllib.parse
 import unittest
 import uuid
 import peewee

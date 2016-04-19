@@ -23,7 +23,7 @@ In current version (0.5.x) new-high level API is introduced while older low-leve
 * Basic operations are supported
 * Transactions support is present, yet not heavily tested
 
-Source code hosted on `GitHub`_.
+The source code is hosted on `GitHub`_.
 
 .. _GitHub: https://github.com/05bit/peewee-async
 
@@ -112,7 +112,7 @@ Prepare environment for tests:
 
 * Clone source code from GitHub as shown above
 * Create PostgreSQL database for testing, i.e. named 'test'
-* Create ``tests.ini`` config file based on ``tests.ini.sample``
+* Create ``tests.json`` config file based on ``tests.json.sample``
 
 Then run tests:
 
@@ -134,6 +134,7 @@ Contents
    :maxdepth: 2
 
    peewee_async/api
+   peewee_async/api_older
    peewee_async/examples
 
 Indices and tables

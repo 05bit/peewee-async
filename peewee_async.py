@@ -79,18 +79,19 @@ class Manager:
         class User(peewee.Model):
             username = peewee.CharField(max_length=40, unique=True)
 
-        objects = Manager(PostgresqlDatabase('my_db'))
+        objects = Manager(PostgresqlDatabase('test'))
 
-        user0 = await objects.create(User, username='test')
-        user1 = await objects.get(User, id=user0.id)
-        user2 = await objects.get(User, username='test')
-        # All should be the same
-        print(user1.id, user2.id, user3.id)
+        async def my_async_func():
+            user0 = await objects.create(User, username='test')
+            user1 = await objects.get(User, id=user0.id)
+            user2 = await objects.get(User, username='test')
+            # All should be the same
+            print(user1.id, user2.id, user3.id)
 
     If you don't pass database to constructor, you should define
-    `database` as a class member like that::
+    ``database`` as a class member like that::
 
-        database = PostgresqlDatabase('my_db')
+        database = PostgresqlDatabase('test')
 
         class MyManager(Manager):
             database = database
@@ -98,6 +99,8 @@ class Manager:
         objects = MyManager()
 
     """
+    #: Async database driver for manager. Must be provided
+    #: in constructor or as a class member.
     database = None
 
     def __init__(self, database=None, *, loop=None):
@@ -123,9 +126,10 @@ class Manager:
 
         Example::
 
-            obj1 = await self.get(MyModel, id=1)
-            obj2 = await self.get(MyModel, MyModel.id == 1)
-            obj3 = await self.get(MyModel.select().where(MyModel.id == 1))
+            async def my_async_func():
+                obj1 = await objects.get(MyModel, id=1)
+                obj2 = await objects.get(MyModel, MyModel.id == 1)
+                obj3 = await objects.get(MyModel.select().where(MyModel.id == 1))
 
         All will return `MyModel` instance with `id = 1`
         """
@@ -183,7 +187,10 @@ class Manager:
     @asyncio.coroutine
     def update(self, obj, only=None):
         """Update object in database. Optionally, update only specified
-        fields. For creating new object use `create()`.
+        fields. For creating new object use :meth:`.create()`
+
+        :param only: (optional) the list/tuple of fields or
+                     field names to update
         """
         field_dict = dict(obj._data)
         pk_field = obj._meta.primary_key
@@ -285,18 +292,42 @@ class Manager:
         yield from self.database.close_async()
 
     def atomic(self):
+        """Similar to `peewee.Database.atomic()` method, but returns
+        **asynchronous** context manager.
+
+        Example::
+
+            async with objects.atomic():
+                await objects.create(
+                    PageBlock, key='intro',
+                    text="There are more things in heaven and earth, "
+                         "Horatio, than are dreamt of in your philosophy.")
+                await objects.create(
+                    PageBlock, key='signature', text="William Shakespeare")
+        """
         return atomic(self.database)
 
     def transaction(self):
+        """Similar to `peewee.Database.transaction()` method, but returns
+        **asynchronous** context manager.
+        """
         return transaction(self.database)
 
     def savepoint(self, sid=None):
+        """Similar to `peewee.Database.savepoint()` method, but returns
+        **asynchronous** context manager.
+        """
         return savepoint(self.database, sid=sid)
 
     @contextlib.contextmanager
     def allow_sync(self):
         """Allow sync queries within context. Close sync
         connection on exit if connected.
+
+        Example::
+
+            with objects.allow_sync():
+                PageBlock.create_table(True)
         """
         old_allow = self.database.allow_sync
         self.database.allow_sync = True
@@ -899,6 +930,10 @@ class AsyncDatabase:
         """
         assert self.allow_sync, ("Error, sync query is not allowed: "
                                  "allow_sync is False")
+        if self.allow_sync in (logging.ERROR, logging.WARNING):
+            logging.log(self.allow_sync,
+                "Error, sync query is not allowed: %s %s" %
+                str(args), str(kwargs))
         return super().execute_sql(*args, **kwargs)
 
 
@@ -1039,6 +1074,10 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
 
+    Example::
+
+        database = PostgresqlDatabase('test')
+
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
     """
@@ -1052,6 +1091,10 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     connection and **async connections pool** interface.
 
     :param max_connections: connections pool size
+
+    Example::
+
+        database = PooledPostgresqlDatabase('test', max_connections=20)
 
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
@@ -1147,6 +1190,10 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
     """MySQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
 
+    Example::
+
+        database = MySQLDatabase('test')
+
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
     """
@@ -1185,6 +1232,10 @@ class PooledMySQLDatabase(MySQLDatabase):
     connection and **async connections pool** interface.
 
     :param max_connections: connections pool size
+
+    Example::
+
+        database = MySQLDatabase('test', max_connections=10)
 
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
