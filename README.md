@@ -7,35 +7,52 @@ ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 [![Build Status](https://travis-ci.org/05bit/peewee-async.svg)](https://travis-ci.org/05bit/peewee-async) [![PyPi Version](https://img.shields.io/pypi/v/peewee-async.svg)](https://pypi.python.org/pypi/peewee-async)
  [![Documentation Status](https://readthedocs.org/projects/peewee-async/badge/?version=latest)](http://peewee-async.readthedocs.org/en/latest/?badge=latest)
 
+Overview
+--------
 
-Documentation
--------------
+- Works on Python 3.4+
+- Has support PostgreSQL via `aiopg`
+- Has support MySQL via `aiomysql`
+- Single point high level async API
+- Drop-in replacement for sync code, sync will remain sync
+- Basic operations are supported
+- Transactions support is present, yet not heavily tested
 
+The complete documentation:  
 http://peewee-async.readthedocs.org
 
 Install
 -------
 
-Works on Python 3.3+ and PostgreSQL database.
-
-Install with `pip`:
+Install with `pip` for PostgreSQL:
 
 ```
-pip install peewee-async
+pip install peewee-async aiopg
+```
+
+or for MySQL:
+
+```
+pip install peewee-async aiomysql
 ```
 
 Quickstart
 ----------
 
-Create test PostgreSQL database, i.e. 'test' for running this snippet:
+Create 'test' PostgreSQL database for running this snippet:
+
+    createdb -E utf-8 test
+
+The code below is using new Python 3.5 `async` / `await` syntax, but older `yield from` will also work!
 
 ```python
 import asyncio
 import peewee
 import peewee_async
 
+# Nothing special, just define model and database:
+
 database = peewee_async.PostgresqlDatabase('test')
-loop = asyncio.get_event_loop()
 
 class TestModel(peewee.Model):
     text = peewee.CharField()
@@ -43,22 +60,43 @@ class TestModel(peewee.Model):
     class Meta:
         database = database
 
-# Create table synchronously!
+# Look, sync code is working!
+
 TestModel.create_table(True)
-# This is optional: close sync connection
+TestModel.create(text="Yo, I can do it sync!")
 database.close()
 
-@asyncio.coroutine
-def my_handler():
-    TestModel.create(text="Yo, I can do it sync!")
-    yield from peewee_async.create_object(TestModel, text="Not bad. Watch this, I'm async!")
-    all_objects = yield from peewee_async.execute(TestModel.select())
+# Create async database manager:
+
+objects = peewee_async.Manager(database)
+
+# No need for sync anymore!
+
+database.allow_sync = False
+
+async def handler():
+    await objects.create(TestModel, text="Not bad. Watch this, I'm async!")
+    all_objects = await objects.execute(TestModel.select())
     for obj in all_objects:
         print(obj.text)
 
-loop.run_until_complete(database.connect_async(loop=loop))
-loop.run_until_complete(my_handler())
+loop = asyncio.get_event_loop()
+loop.run_until_complete(handler())
+loop.close()
+
+# Clean up, can do it sync again:
+with objects.allow_sync():
+    TestModel.drop_table(True)
+
+# Expected output:"
+# Yo, I can do it sync!
+# Not bad. Watch this, I'm async!
 ```
+
+Documentation
+-------------
+
+http://peewee-async.readthedocs.org
 
 Discuss
 -------

@@ -29,42 +29,60 @@ deafults = {
     'postgres': {
         'database': 'test',
         'host': '127.0.0.1',
-        'port': 5432,
+        # 'port': 5432,
         'user': 'postgres',
     },
     'postgres-ext': {
         'database': 'test',
         'host': '127.0.0.1',
-        'port': 5432,
+        # 'port': 5432,
         'user': 'postgres',
     },
     'postgres-pool': {
         'database': 'test',
         'host': '127.0.0.1',
-        'port': 5432,
+        # 'port': 5432,
         'user': 'postgres',
         'max_connections': 4,
     },
     'postgres-pool-ext': {
         'database': 'test',
         'host': '127.0.0.1',
-        'port': 5432,
+        # 'port': 5432,
         'user': 'postgres',
         'max_connections': 4,
     },
     'mysql': {
         'database': 'test',
         'host': '127.0.0.1',
-        'port': 3306,
+        # 'port': 3306,
         'user': 'root',
     },
     'mysql-pool': {
         'database': 'test',
         'host': '127.0.0.1',
-        'port': 3306,
+        # 'port': 3306,
         'user': 'root',
     }
 }
+
+try:
+    import aiopg
+except ImportError:
+    print("aiopg is not installed, ignoring PostgreSQL tests")
+    for k in list(deafults.keys()):
+        if k.startswith('postgres'):
+            deafults.pop(k)
+
+
+try:
+    import aiomysql
+except ImportError:
+    print("aiomysql is not installed, ignoring MySQL tests")
+    for k in list(deafults.keys()):
+        if k.startswith('mysql'):
+            deafults.pop(k)
+
 
 db_classes = {
     'postgres': peewee_async.PostgresqlDatabase,
@@ -93,7 +111,6 @@ def load_managers(*, managers=None, loop=None, only=None):
             pass
 
         database = db_classes[k](**config[k])
-        database.allow_sync = False
         managers[k] = peewee_async.Manager(database, loop=loop)
 
 
@@ -154,12 +171,13 @@ class BaseManagerTestCase(unittest.TestCase):
     @classmethod
     @contextlib.contextmanager
     def manager(cls, objects, allow_sync=False):
-        old_allow_sync = objects.database.allow_sync
-        objects.database.allow_sync = allow_sync
         for model in cls.models:
             model._meta.database = objects.database
-        yield
-        objects.database.allow_sync = old_allow_sync
+        if allow_sync:
+            with objects.allow_sync():
+                yield
+        else:
+            yield
 
     @classmethod
     def setUpClass(cls, *args, **kwargs):
@@ -167,11 +185,15 @@ class BaseManagerTestCase(unittest.TestCase):
         """
         cls.managers = {}
         cls.loop = asyncio.new_event_loop()
-        # cls.loop.set_debug(True)
+        cls.loop.set_debug(True)
 
-        load_managers(managers=cls.managers, loop=cls.loop, only=cls.only)
+        load_managers(managers=cls.managers,
+                      loop=cls.loop,
+                      only=cls.only)
 
         for k, objects in cls.managers.items():
+            objects.database.allow_sync = False
+
             with cls.manager(objects, allow_sync=True):
                 for model in cls.models:
                     model.create_table(True)
@@ -182,12 +204,12 @@ class BaseManagerTestCase(unittest.TestCase):
         """
         for k, objects in cls.managers.items():
             cls.loop.run_until_complete(objects.close())
+        cls.loop.close()
 
         for k, objects in cls.managers.items():
             with cls.manager(objects, allow_sync=True):
                 for model in reversed(cls.models):
                     model.drop_table(fail_silently=True, cascade=True)
-
         cls.managers = None
 
     def setUp(self):

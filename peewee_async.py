@@ -292,12 +292,17 @@ class Manager:
         return savepoint(self.database, sid=sid)
 
     @contextlib.contextmanager
-    def allow_sync(self, allow=True):
-        """Allow sync queries within context.
+    def allow_sync(self):
+        """Allow sync queries within context. Close sync
+        connection on exit if connected.
         """
         old_allow = self.database.allow_sync
-        self.database.allow_sync = allow
+        self.database.allow_sync = True
         yield
+        try:
+            self.database.close()
+        except self.database.Error:
+            pass # already closed
         self.database.allow_sync = old_allow
 
     def _swap_database(self, query):
@@ -970,6 +975,10 @@ class AsyncPostgresqlMixin(AsyncDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
+    if aiopg:
+        import psycopg2
+        Error = psycopg2.Error
+
     def init_async(self, conn_cls=AsyncPostgresqlConnection,
                    enable_json=False,
                    enable_hstore=False):
@@ -1131,6 +1140,10 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
     """
+    if aiomysql:
+        import pymysql
+        Error = pymysql.Error
+
     def init(self, database, **kwargs):
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
