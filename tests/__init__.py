@@ -170,7 +170,7 @@ class BaseManagerTestCase(unittest.TestCase):
         """
         cls.managers = {}
         cls.loop = asyncio.new_event_loop()
-        cls.loop.set_debug(True)
+        # cls.loop.set_debug(True)
 
         load_managers(managers=cls.managers,
                       loop=cls.loop,
