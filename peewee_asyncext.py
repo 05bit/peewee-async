@@ -32,6 +32,8 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     https://peewee.readthedocs.org/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
     def init(self, database, **kwargs):
+        self.min_connections = 1
+        self.max_connections = 1
         super().init(database, **kwargs)
         self.init_async(enable_json=True,
                         enable_hstore=self.register_hstore)
@@ -55,19 +57,8 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabas
     https://peewee.readthedocs.org/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
     def init(self, database, **kwargs):
+        self.min_connections = kwargs.pop('min_connections', 1)
+        self.max_connections = kwargs.pop('max_connections', 20)
         super().init(database, **kwargs)
         self.init_async(enable_json=True,
                         enable_hstore=self.register_hstore)
-        self.min_connections = self.connect_kwargs.pop('min_connections', 1)
-        self.max_connections = self.connect_kwargs.pop('max_connections', 20)
-
-    @property
-    def connect_kwargs_async(self):
-        """Connection parameters for `aiopg.Pool`
-        """
-        kwargs = super().connect_kwargs_async
-        kwargs.update({
-            'minsize': self.min_connections,
-            'maxsize': self.max_connections,
-        })
-        return kwargs

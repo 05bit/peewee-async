@@ -18,7 +18,7 @@ In current version (0.5.x) new-high level API is introduced while older low-leve
 * Works on Python 3.4+
 * Has support for PostgreSQL via `aiopg`
 * Has support for MySQL via `aiomysql`
-* Single point high level async API
+* Single point high-level async API
 * Drop-in replacement for sync code, sync will remain sync
 * Basic operations are supported
 * Transactions support is present, yet not heavily tested
@@ -74,7 +74,7 @@ Quickstart
     with objects.allow_sync():
         TestModel.drop_table(True)
 
-    # Expected output:"
+    # Expected output:
     # Yo, I can do it sync!
     # Not bad. Watch this, I'm async!
 

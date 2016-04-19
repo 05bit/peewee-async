@@ -942,7 +942,7 @@ class AsyncDatabase:
 ##############
 
 
-class AsyncPostgresqlConnectionPool:
+class AsyncPostgresqlConnection:
     """Asynchronous database connection pool.
     """
     def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
@@ -1006,16 +1006,6 @@ class AsyncPostgresqlConnectionPool:
         yield from self.pool.wait_closed()
 
 
-class AsyncPostgresqlConnection(AsyncPostgresqlConnectionPool):
-    """Asynchronous single database connection.
-    """
-    def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
-        kwargs['minsize'] = 1
-        kwargs['maxsize'] = 1
-        super().__init__(database=database, loop=loop, timeout=timeout,
-                         **kwargs)
-
-
 class AsyncPostgresqlMixin(AsyncDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
@@ -1025,11 +1015,9 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         Error = psycopg2.Error
 
     def init_async(self, conn_cls=AsyncPostgresqlConnection,
-                   enable_json=False,
-                   enable_hstore=False):
+                   enable_json=False, enable_hstore=False):
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
-
         self._async_conn_cls = conn_cls
         self._enable_json = enable_json
         self._enable_hstore = enable_hstore
@@ -1040,6 +1028,8 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         """
         kwargs = self.connect_kwargs.copy()
         kwargs.update({
+            'minsize': self.min_connections,
+            'maxsize': self.max_connections,
             'enable_json': self._enable_json,
             'enable_hstore': self._enable_hstore,
         })
@@ -1082,6 +1072,8 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
     """
     def init(self, database, **kwargs):
+        self.min_connections = 1
+        self.max_connections = 1
         super().init(database, **kwargs)
         self.init_async()
 
@@ -1100,21 +1092,10 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
     """
     def init(self, database, **kwargs):
+        self.min_connections = kwargs.pop('min_connections', 1)
+        self.max_connections = kwargs.pop('max_connections', 20)
         super().init(database, **kwargs)
-        self.init_async(conn_cls=AsyncPostgresqlConnectionPool)
-        self.min_connections = self.connect_kwargs.pop('min_connections', 1)
-        self.max_connections = self.connect_kwargs.pop('max_connections', 20)
-
-    @property
-    def connect_kwargs_async(self):
-        """Connection parameters for `aiopg.Pool`
-        """
-        kwargs = super().connect_kwargs_async
-        kwargs.update({
-            'minsize': self.min_connections,
-            'maxsize': self.max_connections,
-        })
-        return kwargs
+        self.init_async()
 
 
 #########
