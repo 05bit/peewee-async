@@ -39,14 +39,12 @@ __all__ = [
     'Manager',
     'PostgresqlDatabase',
     'PooledPostgresqlDatabase',
+    'MySQLDatabase',
+    'PooledMySQLDatabase',
 
     ### Low level API ###
 
     'execute',
-    'get_object',
-    'create_object',
-    'delete_object',
-    'update_object',
     'count',
     'scalar',
     'atomic',
@@ -55,6 +53,10 @@ __all__ = [
 
     ### Deprecated ###
 
+    'get_object',
+    'create_object',
+    'delete_object',
+    'update_object',
     'sync_unwanted',
     'UnwantedSyncQueryError',
 ]
@@ -399,6 +401,10 @@ def create_object(model, **data):
     # - obj._set_pk_value()
     # - obj._prepare_instance()
     #
+    warnings.warn("delete_object() is deprecated, Manager.create() "
+                  "should be used instead",
+                  DeprecationWarning)
+
     obj = model(**data)
 
     pk = yield from insert(model.insert(**dict(obj._data)))
@@ -420,6 +426,10 @@ def get_object(source, *args):
     :param args: lookup parameters
     :return: model instance or raises ``peewee.DoesNotExist`` if object not found
     """
+    warnings.warn("get_object() is deprecated, Manager.get() "
+                  "should be used instead",
+                  DeprecationWarning)
+
     if isinstance(source, peewee.Query):
         query = source
         model = query.model_class
@@ -447,6 +457,10 @@ def delete_object(obj, recursive=False, delete_nullable=False):
 
     .. _Model.delete_instance(): http://peewee.readthedocs.org/en/latest/peewee/api.html#Model.delete_instance
     """
+    warnings.warn("delete_object() is deprecated, Manager.delete() "
+                  "should be used instead",
+                  DeprecationWarning)
+
     # Here are private calls involved:
     # - obj._pk_expr()
     if recursive:
@@ -482,6 +496,10 @@ def update_object(obj, only=None):
     # - obj._pk_expr()
     # - obj._dirty.clear()
     #
+    warnings.warn("delete_object() is deprecated, Manager.update() "
+                  "should be used instead",
+                  DeprecationWarning)
+
     field_dict = dict(obj._data)
     pk_field = obj._meta.primary_key
 

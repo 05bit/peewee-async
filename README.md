@@ -66,7 +66,7 @@ TestModel.create_table(True)
 TestModel.create(text="Yo, I can do it sync!")
 database.close()
 
-# Create async database manager:
+# Create async models manager:
 
 objects = peewee_async.Manager(database)
 
