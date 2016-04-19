@@ -177,12 +177,12 @@ class Manager:
         indicating whether the instance was created.
         """
         try:
-            return (yield from self.get(**kwargs)), False
+            return (yield from self.get(model, **kwargs)), False
         except model.DoesNotExist:
             data = defaults or {}
             data.update({k: v for k, v in kwargs.items()
                 if not '__' in k})
-            return (yield from self.create(**data)), True
+            return (yield from self.create(model, **data)), True
 
     @asyncio.coroutine
     def update(self, obj, only=None):
@@ -235,14 +235,14 @@ class Manager:
         exists, then try to get it by unique fields.
         """
         try:
-            return (yield from self.create(**kwargs)), True
-        except peewee.IntegrityError:
+            return (yield from self.create(model, **kwargs)), True
+        except: # except peewee.IntegrityError:
             query = []
             for field_name, value in kwargs.items():
                 field = getattr(model, field_name)
                 if field.unique or field.primary_key:
                     query.append(field == value)
-            return (yield from self.get(**kwargs)), False
+            return (yield from self.get(model, *query)), False
 
     @asyncio.coroutine
     def execute(self, query):

@@ -53,13 +53,14 @@ From now we may want **only async** calls and treat sync as unwanted or as error
 
 Finally, let's do something async::
 
-    async my_async_func():
+    async def my_async_func():
         # Add new page block
-        await objects.create(PageBlock, key='title',
-                             text="Peewee is AWESOME with async!")
+        await objects.create_or_get(
+            PageBlock, key='title',
+            text="Peewee is AWESOME with async!")
 
         # Get one by key
-        title = objects.get(PageBlock, key='title')
+        title = await objects.get(PageBlock, key='title')
         print("Was:", title.text)
 
         # Save with new text
@@ -67,7 +68,7 @@ Finally, let's do something async::
         await objects.update(title)
         print("New:", title.text)
 
-    loop.run_until_complete(my_async_func)
+    loop.run_until_complete(my_async_func())
     loop.close()
 
 **That's it!**
