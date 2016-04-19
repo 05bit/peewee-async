@@ -118,7 +118,8 @@ def load_managers(*, managers=None, loop=None, only=None):
 
 
 class TestModel(peewee.Model):
-    text = peewee.CharField()
+    text = peewee.CharField(max_length=100, unique=True)
+    data = peewee.TextField(default='')
 
 
 class TestModelAlpha(peewee.Model):
@@ -279,6 +280,41 @@ class ManagerTestCase(BaseManagerTestCase):
             text = "Test %s" % uuid.uuid4()
             obj = yield from objects.create(TestModel, text=text)
             self.assertTrue(obj is not None)
+
+        self.run_with_managers(test)
+
+    def test_create_or_get(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            obj1, created1 = yield from objects.create_or_get(
+                TestModel, text=text, data="Data 1")
+            obj2, created2 = yield from objects.create_or_get(
+                TestModel, text=text, data="Data 2")
+
+            self.assertTrue(created1)
+            self.assertTrue(not created2)
+            self.assertEqual(obj1, obj2)
+            self.assertEqual(obj1.data, "Data 1")
+            self.assertEqual(obj2.data, "Data 1")
+
+        self.run_with_managers(test)
+
+    def test_get_or_create(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+
+            obj1, created1 = yield from objects.get_or_create(
+                TestModel, text=text, defaults={'data': "Data 1"})
+            obj2, created2 = yield from objects.get_or_create(
+                TestModel, text=text, defaults={'data': "Data 2"})
+
+            self.assertTrue(created1)
+            self.assertTrue(not created2)
+            self.assertEqual(obj1, obj2)
+            self.assertEqual(obj1.data, "Data 1")
+            self.assertEqual(obj2.data, "Data 1")
 
         self.run_with_managers(test)
 
