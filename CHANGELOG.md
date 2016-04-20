@@ -5,6 +5,7 @@
 - Add high-level API via Manager class
 - Add support for MySQL
 - Auto-connect is performed for async queries if database is initialized, so no need to call `connect_async()` manually! And no worries, nothing will happen on duplicate calls
+- Run SQL within `peewee.Database.exception_wrapper()` context, the same way as for sync requests
 
 ## 0.4.1
 

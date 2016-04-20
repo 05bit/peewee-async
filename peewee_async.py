@@ -1376,23 +1376,23 @@ class atomic:
 
 
 @asyncio.coroutine
-def _run_sql(db, operation, *args, **kwargs):
+def _run_sql(database, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """
-    cursor = yield from db.cursor_async()
+    with database.exception_wrapper():
+        cursor = yield from database.cursor_async()
 
-    try:
-        yield from cursor.execute(operation, *args, **kwargs)
-    except:
-        cursor.release()
-        raise
+        try:
+            yield from cursor.execute(operation, *args, **kwargs)
+        except:
+            cursor.release()
+            raise
 
-    return cursor
+        return cursor
 
 
 @asyncio.coroutine
 def _execute_query_async(query):
     """Execute query and return cursor object.
     """
-    with query.database.exception_wrapper():
-        return (yield from _run_sql(query.database, *query.sql()))
+    return (yield from _run_sql(query.database, *query.sql()))
