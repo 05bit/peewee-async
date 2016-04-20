@@ -31,7 +31,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5a1'
+__version__ = '0.5'
 
 __all__ = [
     ### High level API ###

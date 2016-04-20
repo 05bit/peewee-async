@@ -267,8 +267,8 @@ class DatabaseTestCase(unittest.TestCase):
 
 
 class OlderTestCase(unittest.TestCase):
-    only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
-    # only = None
+    # only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+    only = None
 
     models = [TestModel, UUIDTestModel, TestModelAlpha,
               TestModelBeta, TestModelGamma]
