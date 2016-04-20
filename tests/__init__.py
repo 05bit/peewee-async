@@ -399,13 +399,33 @@ class ManagerTestCase(BaseManagerTestCase):
 
     def test_connect_close(self):
         @asyncio.coroutine
+        def get_conn(objects):
+            yield from objects.connect()
+            yield from asyncio.sleep(0.125, loop=self.loop)
+            # NOTE: "private" member access
+            return objects.database._async_conn
+
+        @asyncio.coroutine
         def test(objects):
-            yield from objects.connect()
+            c1 = yield from get_conn(objects)
+            c2 = yield from get_conn(objects)
+            self.assertEqual(c1, c2)
             self.assertTrue(objects.is_connected)
-            yield from objects.connect()
-            self.assertTrue(objects.is_connected)
+
             yield from objects.close()
             self.assertTrue(not objects.is_connected)
+
+            done, not_done = yield from asyncio.wait([
+                get_conn(objects),
+                get_conn(objects),
+                get_conn(objects),
+            ], loop=self.loop)
+
+            conn = next(iter(done)).result()
+            self.assertEqual(len(done), 3)
+            self.assertTrue(objects.is_connected)
+            self.assertTrue(all(map(lambda t: t.result() == conn, done)))
+
             yield from objects.close()
             self.assertTrue(not objects.is_connected)
 

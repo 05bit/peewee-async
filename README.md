@@ -10,7 +10,7 @@ ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 Overview
 --------
 
-* Works on Python 3.4+
+* Requires Python 3.4+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Single point for high-level async API
