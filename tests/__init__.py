@@ -401,7 +401,7 @@ class ManagerTestCase(BaseManagerTestCase):
         @asyncio.coroutine
         def get_conn(objects):
             yield from objects.connect()
-            yield from asyncio.sleep(0.125, loop=self.loop)
+            # yield from asyncio.sleep(0.05, loop=self.loop)
             # NOTE: "private" member access
             return objects.database._async_conn
 

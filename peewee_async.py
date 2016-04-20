@@ -236,7 +236,7 @@ class Manager:
         """
         try:
             return (yield from self.create(model, **kwargs)), True
-        except: # except peewee.IntegrityError:
+        except peewee.IntegrityError:
             query = []
             for field_name, value in kwargs.items():
                 field = getattr(model, field_name)
@@ -1394,4 +1394,5 @@ def _run_sql(db, operation, *args, **kwargs):
 def _execute_query_async(query):
     """Execute query and return cursor object.
     """
-    return (yield from _run_sql(query.database, *query.sql()))
+    with query.database.exception_wrapper():
+        return (yield from _run_sql(query.database, *query.sql()))
