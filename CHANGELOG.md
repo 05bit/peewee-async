@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- Fix: #23, running not in the context of a task
+
 ## 0.5.0
 
 - Add high-level API via Manager class
