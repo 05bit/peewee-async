@@ -1274,10 +1274,12 @@ class UnwantedSyncQueryError(Exception):
 
 class transaction:
     """Asynchronous context manager (`async with`), similar to
-    `peewee.transaction()`.
+    `peewee.transaction()`. Will start new `asyncio` task for
+    transaction if not started already.
     """
     def __init__(self, db):
         self.db = db
+        self.loop = db.loop
 
     @asyncio.coroutine
     def commit(self, begin=True):
@@ -1292,12 +1294,18 @@ class transaction:
             yield from _run_sql(self.db, 'BEGIN')
 
     @asyncio.coroutine
-    def __aenter__(self):
+    def begin(self):
         yield from self.db.push_transaction_async()
 
         if self.db.transaction_depth_async() == 1:
             yield from _run_sql(self.db, 'BEGIN')
 
+    @asyncio.coroutine
+    def __aenter__(self):
+        if asyncio.Task.current_task(loop=self.loop):
+            yield from self.begin()
+        else:
+            yield from self.loop.create_task(self.begin())
         return self
 
     @asyncio.coroutine
@@ -1402,8 +1410,16 @@ def _execute_query_async(query):
 
 
 class TaskLocals:
-    """Simple `dict` wrapper to get and set values on
-    per `asyncio` task basis.
+    """Simple `dict` wrapper to get and set values on per `asyncio`
+    task basis.
+
+
+    The idea is similar to thread-local data, but actually *much* simpler.
+    It's no more than a "sugar" class. Use `get()` and `set()` method like
+    you would to for `dict` but values will be get and set in the context
+    of currently running `asyncio` task.
+
+    When task is done, all saved values is removed from stored data.
     """
     def __init__(self, loop):
         self.loop = loop
