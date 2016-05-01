@@ -3,6 +3,7 @@
 ## 0.5.1
 
 - Fix: #23, running not in the context of a task
+- Automatically wrap transaction in task if not running task already
 
 ## 0.5.0
 
