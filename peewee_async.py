@@ -1396,3 +1396,50 @@ def _execute_query_async(query):
     """Execute query and return cursor object.
     """
     return (yield from _run_sql(query.database, *query.sql()))
+
+
+class TaskLocals:
+    """Simple `dict` wrapper to get and set values on
+    per `asyncio` task basis.
+    """
+    def __init__(self, loop):
+        self.loop = loop
+        self.data = {}
+
+    def get(self, key, *val):
+        """Get value stored for current running task. Optionally
+        you may provide the default value. Raises `KeyError` when
+        can't get the value and no default one is provided.
+        """
+        data = self.get_data()
+        if data:
+            return data.get(key, *val)
+        elif len(val):
+            return val[0]
+        else:
+            raise KeyError(key)
+
+    def set(self, key, val):
+        """Set value stored for current running task.
+        """
+        data = self.get_data()
+        if data:
+            data[key] = val
+        else:
+            raise RuntimeError("No task is currently running")
+
+    def get_data(self):
+        """Get dict stored for current running task.
+        """
+        task = asyncio.Task.current_task(loop=self.loop)
+        if task:
+            taks_id = id(task)
+            if not taks_id in self.data:
+                self.data[taks_id] = {}
+                task.add_done_callback(self.pop_data)
+            return self.data[taks_id]
+
+    def pop_data(self, task):
+        """Delete data for task from stored data dict.
+        """
+        self.data.pop(id(task), None)
