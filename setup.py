@@ -24,7 +24,6 @@ setup(
     zip_safe=False,
     install_requires=(
         'peewee >= 2.8.0',
-        'tasklocals >= 0.2',
     ),
     py_modules=[
         'peewee_async',

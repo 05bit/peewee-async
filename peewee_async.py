@@ -17,7 +17,6 @@ import asyncio
 import logging
 import uuid
 import contextlib
-import tasklocals
 import peewee
 import warnings
 
@@ -842,7 +841,7 @@ class AsyncDatabase:
 
             yield from conn.connect()
 
-            self._task_data = tasklocals.local(loop=self.loop)
+            self._task_data = TaskLocals(loop=self.loop)
             self._async_conn = conn
             self._async_wait.set_result(True)
 
@@ -880,32 +879,36 @@ class AsyncDatabase:
         """Increment async transaction depth.
         """
         yield from self.connect_async(loop=self.loop)
-        if not getattr(self._task_data, 'depth', 0):
-            self._task_data.depth = 0
-            self._task_data.conn = yield from self._async_conn.acquire()
-        self._task_data.depth += 1
+
+        depth = self._task_data.get('depth', 0)
+        if not depth:
+            conn = yield from self._async_conn.acquire()
+            self._task_data.set('conn', conn)
+        self._task_data.set('depth', depth + 1)
 
     @asyncio.coroutine
     def pop_transaction_async(self):
         """Decrement async transaction depth.
         """
-        if self._task_data.depth > 0:
-            self._task_data.depth -= 1
-            if self._task_data.depth == 0:
-                self._async_conn.release(self._task_data.conn)
-                self._task_data.conn = None
+        depth = self._task_data.get('depth', 0)
+        if depth > 0:
+            depth -= 1
+            self._task_data.set('depth', depth)
+            if depth == 0:
+                conn = self._task_data.get('conn')
+                self._async_conn.release(conn)
         else:
             raise ValueError("Invalid async transaction depth value")
 
     def transaction_depth_async(self):
         """Get async transaction depth.
         """
-        return getattr(self._task_data, 'depth', 0)
+        return self._task_data.get('depth', 0)
 
     def transaction_conn_async(self):
         """Get async transaction connection.
         """
-        return getattr(self._task_data, 'conn', None)
+        return self._task_data.get('conn', None)
 
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
@@ -1412,7 +1415,7 @@ class TaskLocals:
         can't get the value and no default one is provided.
         """
         data = self.get_data()
-        if data:
+        if data is not None:
             return data.get(key, *val)
         elif len(val):
             return val[0]
@@ -1423,7 +1426,7 @@ class TaskLocals:
         """Set value stored for current running task.
         """
         data = self.get_data()
-        if data:
+        if data is not None:
             data[key] = val
         else:
             raise RuntimeError("No task is currently running")
@@ -1433,11 +1436,11 @@ class TaskLocals:
         """
         task = asyncio.Task.current_task(loop=self.loop)
         if task:
-            taks_id = id(task)
-            if not taks_id in self.data:
-                self.data[taks_id] = {}
+            task_id = id(task)
+            if not task_id in self.data:
+                self.data[task_id] = {}
                 task.add_done_callback(self.pop_data)
-            return self.data[taks_id]
+            return self.data[task_id]
 
     def pop_data(self, task):
         """Delete data for task from stored data dict.
