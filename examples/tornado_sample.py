@@ -91,15 +91,16 @@ class CreateHandler(tornado.web.RequestHandler):
         })
 
     async def get_or_create(self):
+        obj_id = self.get_argument('id', None)
         async with self.application.objects.atomic():
             obj, created = await self.application.objects.get_or_create(
-                TestNameModel, id=100,
-                defaults={'name': "TestNameModel id=100"})
+                TestNameModel, id=obj_id,
+                defaults={'name': "TestNameModel id=%s" % obj_id})
             return obj
 
 app.add_handlers('', [
     (r"/", RootHandler),
-    (r"/create/", CreateHandler),
+    (r"/create", CreateHandler),
 ])
 
 # Setup verbose logging
@@ -112,8 +113,7 @@ print("""Run application server http://127.0.0.1:8888
 
     Try GET urls:
     http://127.0.0.1:8888?id=1
-    http://127.0.0.1:8888?id=2
-    http://127.0.0.1:8888?id=3
+    http://127.0.0.1:8888/create?id=100
 
     Try POST with name=<some text> data:
     http://127.0.0.1:8888
