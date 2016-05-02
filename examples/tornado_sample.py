@@ -12,6 +12,7 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2016, Alexey Kinëv <rudy@05bit.com>
 
 """
+# Start example [marker for docs]
 import tornado.web
 import logging
 import peewee
@@ -78,7 +79,7 @@ class RootHandler(tornado.web.RequestHandler):
 class CreateHandler(tornado.web.RequestHandler):
     async def get(self):
         loop = asyncio.get_event_loop()
-        task1 = asyncio.Task.current_task()
+        task1 = asyncio.Task.current_task() # Just to demonstrate it's None
         task2 = loop.create_task(self.get_or_create())
         obj = await task2
         self.write({
