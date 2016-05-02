@@ -2,6 +2,7 @@
 
 ## 0.5.2
 
+- Fix #24: prevent stucking after connection error
 - Fix #25: starting transaction before connecting raise `AttributeError` exception about `_task_data`
 - **Require** transactions to be run within task context
 
