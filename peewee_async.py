@@ -30,7 +30,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 
 __all__ = [
     ### High level API ###
@@ -815,6 +815,7 @@ class AsyncDatabase:
     loop = None         # asyncio event loop
     _async_conn = None  # async connection
     _async_wait = None  # connection waiter
+    _task_data = None   # task context data
 
     @asyncio.coroutine
     def connect_async(self, loop=None, timeout=None):
@@ -872,6 +873,7 @@ class AsyncDatabase:
             conn = self._async_conn
             self._async_conn = None
             self._async_wait = None
+            self._task_data = None
             yield from conn.close()
 
     @asyncio.coroutine
@@ -879,8 +881,7 @@ class AsyncDatabase:
         """Increment async transaction depth.
         """
         yield from self.connect_async(loop=self.loop)
-
-        depth = self._task_data.get('depth', 0)
+        depth = self.transaction_depth_async()
         if not depth:
             conn = yield from self._async_conn.acquire()
             self._task_data.set('conn', conn)
@@ -890,7 +891,7 @@ class AsyncDatabase:
     def pop_transaction_async(self):
         """Decrement async transaction depth.
         """
-        depth = self._task_data.get('depth', 0)
+        depth = self.transaction_depth_async()
         if depth > 0:
             depth -= 1
             self._task_data.set('depth', depth)
@@ -903,12 +904,12 @@ class AsyncDatabase:
     def transaction_depth_async(self):
         """Get async transaction depth.
         """
-        return self._task_data.get('depth', 0)
+        return self._task_data.get('depth', 0) if self._task_data else 0
 
     def transaction_conn_async(self):
         """Get async transaction connection.
         """
-        return self._task_data.get('conn', None)
+        return self._task_data.get('conn', None) if self._task_data else None
 
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
@@ -1363,11 +1364,10 @@ class atomic:
 
     @asyncio.coroutine
     def __aenter__(self):
-        if self.db.transaction_depth_async() == 0:
-            self._ctx = self.db.transaction_async()
-        else:
+        if self.db.transaction_depth_async() > 0:
             self._ctx = self.db.savepoint_async()
-
+        else:
+            self._ctx = self.db.transaction_async()
         return (yield from self._ctx.__aenter__())
 
     @asyncio.coroutine

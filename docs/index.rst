@@ -135,6 +135,7 @@ Contents
 
    peewee_async/api
    peewee_async/api_older
+   peewee_async/tornado
    peewee_async/examples
 
 Indices and tables

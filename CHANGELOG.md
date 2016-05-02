@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.2
+
+- Fix #25: starting transaction before connecting raise `AttributeError` exception about `_task_data`
+- **Require** transactions to be run within task context
+
 ## 0.5.1
 
 - Fix: #23, running not in the context of a task
