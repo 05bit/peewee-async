@@ -1294,18 +1294,12 @@ class transaction:
             yield from _run_sql(self.db, 'BEGIN')
 
     @asyncio.coroutine
-    def begin(self):
+    def __aenter__(self):
+        if not asyncio.Task.current_task(loop=self.loop):
+            raise RuntimeError("The transaction must run within a task")
         yield from self.db.push_transaction_async()
-
         if self.db.transaction_depth_async() == 1:
             yield from _run_sql(self.db, 'BEGIN')
-
-    @asyncio.coroutine
-    def __aenter__(self):
-        if asyncio.Task.current_task(loop=self.loop):
-            yield from self.begin()
-        else:
-            yield from self.loop.create_task(self.begin())
         return self
 
     @asyncio.coroutine
@@ -1440,24 +1434,29 @@ class TaskLocals:
     def set(self, key, val):
         """Set value stored for current running task.
         """
-        data = self.get_data()
+        data = self.get_data(True)
         if data is not None:
             data[key] = val
         else:
             raise RuntimeError("No task is currently running")
 
-    def get_data(self):
-        """Get dict stored for current running task.
+    def get_data(self, create=False):
+        """Get dict stored for current running task. Return `None`
+        or an empty dict if no data was found depending on the
+        `create` argument value.
+
+        :param create: if argument is `True`, create empty dict
+                       for task, default: `False`
         """
         task = asyncio.Task.current_task(loop=self.loop)
         if task:
             task_id = id(task)
-            if not task_id in self.data:
+            if create and not task_id in self.data:
                 self.data[task_id] = {}
-                task.add_done_callback(self.pop_data)
-            return self.data[task_id]
+                task.add_done_callback(self.del_data)
+            return self.data.get(task_id)
 
-    def pop_data(self, task):
+    def del_data(self, task):
         """Delete data for task from stored data dict.
         """
-        self.data.pop(id(task), None)
+        del self.data[id(task)]
