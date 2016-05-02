@@ -840,11 +840,16 @@ class AsyncDatabase:
                 timeout=timeout,
                 **self.connect_kwargs_async)
 
-            yield from conn.connect()
-
-            self._task_data = TaskLocals(loop=self.loop)
-            self._async_conn = conn
-            self._async_wait.set_result(True)
+            try:
+                yield from conn.connect()
+            except:
+                self._async_wait.cancel()
+                self._async_wait = None
+                raise
+            else:
+                self._task_data = TaskLocals(loop=self.loop)
+                self._async_conn = conn
+                self._async_wait.set_result(True)
 
     @asyncio.coroutine
     def cursor_async(self):
