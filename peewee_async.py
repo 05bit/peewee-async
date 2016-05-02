@@ -485,7 +485,7 @@ def delete_object(obj, recursive=False, delete_nullable=False):
 
     For details please check out `Model.delete_instance()`_ in peewee docs.
 
-    .. _Model.delete_instance(): http://peewee.readthedocs.org/en/latest/peewee/api.html#Model.delete_instance
+    .. _Model.delete_instance(): http://peewee.readthedocs.io/en/latest/peewee/api.html#Model.delete_instance
     """
     warnings.warn("delete_object() is deprecated, Manager.delete() "
                   "should be used instead",
@@ -516,7 +516,7 @@ def update_object(obj, only=None):
     doesn't invoke ``save()`` method on model class. That is important to know if you
     overrided save method for your model.
 
-    .. _Model.save(): http://peewee.readthedocs.org/en/latest/peewee/api.html#Model.save
+    .. _Model.save(): http://peewee.readthedocs.io/en/latest/peewee/api.html#Model.save
     """
     # Here are private calls involved:
     #
@@ -1078,7 +1078,7 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         database = PostgresqlDatabase('test')
 
     See also:
-    http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
+    http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = 1
@@ -1098,7 +1098,7 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         database = PooledPostgresqlDatabase('test', max_connections=20)
 
     See also:
-    http://peewee.readthedocs.org/en/latest/peewee/api.html#PostgresqlDatabase
+    http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
@@ -1185,7 +1185,7 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         database = MySQLDatabase('test')
 
     See also:
-    http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
+    http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
     if aiomysql:
         import pymysql
@@ -1230,7 +1230,7 @@ class PooledMySQLDatabase(MySQLDatabase):
         database = MySQLDatabase('test', max_connections=10)
 
     See also:
-    http://peewee.readthedocs.org/en/latest/peewee/api.html#MySQLDatabase
+    http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)

@@ -5,7 +5,7 @@ Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
 ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 
 [![Build Status](https://travis-ci.org/05bit/peewee-async.svg)](https://travis-ci.org/05bit/peewee-async) [![PyPi Version](https://img.shields.io/pypi/v/peewee-async.svg)](https://pypi.python.org/pypi/peewee-async)
- [![Documentation Status](https://readthedocs.org/projects/peewee-async/badge/?version=latest)](http://peewee-async.readthedocs.org/en/latest/?badge=latest)
+ [![Documentation Status](https://readthedocs.io/projects/peewee-async/badge/?version=latest)](http://peewee-async.readthedocs.io/en/latest/?badge=latest)
 
 Overview
 --------
@@ -19,7 +19,7 @@ Overview
 * Transactions support is present, yet not heavily tested
 
 The complete documentation:  
-http://peewee-async.readthedocs.org
+http://peewee-async.readthedocs.io
 
 Install
 -------
@@ -96,7 +96,7 @@ with objects.allow_sync():
 Documentation
 -------------
 
-http://peewee-async.readthedocs.org
+http://peewee-async.readthedocs.io
 
 Discuss
 -------
