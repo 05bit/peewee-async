@@ -4,6 +4,7 @@
 
 - Fix #24: prevent stucking after connection error
 - Fix #25: starting transaction before connecting raise `AttributeError` exception about `_task_data`
+- Removed `tasklocals` package from dependencies
 - **Require** transactions to be run within task context
 
 ## 0.5.1
