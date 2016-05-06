@@ -564,7 +564,7 @@ def select(query):
     except GeneratorExit:
         pass
 
-    cursor.release()
+    yield from cursor.release
     return result
 
 
@@ -584,7 +584,7 @@ def insert(query):
         result = yield from query.database.last_insert_id_async(
             cursor, query.model_class)
 
-    cursor.release()
+    yield from cursor.release
     return result
 
 
@@ -599,7 +599,7 @@ def update(query):
     cursor = yield from _execute_query_async(query)
     rowcount = cursor.rowcount
 
-    cursor.release()
+    yield from cursor.release
     return rowcount
 
 
@@ -614,7 +614,7 @@ def delete(query):
     cursor = yield from _execute_query_async(query)
     rowcount = cursor.rowcount
 
-    cursor.release()
+    yield from cursor.release
     return rowcount
 
 
@@ -650,7 +650,7 @@ def scalar(query, as_tuple=False):
     cursor = yield from _execute_query_async(query)
     row = yield from cursor.fetchone()
 
-    cursor.release()
+    yield from cursor.release
     if row and not as_tuple:
         return row[0]
     else:
@@ -672,7 +672,7 @@ def raw_query(query):
     except GeneratorExit:
         pass
 
-    cursor.release()
+    yield from cursor.release
     return result
 
 
@@ -983,36 +983,35 @@ class AsyncPostgresqlConnection:
             **self.connect_kwargs)
 
     @asyncio.coroutine
-    def cursor(self, conn=None, *args, **kwargs):
-        """Get cursor for connection from pool.
-        """
-        if conn is None:
-            # Acquire connection with cursor, once cursor is released
-            # connection is also released to pool:
-
-            conn = yield from self.acquire()
-            cursor = yield from conn.cursor(*args, **kwargs)
-
-            def release():
-                cursor.close()
-                self.pool.release(conn)
-            cursor.release = release
-        else:
-            # Acquire cursor from provided connection, after cursor is
-            # released connection is NOT released to pool, i.e.
-            # for handling transactions:
-
-            cursor = yield from conn.cursor(*args, **kwargs)
-            cursor.release = lambda: cursor.close()
-
-        return cursor
-
-    @asyncio.coroutine
     def close(self):
         """Terminate all pool connections.
         """
         self.pool.terminate()
         yield from self.pool.wait_closed()
+
+    @asyncio.coroutine
+    def cursor(self, conn=None, *args, **kwargs):
+        """Get a cursor for the specified transaction connection
+        or acquire from the pool.
+        """
+        in_transaction = conn is not None
+        if not conn:
+            conn = yield from self.acquire()
+        cursor = yield from conn.cursor(*args, **kwargs)
+        # NOTE: `cursor.release` is an awaitable object!
+        cursor.release = self.release_cursor(
+            cursor, in_transaction=in_transaction)
+        return cursor
+
+    @asyncio.coroutine
+    def release_cursor(self, cursor, in_transaction=False):
+        """Release cursor coroutine. Unless in transaction,
+        the connection is also released back to the pool.
+        """
+        conn = cursor.connection
+        cursor.close()
+        if not in_transaction:
+            self.pool.release(conn)
 
 
 class AsyncPostgresqlMixin(AsyncDatabase):
@@ -1144,36 +1143,34 @@ class AsyncMySQLConnection:
             **self.connect_kwargs)
 
     @asyncio.coroutine
-    def cursor(self, conn=None, *args, **kwargs):
-        """Get cursor for connection from pool.
-        """
-        if conn is None:
-            # Acquire connection with cursor, once cursor is released
-            # connection is also released to pool:
-
-            conn = yield from self.acquire()
-            cursor = yield from conn.cursor(*args, **kwargs)
-
-            def release():
-                cursor.close()
-                self.pool.release(conn)
-            cursor.release = release
-        else:
-            # Acquire cursor from provided connection, after cursor is
-            # released connection is NOT released to pool, i.e.
-            # for handling transactions:
-
-            cursor = yield from conn.cursor(*args, **kwargs)
-            cursor.release = lambda: cursor.close()
-
-        return cursor
-
-    @asyncio.coroutine
     def close(self):
         """Terminate all pool connections.
         """
         self.pool.terminate()
         yield from self.pool.wait_closed()
+
+    @asyncio.coroutine
+    def cursor(self, conn=None, *args, **kwargs):
+        """Get cursor for connection from pool.
+        """
+        in_transaction = conn is not None
+        if not conn:
+            conn = yield from self.acquire()
+        cursor = yield from conn.cursor(*args, **kwargs)
+        # NOTE: `cursor.release` is an awaitable object!
+        cursor.release = self.release_cursor(
+            cursor, in_transaction=in_transaction)
+        return cursor
+
+    @asyncio.coroutine
+    def release_cursor(self, cursor, in_transaction=False):
+        """Release cursor coroutine. Unless in transaction,
+        the connection is also released back to the pool.
+        """
+        conn = cursor.connection
+        yield from cursor.close()
+        if not in_transaction:
+            self.pool.release(conn)
 
 
 class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
@@ -1395,7 +1392,7 @@ def _run_sql(database, operation, *args, **kwargs):
         try:
             yield from cursor.execute(operation, *args, **kwargs)
         except:
-            cursor.release()
+            yield from cursor.release
             raise
 
         return cursor

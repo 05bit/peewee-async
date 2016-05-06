@@ -431,6 +431,20 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_many_requests(self):
+        @asyncio.coroutine
+        def test(objects):
+            max_connections = getattr(objects.database, 'max_connections', 0)
+            text = "Test %s" % uuid.uuid4()
+            obj = yield from objects.create(TestModel, text=text)
+            n = 2 * max_connections # number of requests
+            done, not_done = yield from asyncio.wait(
+                [objects.get(TestModel, id=obj.id) for _ in range(n)],
+                loop=self.loop)
+            self.assertEqual(len(done), n)
+
+        self.run_with_managers(test)
+
     def test_create_obj(self):
         @asyncio.coroutine
         def test(objects):
