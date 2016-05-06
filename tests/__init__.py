@@ -445,6 +445,41 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_extend(self):
+        @asyncio.coroutine
+        def test(objects):
+            objects.extend(TestModel)
+            text = "Test %s" % uuid.uuid4()
+
+            obj1 = yield from TestModel.create_async(text=text)
+            self.assertTrue(obj1 is not None)
+
+            obj2 = yield from TestModel.get_async(id=obj1.id)
+            self.assertEqual(obj1, obj2)
+
+            obj1.text = "Updated"
+            yield from obj1.update_async()
+
+            obj2 = yield from TestModel.get_async(id=obj1.id)
+            self.assertEqual(obj2.text, obj1.text)
+
+            obj3, created = yield from TestModel.get_or_create_async(id=obj1.id)
+            self.assertTrue(not created)
+            self.assertEqual(obj1, obj3)
+
+            obj4, created = yield from TestModel.create_or_get_async(text="Updated")
+            self.assertTrue(not created)
+            self.assertEqual(obj1, obj4)
+
+            yield from obj4.delete_async()
+            try:
+                yield from TestModel.get_async(id=obj1.id)
+                self.assertTrue(False)
+            except TestModel.DoesNotExist:
+                pass
+
+        self.run_with_managers(test)
+
     def test_create_obj(self):
         @asyncio.coroutine
         def test(objects):

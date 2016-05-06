@@ -111,6 +111,44 @@ class Manager:
         self.database = database or self.database
         self.database.loop = self.loop
 
+    def extend(self, model):
+        """**Experimental**. Extend the specified model with
+        async methods.
+        """
+        objects = self
+
+        @asyncio.coroutine
+        def create_async(cls, **data):
+            return (yield from objects.create(cls, **data))
+
+        @asyncio.coroutine
+        def get_async(cls, *args, **kwargs):
+            return (yield from objects.get(cls, *args, **kwargs))
+
+        @asyncio.coroutine
+        def get_or_create_async(cls, defaults=None, **kwargs):
+            return (yield from objects.get_or_create(
+                cls, defaults=defaults, **kwargs))
+
+        @asyncio.coroutine
+        def create_or_get_async(cls, **kwargs):
+            return (yield from objects.create_or_get(cls, **kwargs))
+
+        @asyncio.coroutine
+        def update_async(obj, only=None):
+            return (yield from objects.update(obj, only=only))
+
+        def delete_async(obj, recursive=False, delete_nullable=False):
+            return (yield from objects.delete(obj,
+                recursive=recursive, delete_nullable=delete_nullable))
+
+        model.create_async = classmethod(create_async)
+        model.get_async = classmethod(get_async)
+        model.get_or_create_async = classmethod(get_or_create_async)
+        model.create_or_get_async = classmethod(create_or_get_async)
+        model.update_async = update_async
+        model.delete_async = delete_async
+
     @property
     def is_connected(self):
         """Check if database is connected.
@@ -157,16 +195,16 @@ class Manager:
     def create(self, model, **data):
         """Create new object saved to database.
         """
-        inst = model(**data)
-        query = model.insert(**dict(inst._data))
+        obj = model(**data)
+        query = model.insert(**dict(obj._data))
 
         pk = yield from self.execute(query)
         if pk is None:
-            pk = inst._get_pk_value()
-        inst._set_pk_value(pk)
+            pk = obj._get_pk_value()
+        obj._set_pk_value(pk)
 
-        inst._prepare_instance()
-        return inst
+        obj._prepare_instance()
+        return obj
 
     @asyncio.coroutine
     def get_or_create(self, model, defaults=None, **kwargs):
