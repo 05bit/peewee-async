@@ -434,7 +434,7 @@ class ManagerTestCase(BaseManagerTestCase):
     def test_many_requests(self):
         @asyncio.coroutine
         def test(objects):
-            max_connections = getattr(objects.database, 'max_connections', 0)
+            max_connections = getattr(objects.database, 'max_connections', 1)
             text = "Test %s" % uuid.uuid4()
             obj = yield from objects.create(TestModel, text=text)
             n = 2 * max_connections # number of requests
