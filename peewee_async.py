@@ -1011,7 +1011,7 @@ class AsyncPostgresqlConnection:
         conn = cursor.connection
         cursor.close()
         if not in_transaction:
-            self.pool.release(conn)
+            self.release(conn)
 
 
 class AsyncPostgresqlMixin(AsyncDatabase):
@@ -1170,7 +1170,7 @@ class AsyncMySQLConnection:
         conn = cursor.connection
         yield from cursor.close()
         if not in_transaction:
-            self.pool.release(conn)
+            self.release(conn)
 
 
 class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
