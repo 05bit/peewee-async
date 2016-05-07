@@ -19,6 +19,7 @@ import uuid
 import contextlib
 import peewee
 import warnings
+import functools
 
 try:
     import aiopg
@@ -115,39 +116,12 @@ class Manager:
         """**Experimental**. Extend the specified model with
         async methods.
         """
-        objects = self
-
-        @asyncio.coroutine
-        def create_async(cls, **data):
-            return (yield from objects.create(cls, **data))
-
-        @asyncio.coroutine
-        def get_async(cls, *args, **kwargs):
-            return (yield from objects.get(cls, *args, **kwargs))
-
-        @asyncio.coroutine
-        def get_or_create_async(cls, defaults=None, **kwargs):
-            return (yield from objects.get_or_create(
-                cls, defaults=defaults, **kwargs))
-
-        @asyncio.coroutine
-        def create_or_get_async(cls, **kwargs):
-            return (yield from objects.create_or_get(cls, **kwargs))
-
-        @asyncio.coroutine
-        def update_async(obj, only=None):
-            return (yield from objects.update(obj, only=only))
-
-        def delete_async(obj, recursive=False, delete_nullable=False):
-            return (yield from objects.delete(obj,
-                recursive=recursive, delete_nullable=delete_nullable))
-
-        model.create_async = classmethod(create_async)
-        model.get_async = classmethod(get_async)
-        model.get_or_create_async = classmethod(get_or_create_async)
-        model.create_or_get_async = classmethod(create_or_get_async)
-        model.update_async = update_async
-        model.delete_async = delete_async
+        model.create_async = classmethod(self.create)
+        model.get_async = classmethod(self.get)
+        model.get_or_create_async = classmethod(self.get_or_create)
+        model.create_or_get_async = classmethod(self.create_or_get)
+        model.update_async = functools.partialmethod(self.update)
+        model.delete_async = functools.partialmethod(self.delete)
 
     @property
     def is_connected(self):
