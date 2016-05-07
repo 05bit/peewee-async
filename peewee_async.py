@@ -112,10 +112,13 @@ class Manager:
         self.database = database or self.database
         self.database.loop = self.loop
 
-    def extend(self, model):
+    def extend(self, model, attribute='objects'):
         """**Experimental**. Extend the specified model with
         async methods.
         """
+        if attribute:
+            setattr(model, attribute, self)
+            log.info("Extend %s with %s attribute" % (model, attribute))
         model.create_async = classmethod(self.create)
         model.get_async = classmethod(self.get)
         model.get_or_create_async = classmethod(self.get_or_create)

@@ -445,10 +445,11 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
-    def test_extend(self):
+    def test_extend_methods(self):
         @asyncio.coroutine
         def test(objects):
-            objects.extend(TestModel)
+            objects.extend(peewee.Model)
+
             text = "Test %s" % uuid.uuid4()
 
             obj1 = yield from TestModel.create_async(text=text)
@@ -477,6 +478,22 @@ class ManagerTestCase(BaseManagerTestCase):
                 self.assertTrue(False)
             except TestModel.DoesNotExist:
                 pass
+
+        self.run_with_managers(test)
+
+    def test_extend_query(self):
+        @asyncio.coroutine
+        def test(objects):
+            objects.extend(peewee.Model)
+
+            text = "Test %s" % uuid.uuid4()
+
+            obj1 = yield from TestModel.create_async(text=text)
+            self.assertTrue(obj1 is not None)
+
+            query = TestModel.select().where(TestModel.id == obj1.id)
+            result = yield from TestModel.objects.execute(query)
+            self.assertEqual(len(result), 1)
 
         self.run_with_managers(test)
 
