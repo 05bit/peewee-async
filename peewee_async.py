@@ -347,7 +347,9 @@ class Manager:
         If query database can't be swapped and differs from manager's
         database, it's **WRONG AND DANGEROUS**, so assertion is raised.
         """
-        if query.database == self.database:
+        if query.database == self.database or \
+            (isinstance(query.database, peewee.Proxy) and
+             query.database.obj == self.database):
             return query
         elif self._subclassed(peewee.PostgresqlDatabase,
                               query.database,
