@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.3
+
+- Fix: #26, closing MySQL connection and general implementation improvements
+- #28 (pull request): better proxy database support in `Manager`
+
 ## 0.5.2
 
 - Fix #24: prevent stucking after connection error
