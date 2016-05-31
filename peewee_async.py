@@ -109,7 +109,11 @@ class Manager:
 
         self.loop = loop or asyncio.get_event_loop()
         self.database = database or self.database
-        self.database.loop = self.loop
+        attach_callback = getattr(self.database, 'attach_callback', None)
+        if attach_callback:
+            attach_callback(lambda db: db.set_event_loop(self.loop))
+        else:
+            self.database.set_event_loop(self.loop)
 
     @property
     def is_connected(self):
@@ -819,6 +823,22 @@ class AsyncDatabase:
     _async_wait = None  # connection waiter
     _task_data = None   # task context data
 
+    def set_event_loop(self, loop):
+        """Set event loop for the database. Usually, you don't need to
+        call this directly. It's called from `Manager.connect()` or
+        `.connect_async()` methods.
+        """
+        # These checks are not very pythonic, but I believe it's OK to be
+        # a little paranoid about mismatching of asyncio event loops,
+        # because such errors won't show clear traceback and could be
+        # tricky to debug.
+        loop = loop or asyncio.get_event_loop()
+        if not self.loop:
+            self.loop = loop
+        elif self.loop != loop:
+            raise RuntimeError("Error, the event loop is already set before. "
+                               "Make sure you're using the same event loop!")
+
     @asyncio.coroutine
     def connect_async(self, loop=None, timeout=None):
         """Set up async connection on specified event loop or
@@ -833,7 +853,7 @@ class AsyncDatabase:
         elif self._async_wait:
             yield from self._async_wait
         else:
-            self.loop = loop or asyncio.get_event_loop()
+            self.set_event_loop(loop)
             self._async_wait = asyncio.Future(loop=self.loop)
 
             conn = self._async_conn_cls(

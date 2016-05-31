@@ -265,6 +265,29 @@ class DatabaseTestCase(unittest.TestCase):
             TestModel.create_table(True)
             TestModel.drop_table(True)
 
+    def test_proxy_database(self):
+        loop = asyncio.new_event_loop()
+        database = peewee.Proxy()
+        TestModel._meta.database = database
+        objects = peewee_async.Manager(database, loop=loop)
+
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+        config = dict(defaults)
+        for k in list(config.keys()):
+            config[k].update(overrides.get(k, {}))
+            database.initialize(db_classes[k](**config[k]))
+
+            TestModel.create_table(True)
+            loop.run_until_complete(test(objects))
+            loop.run_until_complete(objects.close())
+            TestModel.drop_table(True)
+
+        loop.close()
+
 
 class OlderTestCase(unittest.TestCase):
     # only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
