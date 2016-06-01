@@ -112,14 +112,13 @@ def load_managers(*, managers=None, loop=None, only=None):
         managers[k] = peewee_async.Manager(database, loop=loop)
 
 
-def load_databases(*, databases=None, loop=None, only=None):
+def load_databases(*, databases=None, only=None):
     config = dict(defaults)
     for k in list(config.keys()):
         if only and not k in only:
             continue
         config[k].update(overrides.get(k, {}))
         databases[k] = db_classes[k](**config[k])
-        databases[k].loop = loop
 
 
 ##########
@@ -173,52 +172,42 @@ class BaseManagerTestCase(unittest.TestCase):
         else:
             yield
 
-    @classmethod
-    def setUpClass(cls, *args, **kwargs):
-        """Configure database managers, create test tables.
-        """
-        cls.managers = {}
-        cls.loop = asyncio.new_event_loop()
-        # cls.loop.set_debug(True)
-
-        load_managers(managers=cls.managers,
-                      loop=cls.loop,
-                      only=cls.only)
-
-        for k, objects in cls.managers.items():
-            objects.database.allow_sync = False
-
-            with cls.manager(objects, allow_sync=True):
-                for model in cls.models:
-                    model.create_table(True)
-
-    @classmethod
-    def tearDownClass(cls, *args, **kwargs):
-        """Remove all test tables and close connections.
-        """
-        for k, objects in cls.managers.items():
-            cls.loop.run_until_complete(objects.close())
-        cls.loop.close()
-
-        for k, objects in cls.managers.items():
-            with cls.manager(objects, allow_sync=True):
-                for model in reversed(cls.models):
-                    model.drop_table(fail_silently=True, cascade=True)
-        cls.managers = None
-
     def setUp(self):
-        """Reset all data.
+        """Setup the new event loop, and database configs, reset counter.
         """
         self.run_count = 0
+
+        self.managers = {}
+        self.loop = asyncio.new_event_loop()
+        # self.loop.set_debug(True)
+
+        load_managers(managers=self.managers,
+                      loop=self.loop,
+                      only=self.only)
+
         for k, objects in self.managers.items():
+            objects.database.set_allow_sync(False)
             with self.manager(objects, allow_sync=True):
+                for model in self.models:
+                    model.create_table(True)
                 for model in reversed(self.models):
                     model.delete().execute()
 
     def tearDown(self):
-        """Check if test was actually passed by counter.
+        """Check if test was actually passed by counter, clean up.
         """
         self.assertEqual(len(self.managers), self.run_count)
+
+        for k, objects in self.managers.items():
+            self.loop.run_until_complete(objects.close())
+        self.loop.close()
+
+        for k, objects in self.managers.items():
+            with self.manager(objects, allow_sync=True):
+                for model in reversed(self.models):
+                    model.drop_table(fail_silently=True, cascade=True)
+
+        self.managers = None
 
     def run_with_managers(self, test, exclude=None):
         """Run test coroutine against available Manager instances.
@@ -309,18 +298,17 @@ class OlderTestCase(unittest.TestCase):
         """
         cls.databases = {}
         cls.loop = asyncio.new_event_loop()
-        # cls.loop.set_debug(True)
+        asyncio.set_event_loop(cls.loop)
 
         load_databases(databases=cls.databases,
-                       loop=cls.loop,
                        only=cls.only)
 
         for k, database in cls.databases.items():
-            database.allow_sync = True
+            database.set_allow_sync(True)
             with cls.current_database(database):
                 for model in cls.models:
                     model.create_table(True)
-            database.allow_sync = False
+            database.set_allow_sync(False)
 
     @classmethod
     def tearDownClass(cls, *args, **kwargs):
@@ -331,11 +319,11 @@ class OlderTestCase(unittest.TestCase):
         cls.loop.close()
 
         for k, database in cls.databases.items():
-            database.allow_sync = True
+            database.set_allow_sync(True)
             with cls.current_database(database):
                 for model in reversed(cls.models):
                     model.drop_table(fail_silently=True, cascade=True)
-            database.allow_sync = False
+            database.set_allow_sync(False)
         cls.databases = None
 
     def setUp(self):
@@ -344,10 +332,10 @@ class OlderTestCase(unittest.TestCase):
         self.run_count = 0
         for k, database in self.databases.items():
             with self.current_database(database):
-                database.allow_sync = True
+                database.set_allow_sync(True)
                 for model in reversed(self.models):
                     model.delete().execute()
-                database.allow_sync = False
+                database.set_allow_sync(False)
 
     def tearDown(self):
         """Check if test was actually passed by counter.
@@ -360,12 +348,12 @@ class OlderTestCase(unittest.TestCase):
         for k, database in self.databases.items():
             if exclude is None or (not k in exclude):
                 with self.current_database(database):
-                    database.allow_sync = False
+                    database.set_allow_sync(False)
                     self.loop.run_until_complete(test(database))
-                    database.allow_sync = True
+                    database.set_allow_sync(True)
                     for model in reversed(self.models):
                         model.delete().execute()
-                    database.allow_sync = False
+                    database.set_allow_sync(False)
             self.run_count += 1
 
     def test_create_obj(self):
