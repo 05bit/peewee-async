@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.4
+
+- Fix: #30 and perform some internal cleanups
+- Database `.allow_sync` attribute is deprecated, `allow_sync()` context manager or `.set_allow_sync()` should be used instad
+
 ## 0.5.3
 
 - Fix: #26, closing MySQL connection and general implementation improvements
