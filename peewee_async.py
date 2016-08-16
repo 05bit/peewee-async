@@ -768,16 +768,19 @@ class AsyncQueryWrapper:
     def _get_result_wrapper(self, query):
         """Get result wrapper class.
         """
+        db, speedups = query.database, query.database.use_speedups
+        db.use_speedups = False
         if query._tuples:
-            QRW = query.database.get_result_wrapper(RESULTS_TUPLES)
+            QRW = db.get_result_wrapper(RESULTS_TUPLES)
         elif query._dicts:
-            QRW = query.database.get_result_wrapper(RESULTS_DICTS)
+            QRW = db.get_result_wrapper(RESULTS_DICTS)
         elif query._naive or not query._joins or query.verify_naive():
-            QRW = query.database.get_result_wrapper(RESULTS_NAIVE)
+            QRW = db.get_result_wrapper(RESULTS_NAIVE)
         elif query._aggregate_rows:
-            QRW = query.database.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
+            QRW = db.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
         else:
-            QRW = query.database.get_result_wrapper(RESULTS_MODELS)
+            QRW = db.get_result_wrapper(RESULTS_MODELS)
+        db.use_speedups = speedups
 
         return QRW(query.model_class, None, query.get_query_meta())
 
@@ -802,12 +805,15 @@ class AsyncRawQueryWrapper(AsyncQueryWrapper):
     def _get_result_wrapper(self, query):
         """Get raw query result wrapper class.
         """
+        db, speedups = query.database, query.database.use_speedups
+        db.use_speedups = False
         if query._tuples:
-            QRW = query.database.get_result_wrapper(RESULTS_TUPLES)
+            QRW = db.get_result_wrapper(RESULTS_TUPLES)
         elif query._dicts:
-            QRW = query.database.get_result_wrapper(RESULTS_DICTS)
+            QRW = db.get_result_wrapper(RESULTS_DICTS)
         else:
-            QRW = query.database.get_result_wrapper(RESULTS_NAIVE)
+            QRW = db.get_result_wrapper(RESULTS_NAIVE)
+        db.use_speedups = speedups
 
         return QRW(query.model_class, None, None)
 
