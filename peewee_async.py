@@ -377,7 +377,7 @@ class Manager:
     def _subclassed(base, *classes):
         """Check if all classes are subclassed from base.
         """
-        return all(map(lambda obj, base: isinstance(obj, base), classes))
+        return all(map(lambda obj: isinstance(obj, base), classes))
 
     @staticmethod
     def _prune_fields(field_dict, only):
