@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.5
+
+- Fix: #34, speedups for result wrappers are not supported
+
 ## 0.5.4
 
 - Fix: #30 and perform some internal cleanups
