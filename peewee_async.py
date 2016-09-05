@@ -585,7 +585,10 @@ def insert(query):
     cursor = yield from _execute_query_async(query)
 
     if query.is_insert_returning:
-        result = (yield from cursor.fetchone())[0]
+        if query._return_id_list:
+            result = map(lambda x: x[0], (yield from cursor.fetchall()))
+        else:
+            result = (yield from cursor.fetchone())[0]
     else:
         result = yield from query.database.last_insert_id_async(
             cursor, query.model_class)
