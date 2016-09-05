@@ -386,6 +386,27 @@ class OlderTestCase(unittest.TestCase):
             self.assertTrue(obj3 is None, "Error, object wasn't deleted")
 
         self.run_with_databases(test)
+    
+    def test_insert_many(self):
+        @asyncio.coroutine
+        def test(database):
+            text1 = uuid.uuid4()
+            text2 = uuid.uuid4()
+            data =[
+                {"text": "Test %s" % text1},
+                {"text": "Test %s" % text2},
+                ]
+            result_map = yield from peewee_async.execute(TestModel.insert_many(data).return_id_list())
+            result = list(result_map)
+            self.assertEqual(len(result), 2)
+            obj1 = yield from peewee_async.get_object(
+                TestModel, TestModel.id == res[0])
+            self.assertEqual(text1, obj1.text)
+            obj2 = yield from peewee_async.get_object(
+                TestModel, TestModel.id == res[1])
+            self.assertEqual(text2, obj2.text)
+        
+        self.run_with_databases(test)
 
     def test_get_and_update_obj(self):
         @asyncio.coroutine
