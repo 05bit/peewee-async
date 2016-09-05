@@ -396,7 +396,7 @@ class OlderTestCase(unittest.TestCase):
                 {"text": "Test %s" % text1},
                 {"text": "Test %s" % text2},
                 ]
-            result_map = yield from peewee_async.execute(TestModel.insert_many(data).return_id_list())
+            result_map = yield peewee_async.execute(TestModel.insert_many(data).return_id_list())
             result = list(result_map)
             self.assertEqual(len(result), 2)
             obj1 = yield from peewee_async.get_object(
