@@ -363,6 +363,8 @@ class Manager:
                               query.database,
                               self.database):
             can_swap = True
+        else:
+            can_swap = False
 
         if can_swap:
             # **Experimental** database swapping!
