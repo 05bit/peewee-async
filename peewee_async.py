@@ -1010,7 +1010,7 @@ class AsyncDatabase:
         if self._allow_sync in (logging.ERROR, logging.WARNING):
             logging.log(self._allow_sync,
                         "Error, sync query is not allowed: %s %s" %
-                        str(args), str(kwargs))
+                        (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
 
