@@ -773,8 +773,6 @@ class AsyncQueryWrapper:
     def _get_result_wrapper(self, query):
         """Get result wrapper class.
         """
-        db, speedups = query.database, query.database.use_speedups
-        db.use_speedups = False
         if query._tuples:
             QRW = db.get_result_wrapper(RESULTS_TUPLES)
         elif query._dicts:
@@ -785,7 +783,6 @@ class AsyncQueryWrapper:
             QRW = db.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
         else:
             QRW = db.get_result_wrapper(RESULTS_MODELS)
-        db.use_speedups = speedups
 
         return QRW(query.model_class, None, query.get_query_meta())
 
@@ -810,15 +807,12 @@ class AsyncRawQueryWrapper(AsyncQueryWrapper):
     def _get_result_wrapper(self, query):
         """Get raw query result wrapper class.
         """
-        db, speedups = query.database, query.database.use_speedups
-        db.use_speedups = False
         if query._tuples:
             QRW = db.get_result_wrapper(RESULTS_TUPLES)
         elif query._dicts:
             QRW = db.get_result_wrapper(RESULTS_DICTS)
         else:
             QRW = db.get_result_wrapper(RESULTS_NAIVE)
-        db.use_speedups = speedups
 
         return QRW(query.model_class, None, None)
 
@@ -1153,6 +1147,14 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         super().init(database, **kwargs)
         self.init_async()
 
+    @property
+    def use_speedups(self):
+        return False
+
+    @use_speedups.setter
+    def use_speedups(self, value):
+        pass
+
 
 class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
@@ -1172,6 +1174,14 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         self.max_connections = kwargs.pop('max_connections', 20)
         super().init(database, **kwargs)
         self.init_async()
+
+    @property
+    def use_speedups(self):
+        return False
+
+    @use_speedups.setter
+    def use_speedups(self, value):
+        pass
 
 
 #########

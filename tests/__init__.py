@@ -264,6 +264,7 @@ class DatabaseTestCase(unittest.TestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             yield from objects.create(TestModel, text=text)
+            obj = yield from objects.get(TestModel, text=text)
 
         config = dict(defaults)
         for k in list(config.keys()):

@@ -38,6 +38,14 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
         self.init_async(enable_json=True,
                         enable_hstore=self.register_hstore)
 
+    @property
+    def use_speedups(self):
+        return False
+
+    @use_speedups.setter
+    def use_speedups(self, value):
+        pass
+
 
 class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
@@ -62,3 +70,11 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabas
         super().init(database, **kwargs)
         self.init_async(enable_json=True,
                         enable_hstore=self.register_hstore)
+
+    @property
+    def use_speedups(self):
+        return False
+
+    @use_speedups.setter
+    def use_speedups(self, value):
+        pass
