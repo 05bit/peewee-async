@@ -72,7 +72,7 @@ objects = peewee_async.Manager(database)
 
 # No need for sync anymore!
 
-database.allow_sync = False
+database.set_allow_sync(False)
 
 async def handler():
     await objects.create(TestModel, text="Not bad. Watch this, I'm async!")
