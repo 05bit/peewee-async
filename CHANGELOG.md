@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.6
+
+- Feature #32: debug logging to `peewee.async` logger
+- Fix #46: another issue with `Proxy` database
+- Fix #44: argument names now should not clash with model field names
+
 ## 0.5.5
 
 - Fix: #34, speedups for result wrappers are not supported
