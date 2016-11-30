@@ -19,6 +19,10 @@ import uuid
 import contextlib
 import peewee
 import warnings
+import logging
+
+logger = logging.getLogger('peewee.async')
+logger.addHandler(logging.NullHandler())
 
 try:
     import aiopg
@@ -1466,6 +1470,8 @@ class atomic:
 def _run_sql(database, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """
+    logger.debug((operation, args, kwargs))
+
     with database.exception_wrapper():
         cursor = yield from database.cursor_async()
 
