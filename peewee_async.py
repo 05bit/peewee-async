@@ -578,6 +578,7 @@ def select(query):
     finally:
         yield from cursor.release
 
+    yield from cursor.release
     return result
 
 
@@ -689,8 +690,9 @@ def raw_query(query):
             yield from result.fetchone()
     except GeneratorExit:
         pass
+    finally:
+        yield from cursor.release
 
-    yield from cursor.release
     return result
 
 
