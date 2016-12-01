@@ -34,7 +34,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5.6'
+__version__ = '0.5.7'
 
 __all__ = [
     ### High level API ###
@@ -1303,6 +1303,14 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         """
         if model._meta.auto_increment:
             return cursor.lastrowid
+
+    @property
+    def use_speedups(self):
+        return False
+
+    @use_speedups.setter
+    def use_speedups(self, value):
+        pass
 
 
 class PooledMySQLDatabase(MySQLDatabase):
