@@ -1477,7 +1477,7 @@ def _run_sql(database, operation, *args, **kwargs):
     """
     logger.debug((operation, args, kwargs))
 
-    with database.exception_wrapper():
+    with database.exception_wrapper:
         cursor = yield from database.cursor_async()
 
         try:
