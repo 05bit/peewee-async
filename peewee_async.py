@@ -1485,7 +1485,11 @@ def _run_sql(database, operation, *args, **kwargs):
     """
     logger.debug((operation, args, kwargs))
 
-    with database.exception_wrapper:
+    exception_wrapper = database.exception_wrapper
+    if peewee.__version__ <= (2, 8, 5):
+        exception_wrapper = exception_wrapper()
+
+    with exception_wrapper:
         cursor = yield from database.cursor_async()
 
         try:
