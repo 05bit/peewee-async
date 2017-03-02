@@ -24,6 +24,12 @@ import logging
 logger = logging.getLogger('peewee.async')
 logger.addHandler(logging.NullHandler())
 
+
+def get_peewee_version_tuple():
+    return tuple(peewee.__version__.split('.'))
+
+PEEWEE_VERSION = get_peewee_version_tuple()
+
 try:
     import aiopg
 except ImportError:
@@ -1486,7 +1492,7 @@ def _run_sql(database, operation, *args, **kwargs):
     logger.debug((operation, args, kwargs))
 
     exception_wrapper = database.exception_wrapper
-    if peewee.__version__ <= (2, 8, 5):
+    if PEEWEE_VERSION <= (2, 8, 5):
         exception_wrapper = exception_wrapper()
 
     with exception_wrapper:
