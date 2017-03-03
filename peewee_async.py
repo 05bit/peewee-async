@@ -360,11 +360,11 @@ class Manager:
         if query.database == self.database:
             return query
         elif self._subclassed(peewee.PostgresqlDatabase,
-                              query.database,
+                              query.database.obj,
                               self.database):
             can_swap = True
         elif self._subclassed(peewee.MySQLDatabase,
-                              query.database,
+                              query.database.obj,
                               self.database):
             can_swap = True
         else:
@@ -376,8 +376,12 @@ class Manager:
             query.database = self.database
             return query
         else:
-            assert False, ("Error, models's database and manager's "
-                           "database are different: %s" % model)
+            assert False, (
+                "Error, models's database and manager's database are "
+                "different: Model: %s Manager: %s" % (
+                    query.database, self.database
+                )
+            )
 
     @staticmethod
     def _subclassed(base, *classes):
