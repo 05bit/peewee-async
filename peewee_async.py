@@ -351,11 +351,12 @@ class Manager:
         """Swap database for query if swappable. Return **new query**
         with swapped database.
 
-        Check manager database and model database match. If model
-        database is `auto`, manager's one will be used.
+        This is experimental feature which allows us to have multiple
+        managers configured against different databases for single model
+        definition.
 
-        If query database can't be swapped and differs from manager's
-        database, it's **WRONG AND DANGEROUS**, so assertion is raised.
+        The essential limitation though is that database backend have
+        to be **the same type** for model and manager!
         """
         if query.database == self.database:
             return query
@@ -376,8 +377,12 @@ class Manager:
             query.database = self.database
             return query
         else:
-            assert False, ("Error, models's database and manager's "
-                           "database are different: %s" % model)
+            assert False, (
+                "Error, query's database and manager's database are "
+                "different. Query: %s Manager: %s" % (
+                    query.database, self.database
+                )
+            )
 
     @staticmethod
     def _subclassed(base, *classes):
