@@ -26,7 +26,7 @@ logger.addHandler(logging.NullHandler())
 
 
 def get_peewee_version_tuple():
-    return tuple(peewee.__version__.split('.'))
+    return tuple([int(x) for x in peewee.__version__.split('.')])
 
 PEEWEE_VERSION = get_peewee_version_tuple()
 
