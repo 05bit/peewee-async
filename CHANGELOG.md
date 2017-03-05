@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.7 (latest)
+
+- #49, compatibility with peewee 2.8.6+
+- Fix: #50, NameError in `_swap_database` method
+
 ## 0.5.6
 
 - Feature #32: debug logging to `peewee.async` logger
