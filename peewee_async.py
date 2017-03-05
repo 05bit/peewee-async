@@ -24,8 +24,6 @@ import logging
 logger = logging.getLogger('peewee.async')
 logger.addHandler(logging.NullHandler())
 
-PEEWEE_VERSION = tuple([int(x) for x in peewee.__version__.split('.')])
-
 try:
     import aiopg
 except ImportError:
@@ -1484,10 +1482,10 @@ def _get_exception_wrapper(database):
     """Get peewee exceptions context manager for database
     in backward compatible manner.
     """
-    if PEEWEE_VERSION <= (2, 8, 5):
-        return database.exception_wrapper()
-    else:
+    if isinstance(database.exception_wrapper, peewee.ExceptionWrapper):
         return database.exception_wrapper
+    else:
+        return database.exception_wrapper()
 
 
 @asyncio.coroutine
