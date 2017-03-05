@@ -24,11 +24,7 @@ import logging
 logger = logging.getLogger('peewee.async')
 logger.addHandler(logging.NullHandler())
 
-
-def get_peewee_version_tuple():
-    return tuple([int(x) for x in peewee.__version__.split('.')])
-
-PEEWEE_VERSION = get_peewee_version_tuple()
+PEEWEE_VERSION = tuple([int(x) for x in peewee.__version__.split('.')])
 
 try:
     import aiopg
@@ -1484,6 +1480,15 @@ class atomic:
 # Internal helpers #
 ####################
 
+def _get_exception_wrapper(database):
+    """Get peewee exceptions context manager for database
+    in backward compatible manner.
+    """
+    if PEEWEE_VERSION <= (2, 8, 5):
+        return database.exception_wrapper()
+    else:
+        return database.exception_wrapper
+
 
 @asyncio.coroutine
 def _run_sql(database, operation, *args, **kwargs):
@@ -1491,11 +1496,7 @@ def _run_sql(database, operation, *args, **kwargs):
     """
     logger.debug((operation, args, kwargs))
 
-    exception_wrapper = database.exception_wrapper
-    if PEEWEE_VERSION <= (2, 8, 5):
-        exception_wrapper = exception_wrapper()
-
-    with exception_wrapper:
+    with _get_exception_wrapper(database):
         cursor = yield from database.cursor_async()
 
         try:
