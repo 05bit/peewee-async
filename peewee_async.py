@@ -1174,7 +1174,7 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         pass
 
 
-register_database(PostgresqlDatabase, ['postgres+async', 'postgresql+async'])
+register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
 
 
 class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -1205,7 +1205,7 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         pass
 
 
-register_database(PooledPostgresqlDatabase, ['postgres+pool+async', 'postgresql+pool+async'])
+register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
 
 
 #########
@@ -1326,7 +1326,7 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         pass
 
 
-register_database(MySQLDatabase, ['mysql+async'])
+register_database(MySQLDatabase, 'mysql+async')
 
 
 class PooledMySQLDatabase(MySQLDatabase):
@@ -1350,7 +1350,7 @@ class PooledMySQLDatabase(MySQLDatabase):
         self.max_connections = max_connections
 
 
-register_database(PooledMySQLDatabase, ['mysql+pool+async'])
+register_database(PooledMySQLDatabase, 'mysql+pool+async')
 
 
 ##############

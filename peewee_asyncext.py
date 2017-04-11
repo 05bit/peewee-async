@@ -49,7 +49,7 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
         pass
 
 
-register_database(PostgresqlExtDatabase, ['postgresext+async', 'postgresqlext+async'])
+register_database(PostgresqlExtDatabase, 'postgresext+async', 'postgresqlext+async')
 
 
 class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
@@ -85,4 +85,4 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabas
         pass
 
 
-register_database(PooledPostgresqlExtDatabase, ['postgresext+pool+async', 'postgresqlext+pool+async'])
+register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
