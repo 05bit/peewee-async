@@ -205,7 +205,7 @@ class BaseManagerTestCase(unittest.TestCase):
         for k, objects in self.managers.items():
             with self.manager(objects, allow_sync=True):
                 for model in reversed(self.models):
-                    model.drop_table(fail_silently=True, cascade=True)
+                    model.drop_table(fail_silently=True)
 
         self.managers = None
 
@@ -323,7 +323,7 @@ class OlderTestCase(unittest.TestCase):
             database.set_allow_sync(True)
             with cls.current_database(database):
                 for model in reversed(cls.models):
-                    model.drop_table(fail_silently=True, cascade=True)
+                    model.drop_table(fail_silently=True)
             database.set_allow_sync(False)
         cls.databases = None
 
