@@ -1,7 +1,6 @@
 """
 Asynchronous interface for peewee ORM powered by asyncio.
 """
-import os
 from setuptools import setup
 
 __version__ = ''
@@ -45,7 +44,8 @@ setup(
     ),
     py_modules=[
         'peewee_async',
-        'peewee_asyncext'
+        'peewee_asyncext',
+        'src'
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
