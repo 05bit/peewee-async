@@ -21,6 +21,8 @@ import peewee
 import warnings
 import logging
 
+from playhouse.db_url import register_database
+
 logger = logging.getLogger('peewee.async')
 logger.addHandler(logging.NullHandler())
 
@@ -1172,6 +1174,9 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         pass
 
 
+register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
+
+
 class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
@@ -1198,6 +1203,9 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
     @use_speedups.setter
     def use_speedups(self, value):
         pass
+
+
+register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
 
 
 #########
@@ -1318,6 +1326,9 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         pass
 
 
+register_database(MySQLDatabase, 'mysql+async')
+
+
 class PooledMySQLDatabase(MySQLDatabase):
     """MySQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
@@ -1337,6 +1348,9 @@ class PooledMySQLDatabase(MySQLDatabase):
         super().init(database, **kwargs)
         self.min_connections = min_connections
         self.max_connections = max_connections
+
+
+register_database(PooledMySQLDatabase, 'mysql+pool+async')
 
 
 ##############
