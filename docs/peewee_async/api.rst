@@ -78,50 +78,50 @@ Other methods for operations like selecting, deleting etc. are listed below.
 Manager
 -------
 
-.. autoclass:: peewee_async.Manager
+.. autoclass:: src.manager.Manager
 
-.. autoattribute:: peewee_async.Manager.database
+.. autoattribute:: src.manager.Manager.database
 
-.. automethod:: peewee_async.Manager.allow_sync
+.. automethod:: src.manager.Manager.allow_sync
 
-.. automethod:: peewee_async.Manager.get
+.. automethod:: src.manager.Manager.get
 
-.. automethod:: peewee_async.Manager.create
+.. automethod:: src.manager.Manager.create
 
-.. automethod:: peewee_async.Manager.update
+.. automethod:: src.manager.Manager.update
 
-.. automethod:: peewee_async.Manager.delete
+.. automethod:: src.manager.Manager.delete
 
-.. automethod:: peewee_async.Manager.get_or_create
+.. automethod:: src.manager.Manager.get_or_create
 
-.. automethod:: peewee_async.Manager.create_or_get
+.. automethod:: src.manager.Manager.create_or_get
 
-.. automethod:: peewee_async.Manager.execute
+.. automethod:: src.manager.Manager.execute
 
-.. automethod:: peewee_async.Manager.prefetch
+.. automethod:: src.manager.Manager.prefetch
 
-.. automethod:: peewee_async.Manager.count
+.. automethod:: src.manager.Manager.count
 
-.. automethod:: peewee_async.Manager.scalar
+.. automethod:: src.manager.Manager.scalar
 
-.. automethod:: peewee_async.Manager.connect
+.. automethod:: src.manager.Manager.connect
 
-.. automethod:: peewee_async.Manager.close
+.. automethod:: src.manager.Manager.close
 
-.. automethod:: peewee_async.Manager.atomic
+.. automethod:: src.manager.Manager.atomic
 
-.. automethod:: peewee_async.Manager.transaction
+.. automethod:: src.manager.Manager.transaction
 
-.. automethod:: peewee_async.Manager.savepoint
+.. automethod:: src.manager.Manager.savepoint
 
 
 Databases
 ---------
 
-.. autoclass:: peewee_async.PostgresqlDatabase
+.. autoclass:: src.postgres.PostgresqlDatabase
     :members: init
 
-.. autoclass:: peewee_async.PooledPostgresqlDatabase
+.. autoclass:: src.postgres.PooledPostgresqlDatabase
     :members: init
 
 .. autoclass:: peewee_asyncext.PostgresqlExtDatabase
@@ -130,8 +130,8 @@ Databases
 .. autoclass:: peewee_asyncext.PooledPostgresqlExtDatabase
     :members: init
 
-.. autoclass:: peewee_async.MySQLDatabase
+.. autoclass:: src.mysql.MySQLDatabase
     :members: init
 
-.. autoclass:: peewee_async.PooledMySQLDatabase
+.. autoclass:: src.mysql.PooledMySQLDatabase
     :members: init
