@@ -36,7 +36,7 @@ setup(
     author="Alexey Kinev",
     author_email='rudy@05bit.com',
     url='https://github.com/05bit/peewee-async',
-    description=__doc__,
+    description=__doc__.strip(),
     long_description=long_description,
     license='MIT',
     zip_safe=False,
