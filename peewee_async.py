@@ -734,7 +734,8 @@ def prefetch(query, *subqueries):
         # NOTE! This is hacky, we perform async `execute()` and substitute result
         # to the initial query:
 
-        prefetch_result.query._qr = yield from execute(prefetch_result.query)
+        qr = yield from execute(prefetch_result.query)
+        prefetch_result.query._qr = list(qr)
         prefetch_result.query._dirty = False
 
         for instance in prefetch_result.query._qr:
