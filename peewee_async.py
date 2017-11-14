@@ -827,7 +827,6 @@ class AsyncQueryWrapper:
 
 
 class AsyncRawQueryWrapper(AsyncQueryWrapper):
-    @classmethod
     def _get_result_wrapper(self, query):
         """Get raw query result wrapper class.
         """
