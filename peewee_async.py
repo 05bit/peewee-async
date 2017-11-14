@@ -839,7 +839,8 @@ class AsyncRawQueryWrapper(AsyncQueryWrapper):
         else:
             QRW = db.get_result_wrapper(RESULTS_NAIVE)
 
-        return QRW(query.model_class, None, None)
+        cursor = RowsCursor(self._rows, self._cursor.description)
+        return QRW(query.model_class, cursor, None)
 
 
 ############
