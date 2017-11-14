@@ -544,17 +544,17 @@ class ManagerTestCase(BaseManagerTestCase):
             result1 = yield from objects.execute(TestModel.raw(
                 'select id, text from testmodel'))
             self.assertEqual(len(list(result1)), 1)
-            self.assertTrue(isinstance(result1[0], TestModel))
+            self.assertTrue(isinstance(list(result1)[0], TestModel))
 
             result2 = yield from objects.execute(TestModel.raw(
                 'select id, text from testmodel').tuples())
             self.assertEqual(len(list(result2)), 1)
-            self.assertTrue(isinstance(result2[0], tuple))
+            self.assertTrue(isinstance(list(result2)[0], tuple))
 
             result3 = yield from objects.execute(TestModel.raw(
                 'select id, text from testmodel').dicts())
             self.assertEqual(len(list(result3)), 1)
-            self.assertTrue(isinstance(result3[0], dict))
+            self.assertTrue(isinstance(list(result3)[0], dict))
 
         self.run_with_managers(test)
 
