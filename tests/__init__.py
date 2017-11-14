@@ -541,18 +541,21 @@ class ManagerTestCase(BaseManagerTestCase):
             text = "Test %s" % uuid.uuid4()
             yield from objects.create(TestModel, text=text)
 
-            result1 = list(yield from objects.execute(TestModel.raw(
-                'select id, text from testmodel')))
+            result1 = yield from objects.execute(TestModel.raw(
+                'select id, text from testmodel'))
+            result1 = list(result1)
             self.assertEqual(len(result1), 1)
             self.assertTrue(isinstance(result1[0], TestModel))
 
-            result2 = list(yield from objects.execute(TestModel.raw(
-                'select id, text from testmodel').tuples()))
+            result2 = yield from objects.execute(TestModel.raw(
+                'select id, text from testmodel').tuples())
+            result2 = list(result2)
             self.assertEqual(len(result2), 1)
             self.assertTrue(isinstance(result2[0], tuple))
 
-            result3 = list(yield from objects.execute(TestModel.raw(
-                'select id, text from testmodel').dicts()))
+            result3 = yield from objects.execute(TestModel.raw(
+                'select id, text from testmodel').dicts())
+            result3 = list(result3)
             self.assertEqual(len(result3), 1)
             self.assertTrue(isinstance(result3[0], dict))
 
