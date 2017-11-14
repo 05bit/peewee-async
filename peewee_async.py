@@ -734,7 +734,8 @@ def prefetch(query, *subqueries):
         # NOTE! This is hacky, we perform async `execute()` and substitute result
         # to the initial query:
 
-        prefetch_result.query._qr = yield from execute(prefetch_result.query)
+        qr = yield from execute(prefetch_result.query)
+        prefetch_result.query._qr = list(qr)
         prefetch_result.query._dirty = False
 
         for instance in prefetch_result.query._qr:
@@ -758,6 +759,23 @@ RESULTS_DICTS = peewee.RESULTS_DICTS
 RESULTS_AGGREGATE_MODELS = peewee.RESULTS_AGGREGATE_MODELS
 
 
+class RowsCursor(object):
+    def __init__(self, rows, description):
+        self._rows = rows
+        self.description = description
+        self._idx = 0
+
+    def fetchone(self):
+        if self._idx >= len(self._rows):
+            return None
+        row = self._rows[self._idx]
+        self._idx += 1
+        return row
+
+    def close(self):
+        pass
+
+
 class AsyncQueryWrapper:
     """Async query results wrapper for async `select()`. Internally uses
     results wrapper produced by sync peewee select query.
@@ -773,19 +791,16 @@ class AsyncQueryWrapper:
     def __init__(self, *, cursor=None, query=None):
         self._initialized = False
         self._cursor = cursor
-        self._result = []
+        self._rows = []
         self._result_wrapper = self._get_result_wrapper(query)
 
     def __iter__(self):
-        return iter(self._result)
-
-    def __getitem__(self, key):
-        return self._result[key]
+        while True:
+            yield self._result_wrapper.iterate()
 
     def __len__(self):
-        return len(self._result)
+        return len(self._rows)
 
-    @classmethod
     def _get_result_wrapper(self, query):
         """Get result wrapper class.
         """
@@ -801,26 +816,18 @@ class AsyncQueryWrapper:
         else:
             QRW = db.get_result_wrapper(RESULTS_MODELS)
 
-        return QRW(query.model_class, None, query.get_query_meta())
+        cursor = RowsCursor(self._rows, self._cursor.description)
+        return QRW(query.model_class, cursor, query.get_query_meta())
 
     @asyncio.coroutine
     def fetchone(self):
         row = yield from self._cursor.fetchone()
-
         if not row:
-            self._cursor = None
-            self._result_wrapper = None
             raise GeneratorExit
-        elif not self._initialized:
-            self._result_wrapper.initialize(self._cursor.description)
-            self._initialized = True
-
-        obj = self._result_wrapper.process_row(row)
-        self._result.append(obj)
+        self._rows.append(row)
 
 
 class AsyncRawQueryWrapper(AsyncQueryWrapper):
-    @classmethod
     def _get_result_wrapper(self, query):
         """Get raw query result wrapper class.
         """
@@ -832,7 +839,8 @@ class AsyncRawQueryWrapper(AsyncQueryWrapper):
         else:
             QRW = db.get_result_wrapper(RESULTS_NAIVE)
 
-        return QRW(query.model_class, None, None)
+        cursor = RowsCursor(self._rows, self._cursor.description)
+        return QRW(query.model_class, cursor, None)
 
 
 ############
