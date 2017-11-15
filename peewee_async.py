@@ -168,7 +168,7 @@ class Manager:
             query = query.where(*conditions)
 
         try:
-            result = yield from self.execute(query.limit(1))
+            result = yield from self.execute(query)
             return list(result)[0]
         except IndexError:
             raise model.DoesNotExist
@@ -487,7 +487,7 @@ def get_object(source, *args):
         model = source
 
     # Return first object from query
-    for obj in (yield from select(query.where(*args).limit(1))):
+    for obj in (yield from select(query.where(*args))):
         return obj
 
     # No objects found
