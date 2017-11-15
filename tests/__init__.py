@@ -132,20 +132,17 @@ class TestModel(peewee.Model):
 
 
 class TestModelAlpha(peewee.Model):
-    id = peewee.PrimaryKeyField()
     text = peewee.CharField()
 
 
 class TestModelBeta(peewee.Model):
-    id = peewee.PrimaryKeyField()
     alpha = peewee.ForeignKeyField(TestModelAlpha, related_name='betas')
     text = peewee.CharField()
 
 
 class TestModelGamma(peewee.Model):
-    id = peewee.PrimaryKeyField()
-    beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
     text = peewee.CharField()
+    beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
 
 
 class UUIDTestModel(peewee.Model):
@@ -763,8 +760,7 @@ class ManagerTestCase(BaseManagerTestCase):
                 TestModelAlpha
                 .select(TestModelAlpha, TestModelBeta)
                 .join(TestModelBeta)
-                .where(TestModelAlpha.id == alpha.id)
-                .order_by(TestModelAlpha.id, TestModelBeta.id)
+                .order_by(TestModelAlpha.text, TestModelBeta.text)
                 .aggregate_rows()))
 
             self.assertEqual(result, alpha)
