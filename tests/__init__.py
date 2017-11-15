@@ -768,7 +768,7 @@ class ManagerTestCase(BaseManagerTestCase):
                 .select(TestModelAlpha, TestModelBeta, TestModelGamma)
                 .join(TestModelBeta)
                 .join(TestModelGamma)
-                .where(TestModelAlpha.text == 'Alpha·10')
+                .where(TestModelAlpha.text == 'Alpha 10')
                 .order_by(TestModelAlpha.text, TestModelBeta.text, TestModelGamma.text)
                 .aggregate_rows()))
 
