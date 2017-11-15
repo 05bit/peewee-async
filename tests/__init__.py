@@ -132,20 +132,17 @@ class TestModel(peewee.Model):
 
 
 class TestModelAlpha(peewee.Model):
-    id = peewee.PrimaryKeyField()
     text = peewee.CharField()
 
 
 class TestModelBeta(peewee.Model):
-    id = peewee.PrimaryKeyField()
     alpha = peewee.ForeignKeyField(TestModelAlpha, related_name='betas')
     text = peewee.CharField()
 
 
 class TestModelGamma(peewee.Model):
-    id = peewee.PrimaryKeyField()
-    beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
     text = peewee.CharField()
+    beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
 
 
 class UUIDTestModel(peewee.Model):
@@ -749,36 +746,37 @@ class ManagerTestCase(BaseManagerTestCase):
     def test_aggregate_rows(self):
         @asyncio.coroutine
         def test(objects):
-            alpha_1 = yield from objects.create(TestModelAlpha,
-                                                text='Alpha 1')
+            alpha = yield from objects.create(TestModelAlpha,
+                                                text='Alpha 10')
 
-            beta_11 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha_1,
-                                                text='Beta 11')
-            beta_12 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha_1,
-                                                text='Beta 12')
+            beta_1 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha,
+                                                text='Beta 110')
+            beta_2 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha,
+                                                text='Beta 120')
 
-            gamma_111 = yield from objects.create(TestModelGamma,
-                                                  beta=beta_11,
-                                                  text='Gamma 111')
-            gamma_112 = yield from objects.create(TestModelGamma,
-                                                  beta=beta_11,
-                                                  text='Gamma 112')
+            gamma_1 = yield from objects.create(TestModelGamma,
+                                                beta=beta_1,
+                                                text='Gamma 1110')
+            gamma_2 = yield from objects.create(TestModelGamma,
+                                                beta=beta_1,
+                                                text='Gamma 1120')
 
             result = yield from objects.get((
                 TestModelAlpha
                 .select(TestModelAlpha, TestModelBeta, TestModelGamma)
                 .join(TestModelBeta)
                 .join(TestModelGamma)
+                .where(TestModelAlpha.text == 'Alpha·10')
                 .order_by(TestModelAlpha.text, TestModelBeta.text, TestModelGamma.text)
                 .aggregate_rows()))
 
-            self.assertEqual(result, alpha_1)
+            self.assertEqual(result, alpha)
 
-            self.assertEqual(result.betas, [beta_11, beta_12])
+            self.assertEqual(result.betas, [beta_1, beta_2])
 
-            self.assertEqual(result.betas[0].gammas, [gamma_111, gamma_112])
+            self.assertEqual(result.betas[0].gammas, [gamma_1, gamma_2])
 
         self.run_with_managers(test)
 
