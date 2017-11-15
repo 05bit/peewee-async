@@ -759,20 +759,12 @@ class ManagerTestCase(BaseManagerTestCase):
                                                alpha=alpha,
                                                text='Beta 2')
 
-            gamma_1 = yield from objects.create(TestModelGamma,
-                                                beta=beta_1,
-                                                text='Gamma 1')
-            gamma_2 = yield from objects.create(TestModelGamma,
-                                                beta=beta_1,
-                                                text='Gamma 2')
-
             result = yield from objects.execute((
                 TestModelAlpha
-                .select(TestModelAlpha, TestModelBeta, TestModelGamma)
+                .select(TestModelAlpha, TestModelBeta)
                 .join(TestModelBeta)
-                .join(TestModelGamma)
                 .where(TestModelAlpha.id == alpha.id)
-                .order_by(TestModelAlpha.id, TestModelBeta.id, TestModelGamma.id)
+                .order_by(TestModelAlpha.id, TestModelBeta.id)
                 .aggregate_rows()))
 
             result = list(result)
@@ -782,8 +774,6 @@ class ManagerTestCase(BaseManagerTestCase):
             self.assertEqual(result[0], alpha)
 
             self.assertEqual(result[0].betas, [beta_1, beta_2])
-
-            self.assertEqual(result[0].betas[0].gammas, [gamma_1, gamma_2])
 
         self.run_with_managers(test)
 
