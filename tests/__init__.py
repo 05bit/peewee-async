@@ -743,6 +743,44 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_aggregate_rows(self):
+        @asyncio.coroutine
+        def test(objects):
+            alpha_1 = yield from objects.create(TestModelAlpha,
+                                                text='Alpha 1')
+
+            beta_11 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha_1,
+                                                text='Beta 11')
+            beta_12 = yield from objects.create(TestModelBeta,
+                                                alpha=alpha_1,
+                                                text='Beta 12')
+
+            gamma_111 = yield from objects.create(TestModelGamma,
+                                                  beta=beta_11,
+                                                  text='Gamma 111')
+            gamma_112 = yield from objects.create(TestModelGamma,
+                                                  beta=beta_11,
+                                                  text='Gamma 112')
+
+            result = yield from objects.get((
+                TestModelAlpha
+                .select(TestModelAlpha, TestModelBeta, TestModelGamma)
+                .join(TestModelBeta)
+                .join(TestModelGamma)
+                .order_by(TestModelAlpha.text, TestModelBeta.text, TestModelGamma.text)
+                .aggregate_rows()))
+
+            self.assertEqual(result, alpha_1)
+
+            self.assertEqual(tuple(result.betas),
+                            (beta_11, beta_12))
+
+            self.assertEqual(tuple(result.betas[0].gammas),
+                             (gamma_111, gamma_112))
+
+        self.run_with_managers(test)
+
 
 #####################
 # Python 3.5+ tests #
