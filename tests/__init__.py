@@ -747,14 +747,14 @@ class ManagerTestCase(BaseManagerTestCase):
         @asyncio.coroutine
         def test(objects):
             alpha = yield from objects.create(TestModelAlpha,
-                                                text='Alpha 10')
+                                              text='Alpha 10')
 
             beta_1 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha,
-                                                text='Beta 110')
+                                               alpha=alpha,
+                                               text='Beta 110')
             beta_2 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha,
-                                                text='Beta 120')
+                                               alpha=alpha,
+                                               text='Beta 120')
 
             gamma_1 = yield from objects.create(TestModelGamma,
                                                 beta=beta_1,
