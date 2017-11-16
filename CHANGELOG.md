@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.5.8 (latest)
+## 0.5.9 (latest)
+
+- Get rid of `limit(1)` in `get()`
+- Tests for aggregated queries
+
+## 0.5.8
 
 - #10, aggregated rows seems to work now (no tests yet, sorry)
 
