@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.5.9 (latest)
+## 0.5.10 (latest)
+
+- #77, get object by index from `select()` result should work again 
+
+## 0.5.9
 
 - Get rid of `limit(1)` in `get()`
 - Tests for aggregated queries

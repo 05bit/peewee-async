@@ -582,6 +582,17 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_indexing_result(self):
+        @asyncio.coroutine
+        def test(objects):
+            yield from objects.create(TestModel, text="Test 1")
+            obj = yield from objects.create(TestModel, text="Test 2")
+            result = yield from objects.execute(
+                TestModel.select().order_by(TestModel.text))
+            self.assertEqual(obj, result[1])
+
+        self.run_with_managers(test)
+
     def test_insert_many_rows_query(self):
         @asyncio.coroutine
         def test(objects):

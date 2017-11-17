@@ -36,7 +36,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5.9'
+__version__ = '0.5.10'
 
 __all__ = [
     ### High level API ###
@@ -792,6 +792,7 @@ class AsyncQueryWrapper:
         self._initialized = False
         self._cursor = cursor
         self._rows = []
+        self._result_cache = None
         self._result_wrapper = self._get_result_wrapper(query)
 
     def __iter__(self):
@@ -800,6 +801,13 @@ class AsyncQueryWrapper:
 
     def __len__(self):
         return len(self._rows)
+
+    def __getitem__(self, idx):
+        # NOTE: side effects will appear when both
+        # iterating and accessing by index!
+        if self._result_cache is None:
+            self._result_cache = list(self)
+        return self._result_cache[idx]
 
     def _get_result_wrapper(self, query):
         """Get result wrapper class.
