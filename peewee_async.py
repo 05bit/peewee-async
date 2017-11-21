@@ -438,7 +438,7 @@ def execute(query):
 @asyncio.coroutine
 def create_object(model, **data):
     """Create object asynchronously.
-    
+
     :param model: mode class
     :param data: data for initializing object
     :return: new object saved to database
@@ -461,7 +461,7 @@ def create_object(model, **data):
     if pk is None:
         pk = obj._get_pk_value()
     obj._set_pk_value(pk)
-    
+
     obj._prepare_instance()
 
     return obj
@@ -604,7 +604,18 @@ def insert(query):
             if query._return_id_list:
                 result = map(lambda x: x[0], (yield from cursor.fetchall()))
             else:
-                result = (yield from cursor.fetchone())[0]
+                result = (yield from cursor.fetchone())
+                if query._returning:
+                    # Specific fields has been asked.
+                    class_data = {}
+                    for name, field in query.model_class._meta.fields.items():
+                        for i, returning_field in enumerate(query._returning):
+                            if returning_field is field:
+                                class_data[name] = result[i]
+                    result = query.model_class(**class_data)
+                else:
+                    # Database is simply returning the inserted id.
+                    result = result[0]
         else:
             result = yield from query.database.last_insert_id_async(
                 cursor, query.model_class)

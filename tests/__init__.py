@@ -622,6 +622,30 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_insert_one_row_returning_one_column(self):
+        @asyncio.coroutine
+        def test(objects):
+            query = TestModel.insert(text="Test %s" % uuid.uuid4()) \
+                             .returning(TestModel.data)
+            obj = yield from objects.execute(query)
+            self.assertIsInstance(obj, TestModel)
+            self.assertIsNone(obj.text)
+            self.assertEqual(obj.data, '')
+
+        self.run_with_managers(test)
+
+    def test_insert_one_row_returning_object(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            query = TestModel.insert(text=text).returning(TestModel)
+            obj = yield from objects.execute(query)
+            self.assertIsInstance(obj, TestModel)
+            self.assertEqual(obj.text, text)
+            self.assertEqual(obj.data, '')
+
+        self.run_with_managers(test)
+
     def test_insert_one_row_uuid_query(self):
         @asyncio.coroutine
         def test(objects):
@@ -639,7 +663,7 @@ class ManagerTestCase(BaseManagerTestCase):
 
             query = TestModel.update(text="Test update query") \
                              .where(TestModel.id == obj1.id)
-            
+
             upd1 = yield from objects.execute(query)
             self.assertEqual(upd1, 1)
 
@@ -705,7 +729,7 @@ class ManagerTestCase(BaseManagerTestCase):
 
             count = yield from objects.count(TestModel.select())
             self.assertEqual(count, 3)
-            
+
         self.run_with_managers(test)
 
     def test_prefetch(self):
@@ -735,7 +759,7 @@ class ManagerTestCase(BaseManagerTestCase):
             gamma_112 = yield from objects.create(TestModelGamma,
                                                   beta=beta_11,
                                                   text='Gamma 112')
-            
+
             result = yield from objects.prefetch(
                 TestModelAlpha.select(),
                 TestModelBeta.select(),
