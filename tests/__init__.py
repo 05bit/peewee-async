@@ -627,10 +627,8 @@ class ManagerTestCase(BaseManagerTestCase):
         def test(objects):
             query = TestModel.insert(text="Test %s" % uuid.uuid4()) \
                              .returning(TestModel.data)
-            obj = yield from objects.execute(query)
-            self.assertIsInstance(obj, TestModel)
-            self.assertIsNone(obj.text)
-            self.assertEqual(obj.data, '')
+            values = yield from objects.execute(query)
+            self.assertEqual(values, {'data': ''})
 
         self.run_with_managers(test)
 
@@ -639,10 +637,10 @@ class ManagerTestCase(BaseManagerTestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             query = TestModel.insert(text=text).returning(TestModel)
-            obj = yield from objects.execute(query)
-            self.assertIsInstance(obj, TestModel)
-            self.assertEqual(obj.text, text)
-            self.assertEqual(obj.data, '')
+            values = yield from objects.execute(query)
+            self.assertEqual(values['id'], 1)
+            self.assertEqual(values['text'], text)
+            self.assertEqual(values['data'], '')
 
         self.run_with_managers(test)
 
@@ -654,6 +652,19 @@ class ManagerTestCase(BaseManagerTestCase):
             self.assertEqual(len(str(last_id)), 36)
 
         self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
+
+    def test_create_obj(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            query = TestModel.insert(text=text).returning(TestModel)
+            obj = yield from objects.create(TestModel, text=text)
+            self.assertIsInstance(obj, TestModel)
+            self.assertEqual(obj.id, 1)
+            self.assertEqual(obj.text, text)
+            self.assertEqual(obj.data, '')
+
+        self.run_with_managers(test)
 
     def test_update_query(self):
         @asyncio.coroutine
