@@ -180,10 +180,16 @@ class Manager:
         inst = model_(**data)
         query = model_.insert(**dict(inst._data))
 
-        pk = yield from self.execute(query)
-        if pk is None:
-            pk = inst._get_pk_value()
-        inst._set_pk_value(pk)
+        if query.is_insert_returning:
+            query = query.returning(model_)
+            result = yield from self.execute(query)
+            for field, value in result.items():
+                setattr(inst, field, value)
+        else:
+            pk = yield from self.execute(query)
+            if pk is None:
+                pk = inst._get_pk_value()
+            inst._set_pk_value(pk)
 
         inst._prepare_instance()
         return inst
@@ -438,7 +444,7 @@ def execute(query):
 @asyncio.coroutine
 def create_object(model, **data):
     """Create object asynchronously.
-    
+
     :param model: mode class
     :param data: data for initializing object
     :return: new object saved to database
@@ -461,7 +467,7 @@ def create_object(model, **data):
     if pk is None:
         pk = obj._get_pk_value()
     obj._set_pk_value(pk)
-    
+
     obj._prepare_instance()
 
     return obj
@@ -603,6 +609,15 @@ def insert(query):
         if query.is_insert_returning:
             if query._return_id_list:
                 result = map(lambda x: x[0], (yield from cursor.fetchall()))
+            elif query._returning:
+                # Specific values asked, return a dict of it.
+                result = {}
+                values = (yield from cursor.fetchone())
+                for name, field in query.model_class._meta.fields.items():
+                    for i, returning_field in enumerate(query._returning):
+                        if returning_field is field:
+                            result[name] = values[i]
+                            break
             else:
                 result = (yield from cursor.fetchone())[0]
         else:
