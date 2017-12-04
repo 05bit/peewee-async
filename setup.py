@@ -42,6 +42,7 @@ setup(
     zip_safe=False,
     install_requires=(
         'peewee >= 2.8.0',
+        'asyncpg'
     ),
     py_modules=[
         'peewee_async',
