@@ -6,7 +6,7 @@ from setuptools import setup
 
 __version__ = ''
 
-with open('peewee_async.py') as file:
+with open('peewee_async/__init__.py') as file:
     for line in file:
         if line.startswith('__version__'):
             __version__ = line.split('=')[1].strip().strip("'").strip('"')

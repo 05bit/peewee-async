@@ -3,7 +3,6 @@ branches:
     - master
 language: python
 python:
-  - "3.4"
   - "3.5"
   - "3.6"
   - "nightly" # currently points to 3.7-dev
@@ -18,6 +17,7 @@ before_script:
   - mysql -e "create database IF NOT EXISTS test;" -uroot
 # command to install dependencies
 install: "pip install -e ."
+
 # command to run tests
 script:
   - python setup.py test
