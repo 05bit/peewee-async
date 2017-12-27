@@ -1,7 +1,7 @@
 import asyncio
 import peewee
 
-from .utils import execute, prefetch, count, scalar
+from .queries import execute, prefetch, count, scalar
 from .transactions import transaction, atomic, savepoint
 
 

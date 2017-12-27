@@ -1,8 +1,8 @@
 from .manager import Manager
-from .pg import PostgresqlDatabase, PooledPostgresqlDatabase
+from .pg import PostgresqlDatabase, PooledPostgresqlDatabase, AsyncPostgresqlMixin
 from .mysql import MySQLDatabase, PooledMySQLDatabase
 
-from .utils import (
+from .queries import (
     execute,
     count,
     scalar,
@@ -24,6 +24,7 @@ __all__ = [
     'PooledPostgresqlDatabase',
     'MySQLDatabase',
     'PooledMySQLDatabase',
+    'AsyncPostgresqlMixin',
 
     ### Low level API ###
 
