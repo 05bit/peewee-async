@@ -796,8 +796,7 @@ class AsyncQueryWrapper:
         self._result_wrapper = self._get_result_wrapper(query)
 
     def __iter__(self):
-        while True:
-            yield self._result_wrapper.iterate()
+        return iter(self._result_wrapper)
 
     def __len__(self):
         return len(self._rows)
