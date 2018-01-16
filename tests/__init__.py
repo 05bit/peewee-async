@@ -593,6 +593,18 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_multiple_iterate_over_result(self):
+        @asyncio.coroutine
+        def test(objects):
+            obj1 = yield from objects.create(TestModel, text="Test 1")
+            obj2 = yield from objects.create(TestModel, text="Test 2")
+            result = yield from objects.execute(
+                TestModel.select().order_by(TestModel.text))
+            self.assertEqual(list(result), [obj1, obj2])
+            self.assertEqual(list(result), [obj1, obj2])
+
+        self.run_with_managers(test)
+
     def test_insert_many_rows_query(self):
         @asyncio.coroutine
         def test(objects):
