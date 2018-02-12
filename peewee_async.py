@@ -585,7 +585,6 @@ def select(query):
     finally:
         yield from cursor.release
 
-    yield from cursor.release
     return result
 
 
@@ -674,9 +673,12 @@ def scalar(query, as_tuple=False):
     :return: result is the same as after sync ``query.scalar()`` call
     """
     cursor = yield from _execute_query_async(query)
-    row = yield from cursor.fetchone()
 
-    yield from cursor.release
+    try:
+        row = yield from cursor.fetchone()
+    finally:
+        yield from cursor.release
+
     if row and not as_tuple:
         return row[0]
     else:
