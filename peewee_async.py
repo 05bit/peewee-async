@@ -1421,15 +1421,15 @@ class transaction:
 
     @asyncio.coroutine
     def commit(self, begin=True):
-        yield from _run_sql(self.db, 'COMMIT')
+        yield from _run_no_result_sql(self.db, 'COMMIT')
         if begin:
-            yield from _run_sql(self.db, 'BEGIN')
+            yield from _run_no_result_sql(self.db, 'BEGIN')
 
     @asyncio.coroutine
     def rollback(self, begin=True):
-        yield from _run_sql(self.db, 'ROLLBACK')
+        yield from _run_no_result_sql(self.db, 'ROLLBACK')
         if begin:
-            yield from _run_sql(self.db, 'BEGIN')
+            yield from _run_no_result_sql(self.db, 'BEGIN')
 
     @asyncio.coroutine
     def __aenter__(self):
@@ -1437,7 +1437,7 @@ class transaction:
             raise RuntimeError("The transaction must run within a task")
         yield from self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
-            yield from _run_sql(self.db, 'BEGIN')
+            yield from _run_no_result_sql(self.db, 'BEGIN')
         return self
 
     @asyncio.coroutine
@@ -1466,15 +1466,15 @@ class savepoint:
 
     @asyncio.coroutine
     def commit(self):
-        yield from _run_sql(self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
+        yield from _run_no_result_sql(self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
 
     @asyncio.coroutine
     def rollback(self):
-        yield from _run_sql(self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+        yield from _run_no_result_sql(self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
 
     @asyncio.coroutine
     def __aenter__(self):
-        yield from _run_sql(self.db, 'SAVEPOINT %s;' % self.quoted_sid)
+        yield from _run_no_result_sql(self.db, 'SAVEPOINT %s;' % self.quoted_sid)
         return self
 
     @asyncio.coroutine
@@ -1542,6 +1542,12 @@ def _run_sql(database, operation, *args, **kwargs):
             raise
 
         return cursor
+
+
+@asyncio.coroutine
+def _run_no_result_sql(database, operation, *args, **kwargs):
+    cursor = yield from _run_sql(database, operation, *args, **kwargs)
+    yield from cursor.release
 
 
 @asyncio.coroutine
