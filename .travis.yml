@@ -6,7 +6,9 @@ python:
   - "3.4"
   - "3.5"
   - "3.6"
-  - "nightly" # currently points to 3.7-dev
+  # TODO: aiopg is not compatible now with python 3.7 (syntax error)
+  # Uncomment line bellow when issue fixed: https://github.com/aio-libs/aiopg/issues/436
+  # - "nightly" # currently points to 3.7-dev
 addons:
   postgresql: "9.3"
 services:
