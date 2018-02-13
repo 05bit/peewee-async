@@ -14,7 +14,6 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 import asyncio
-import logging
 import uuid
 import contextlib
 import peewee
