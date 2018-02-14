@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.5.10 (latest)
+## 0.5.11 (latest)
+
+- #86 pull request is merged, releasing cursor issue after transaction releated queries
+
+## 0.5.10
 
 - #77, get object by index from `select()` result should work again 
 

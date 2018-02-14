@@ -19,7 +19,6 @@ import contextlib
 import peewee
 import warnings
 import logging
-
 from playhouse.db_url import register_database
 
 logger = logging.getLogger('peewee.async')
@@ -35,7 +34,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5.10'
+__version__ = '0.5.11'
 
 __all__ = [
     ### High level API ###
