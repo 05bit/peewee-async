@@ -358,6 +358,8 @@ class Manager:
         The essential limitation though is that database backend have
         to be **the same type** for model and manager!
         """
+        if isinstance(query.database, peewee.Proxy):
+            query.database = query.database.obj
         if query.database == self.database:
             return query
         elif self._subclassed(peewee.PostgresqlDatabase,
@@ -436,7 +438,7 @@ def execute(query):
 @asyncio.coroutine
 def create_object(model, **data):
     """Create object asynchronously.
-    
+
     :param model: mode class
     :param data: data for initializing object
     :return: new object saved to database
@@ -459,7 +461,7 @@ def create_object(model, **data):
     if pk is None:
         pk = obj._get_pk_value()
     obj._set_pk_value(pk)
-    
+
     obj._prepare_instance()
 
     return obj
