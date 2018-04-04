@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.5.11 (latest)
+## 0.5.12 (latest)
+
+- #92 pull request is merged, raise original exception instead of ValueError in atomic on disconnect
+
+## 0.5.11
 
 - #86 pull request is merged, releasing cursor issue after transaction releated queries
 
