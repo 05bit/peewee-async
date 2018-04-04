@@ -93,3 +93,19 @@ class ManagerTransactionsTestCase(BaseManagerTestCase):
                     model.delete().execute()
 
             self.run_count += 1
+
+    def test_atomic_fail_with_disconnect(self):
+        """Database gone in transaction.
+        """
+        async def test(objects):
+            error = False
+            try:
+                async with objects.atomic():
+                    await objects.database.close_async()
+                    raise FakeUpdateError()
+            except FakeUpdateError:
+                error = True
+
+            self.assertTrue(error)
+
+        self.run_with_managers(test)

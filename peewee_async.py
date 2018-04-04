@@ -1450,7 +1450,10 @@ class transaction:
                     yield from self.rollback(False)
                     raise
         finally:
-            yield from self.db.pop_transaction_async()
+            # transaction depth may be zero if database gone
+            depth = self.db.transaction_depth_async()
+            if depth > 0:
+                yield from self.db.pop_transaction_async()
 
 
 class savepoint:
