@@ -358,15 +358,21 @@ class Manager:
         The essential limitation though is that database backend have
         to be **the same type** for model and manager!
         """
-        if query.database == self.database:
+        query_database = query.database
+        self_database = self.database
+        if isinstance(query_database, peewee.Proxy):
+            query_database = query_database.obj
+        if isinstance(self_database, peewee.Proxy):
+            self_database = self_database.obj
+        if query_database == self_database:
             return query
         elif self._subclassed(peewee.PostgresqlDatabase,
-                              query.database,
-                              self.database):
+                              query_database,
+                              self_database):
             can_swap = True
         elif self._subclassed(peewee.MySQLDatabase,
-                              query.database,
-                              self.database):
+                              query_database,
+                              self_database):
             can_swap = True
         else:
             can_swap = False
@@ -380,7 +386,7 @@ class Manager:
             assert False, (
                 "Error, query's database and manager's database are "
                 "different. Query: %s Manager: %s" % (
-                    query.database, self.database
+                    query_database, self_database
                 )
             )
 
@@ -436,7 +442,7 @@ def execute(query):
 @asyncio.coroutine
 def create_object(model, **data):
     """Create object asynchronously.
-    
+
     :param model: mode class
     :param data: data for initializing object
     :return: new object saved to database
@@ -459,7 +465,7 @@ def create_object(model, **data):
     if pk is None:
         pk = obj._get_pk_value()
     obj._set_pk_value(pk)
-    
+
     obj._prepare_instance()
 
     return obj
