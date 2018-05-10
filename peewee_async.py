@@ -896,12 +896,14 @@ class AsyncDatabase:
         else:
             self._loop = loop
             self._async_wait = asyncio.Future(loop=self._loop)
+            connect_kwargs = self.connect_kwargs_async
+            if 'timeout' not in connect_kwargs:
+                connect_kwargs['timeout'] = timeout
 
             conn = self._async_conn_cls(
                 database=self.database,
                 loop=self._loop,
-                timeout=timeout,
-                **self.connect_kwargs_async)
+                **connect_kwargs)
 
             try:
                 yield from conn.connect()
