@@ -897,11 +897,14 @@ class AsyncDatabase:
             self._loop = loop
             self._async_wait = asyncio.Future(loop=self._loop)
 
+            connect_kwargs = self.connect_kwargs_async
+            timeout = connect_kwargs.pop('timeout', timeout)
+
             conn = self._async_conn_cls(
                 database=self.database,
                 loop=self._loop,
-                timeout=self.connect_kwargs_async.get('timeout', timeout),
-                **self.connect_kwargs_async)
+                timeout=timeout,
+                **connect_kwargs)
 
             try:
                 yield from conn.connect()
