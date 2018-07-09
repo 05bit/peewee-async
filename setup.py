@@ -41,7 +41,7 @@ setup(
     license='MIT',
     zip_safe=False,
     install_requires=(
-        'peewee>=3.5.2',
+        'peewee>=3.5.0',
     ),
     py_modules=[
         'peewee_async',

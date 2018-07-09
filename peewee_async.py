@@ -588,6 +588,7 @@ def select(query):
 @asyncio.coroutine
 def insert(query):
     """Perform INSERT query asynchronously. Returns last insert ID.
+    This function is called by object.create for single objects only.
     """
     assert isinstance(query, peewee.Insert),\
         ("Error, trying to run insert coroutine"
@@ -597,15 +598,6 @@ def insert(query):
 
     try:
         result = (yield from cursor.fetchone())[0]
-        # # result = query.returning(query.model)
-        # if 0:  # query.is_insert_returning:  # TODOK2
-        #     if query._returning:  # TODOK2
-        #         result = map(lambda x: x[0], (yield from cursor.fetchall()))
-        #     else:
-        #         result = (yield from cursor.fetchone())[0]
-        # else:
-        #     result = yield from query._database.last_insert_id_async(
-        #         cursor, query.model)
     finally:
         yield from cursor.release
 
@@ -869,7 +861,7 @@ class AsyncDatabase:
                 database=self.database,
                 loop=self._loop,
                 timeout=timeout,
-                **self.connect_kwargs_async)
+                **self.connect_params_async)
 
             try:
                 yield from conn.connect()
@@ -1022,7 +1014,7 @@ class AsyncPostgresqlConnection:
         self.loop = loop
         self.database = database
         self.timeout = timeout or aiopg.DEFAULT_TIMEOUT
-        self.connect_kwargs = kwargs
+        self.connect_params = kwargs
 
     @asyncio.coroutine
     def acquire(self):
@@ -1043,7 +1035,7 @@ class AsyncPostgresqlConnection:
             loop=self.loop,
             timeout=self.timeout,
             database=self.database,
-            **self.connect_kwargs)
+            **self.connect_params)
 
     @asyncio.coroutine
     def close(self):
@@ -1094,7 +1086,7 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         self._enable_hstore = enable_hstore
 
     @property
-    def connect_kwargs_async(self):
+    def connect_params_async(self):
         """Connection parameters for `aiopg.Connection`
         """
         kwargs = self.connect_params.copy()
@@ -1207,7 +1199,7 @@ class AsyncMySQLConnection:
         self.loop = loop
         self.database = database
         self.timeout = timeout
-        self.connect_kwargs = kwargs
+        self.connect_params = kwargs
 
     @asyncio.coroutine
     def acquire(self):
@@ -1228,7 +1220,7 @@ class AsyncMySQLConnection:
             loop=self.loop,
             db=self.database,
             connect_timeout=self.timeout,
-            **self.connect_kwargs)
+            **self.connect_params)
 
     @asyncio.coroutine
     def close(self):
@@ -1285,7 +1277,7 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         super().init(database, **kwargs)
 
     @property
-    def connect_kwargs_async(self):
+    def connect_params_async(self):
         """Connection parameters for `aiomysql.Connection`
         """
         kwargs = self.connect_params.copy()
