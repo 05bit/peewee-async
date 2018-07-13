@@ -52,7 +52,13 @@ import peewee_async
 
 # Nothing special, just define model and database:
 
-database = peewee_async.PostgresqlDatabase('test')
+database = peewee_async.PostgresqlDatabase(
+    database='db_name',
+    user='user',
+    host='127.0.0.1',
+    port='5432',
+    password='password'
+)
 
 class TestModel(peewee.Model):
     text = peewee.CharField()
