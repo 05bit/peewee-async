@@ -3,7 +3,6 @@ branches:
     - master
 language: python
 python:
-  - "3.4"
   - "3.5"
   - "3.6"
   # TODO: aiopg is not compatible now with python 3.7 (syntax error)

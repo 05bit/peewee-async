@@ -23,7 +23,7 @@ import peewee_asyncext
 
 # logging.basicConfig(level=logging.DEBUG)
 
-defaults = {
+DB_DEFAULTS = {
     'postgres': {
         'database': 'test',
         'host': '127.0.0.1',
@@ -64,27 +64,9 @@ defaults = {
     }
 }
 
-overrides = {}
+DB_OVERRIDES = {}
 
-try:
-    import aiopg
-except ImportError:
-    print("aiopg is not installed, ignoring PostgreSQL tests")
-    for k in list(defaults.keys()):
-        if k.startswith('postgres'):
-            defaults.pop(k)
-
-
-try:
-    import aiomysql
-except ImportError:
-    print("aiomysql is not installed, ignoring MySQL tests")
-    for k in list(defaults.keys()):
-        if k.startswith('mysql'):
-            defaults.pop(k)
-
-
-db_classes = {
+DB_CLASSES = {
     'postgres': peewee_async.PostgresqlDatabase,
     'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
     'postgres-pool': peewee_async.PooledPostgresqlDatabase,
@@ -93,32 +75,58 @@ db_classes = {
     'mysql-pool': peewee_async.PooledMySQLDatabase
 }
 
+try:
+    import aiopg
+except ImportError:
+    aiopg = None
+
+try:
+    import aiomysql
+except ImportError:
+    aiomysql = None
+
 
 def setUpModule():
     try:
-        with open('tests.json', 'r') as f:
-            overrides.update(json.load(f))
-    except:
+        with open('tests.json', 'r') as tests_fp:
+            DB_OVERRIDES.update(json.load(tests_fp))
+    except FileNotFoundError:
         print("'tests.json' file not found, will use defaults")
 
+    if not aiopg:
+        print("aiopg is not installed, ignoring PostgreSQL tests")
+        for key in list(DB_CLASSES.keys()):
+            if key.startswith('postgres'):
+                DB_CLASSES.pop(key)
 
-def load_managers(*, managers=None, loop=None, only=None):
-    config = dict(defaults)
-    for k in list(config.keys()):
-        if only and k not in only:
+    if not aiomysql:
+        print("aiomysql is not installed, ignoring MySQL tests")
+        for key in list(DB_CLASSES.keys()):
+            if key.startswith('mysql'):
+                DB_CLASSES.pop(key)
+
+
+def load_managers(*, loop, only):
+    managers = {}
+    for key in DB_CLASSES:
+        if only and key not in only:
             continue
-        config[k].update(overrides.get(k, {}))
-        database = db_classes[k](**config[k])
-        managers[k] = peewee_async.Manager(database, loop=loop)
+        params = DB_DEFAULTS.get(key) or {}
+        params.update(DB_OVERRIDES.get(key) or {})
+        database = DB_CLASSES[key](**params)
+        managers[key] = peewee_async.Manager(database, loop=loop)
+    return managers
 
 
-def load_databases(*, databases=None, only=None):
-    config = dict(defaults)
-    for k in list(config.keys()):
-        if only and k not in only:
+def load_databases(*, only):
+    databases = {}
+    for key in DB_CLASSES:
+        if only and key not in only:
             continue
-        config[k].update(overrides.get(k, {}))
-        databases[k] = db_classes[k](**config[k])
+        params = DB_DEFAULTS.get(key) or {}
+        params.update(DB_OVERRIDES.get(key) or {})
+        databases[key] = DB_CLASSES[key](**params)
+    return databases
 
 
 ##########
@@ -176,16 +184,11 @@ class BaseManagerTestCase(unittest.TestCase):
         """Setup the new event loop, and database configs, reset counter.
         """
         self.run_count = 0
-
-        self.managers = {}
         self.loop = asyncio.new_event_loop()
-        # self.loop.set_debug(True)
+        self.managers = load_managers(loop=self.loop, only=self.only)
 
-        load_managers(managers=self.managers,
-                      loop=self.loop,
-                      only=self.only)
-
-        for k, objects in self.managers.items():
+        # Clean up before tests
+        for _, objects in self.managers.items():
             objects.database.set_allow_sync(False)
             with self.manager(objects, allow_sync=True):
                 for model in self.models:
@@ -198,11 +201,11 @@ class BaseManagerTestCase(unittest.TestCase):
         """
         self.assertEqual(len(self.managers), self.run_count)
 
-        for k, objects in self.managers.items():
+        for _, objects in self.managers.items():
             self.loop.run_until_complete(objects.close())
         self.loop.close()
 
-        for k, objects in self.managers.items():
+        for _, objects in self.managers.items():
             with self.manager(objects, allow_sync=True):
                 for model in reversed(self.models):
                     model.drop_table(fail_silently=True)
@@ -223,8 +226,8 @@ class BaseManagerTestCase(unittest.TestCase):
 
             run_with_managers(test, exclude=['mysql', 'mysql-pool'])
         """
-        for k, objects in self.managers.items():
-            if exclude is None or (k not in exclude):
+        for key, objects in self.managers.items():
+            if exclude is None or (key not in exclude):
                 with self.manager(objects):
                     self.loop.run_until_complete(test(objects))
                 with self.manager(objects, allow_sync=True):
@@ -240,14 +243,14 @@ class BaseManagerTestCase(unittest.TestCase):
 
 class DatabaseTestCase(unittest.TestCase):
     def test_deferred_init(self):
-        config = dict(defaults)
-        for k in list(config.keys()):
-            config[k].update(overrides.get(k, {}))
+        for key in DB_CLASSES:
+            params = DB_DEFAULTS.get(key) or {}
+            params.update(DB_OVERRIDES.get(key) or {})
 
-            database = db_classes[k](None)
+            database = DB_CLASSES[key](None)
             self.assertTrue(database.deferred)
 
-            database.init(**config[k])
+            database.init(**params)
             self.assertTrue(not database.deferred)
 
             TestModel._meta.database = database
@@ -264,12 +267,12 @@ class DatabaseTestCase(unittest.TestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             yield from objects.create(TestModel, text=text)
-            obj = yield from objects.get(TestModel, text=text)
+            yield from objects.get(TestModel, text=text)
 
-        config = dict(defaults)
-        for k in list(config.keys()):
-            config[k].update(overrides.get(k, {}))
-            database.initialize(db_classes[k](**config[k]))
+        for key in DB_CLASSES:
+            params = DB_DEFAULTS.get(key) or {}
+            params.update(DB_OVERRIDES.get(key) or {})
+            database.initialize(DB_CLASSES[key](**params))
 
             TestModel.create_table(True)
             loop.run_until_complete(test(objects))
@@ -297,12 +300,9 @@ class OlderTestCase(unittest.TestCase):
     def setUpClass(cls, *args, **kwargs):
         """Configure database managers, create test tables.
         """
-        cls.databases = {}
         cls.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(cls.loop)
-
-        load_databases(databases=cls.databases,
-                       only=cls.only)
+        cls.databases = load_databases(only=cls.only)
 
         for k, database in cls.databases.items():
             database.set_allow_sync(True)
@@ -516,7 +516,6 @@ class ManagerTestCase(BaseManagerTestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             obj1 = yield from objects.create(TestModel, text=text)
-
             obj2 = yield from objects.get(TestModel, id=obj1.id)
             self.assertEqual(obj1, obj2)
             self.assertEqual(obj1.id, obj2.id)
@@ -528,7 +527,6 @@ class ManagerTestCase(BaseManagerTestCase):
         def test(objects):
             text = "Test %s" % uuid.uuid4()
             obj1 = yield from objects.create(UUIDTestModel, text=text)
-
             obj2 = yield from objects.get(UUIDTestModel, id=obj1.id)
             self.assertEqual(obj1, obj2)
             self.assertEqual(len(str(obj1.id)), 36)

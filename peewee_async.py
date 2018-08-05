@@ -16,13 +16,10 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 import asyncio
 import uuid
 import contextlib
-import peewee
 import warnings
 import logging
+import peewee
 from playhouse.db_url import register_database
-
-logger = logging.getLogger('peewee.async')
-logger.addHandler(logging.NullHandler())
 
 try:
     import aiopg
@@ -34,7 +31,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5.12'
+__version__ = '0.6.0a'
 
 __all__ = [
     # High level API ###
@@ -64,7 +61,9 @@ __all__ = [
     'UnwantedSyncQueryError',
 ]
 
-log = logging.getLogger('peewee.async')
+__log__ = logging.getLogger('peewee.async')
+__log__.addHandler(logging.NullHandler())
+
 
 #################
 # Async manager #
@@ -1487,7 +1486,7 @@ class atomic:
 def _run_sql(database, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """
-    logger.debug((operation, args, kwargs))
+    __log__.debug((operation, args, kwargs))
 
     with peewee.__exception_wrapper__:
         cursor = yield from database.cursor_async()

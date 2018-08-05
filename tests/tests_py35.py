@@ -52,7 +52,7 @@ class ManagerTransactionsTestCase(BaseManagerTestCase):
             except FakeUpdateError as e:
                 error = True
                 res = await objects.get(TestModel, id=obj_id)
-            
+
             self.assertTrue(error)
             self.assertEqual(res.text, 'FOO')
 
@@ -61,10 +61,10 @@ class ManagerTransactionsTestCase(BaseManagerTestCase):
     def test_several_transactions(self):
         """Run several transactions in parallel tasks.
         """
-        run = lambda c: self.loop.run_until_complete(c)
-
-        wait = lambda tasks: run(asyncio.wait([self.loop.create_task(t)
-            for t in tasks], loop=self.loop))
+        wait = lambda tasks: self.loop.run_until_complete(
+            asyncio.wait([
+                self.loop.create_task(t) for t in tasks
+            ], loop=self.loop))
 
         async def t1(objects):
             async with objects.atomic():
@@ -81,7 +81,7 @@ class ManagerTransactionsTestCase(BaseManagerTestCase):
                 self.assertEqual(objects.database.transaction_depth_async(), 1)
                 await asyncio.sleep(0.125, loop=self.loop)
 
-        for k, objects in self.managers.items():
+        for _, objects in self.managers.items():
             wait([
                 t1(objects),
                 t2(objects),
