@@ -150,24 +150,39 @@ class TestModel(peewee.Model):
     text = peewee.CharField(max_length=100, unique=True)
     data = peewee.TextField(default='')
 
+    def __str__(self):
+        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
+
 
 class TestModelAlpha(peewee.Model):
     text = peewee.CharField()
+
+    def __str__(self):
+        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
 class TestModelBeta(peewee.Model):
     alpha = peewee.ForeignKeyField(TestModelAlpha, related_name='betas')
     text = peewee.CharField()
 
+    def __str__(self):
+        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
+
 
 class TestModelGamma(peewee.Model):
     text = peewee.CharField()
     beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
 
+    def __str__(self):
+        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
+
 
 class UUIDTestModel(peewee.Model):
     id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
     text = peewee.CharField()
+
+    def __str__(self):
+        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
 ####################
@@ -455,19 +470,19 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
-    # def test_many_requests(self):
-    #     @asyncio.coroutine
-    #     def test(objects):
-    #         max_connections = getattr(objects.database, 'max_connections', 1)
-    #         text = "Test %s" % uuid.uuid4()
-    #         obj = yield from objects.create(TestModel, text=text)
-    #         n = 2 * max_connections  # number of requests
-    #         done, not_done = yield from asyncio.wait(
-    #             [objects.get(TestModel, id=obj.id) for _ in range(n)],
-    #             loop=self.loop)
-    #         self.assertEqual(len(done), n)
+    def test_many_requests(self):
+        @asyncio.coroutine
+        def test(objects):
+            max_connections = getattr(objects.database, 'max_connections', 1)
+            text = "Test %s" % uuid.uuid4()
+            obj = yield from objects.create(TestModel, text=text)
+            n = 2 * max_connections  # number of requests
+            done, not_done = yield from asyncio.wait(
+                [objects.get(TestModel, id=obj.id) for _ in range(n)],
+                loop=self.loop)
+            self.assertEqual(len(done), n)
 
-    #     self.run_with_managers(test)
+        self.run_with_managers(test)
 
     def test_create_obj(self):
         @asyncio.coroutine
@@ -745,6 +760,43 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_prefetch(self):
+        @asyncio.coroutine
+        def test(objects):
+            alpha_1 = yield from objects.create(
+                TestModelAlpha, text='Alpha 1')
+            alpha_2 = yield from objects.create(
+                TestModelAlpha, text='Alpha 2')
+
+            beta_11 = yield from objects.create(
+                TestModelBeta, alpha=alpha_1, text='Beta 11')
+            beta_12 = yield from objects.create(
+                TestModelBeta, alpha=alpha_1, text='Beta 12')
+            _ = yield from objects.create(
+                TestModelBeta, alpha=alpha_2, text='Beta 21')
+            _ = yield from objects.create(
+                TestModelBeta, alpha=alpha_2, text='Beta 22')
+
+            gamma_111 = yield from objects.create(
+                TestModelGamma, beta=beta_11, text='Gamma 111')
+            gamma_112 = yield from objects.create(
+                TestModelGamma, beta=beta_11, text='Gamma 112')
+
+            result = yield from objects.prefetch(
+                TestModelAlpha.select(),
+                TestModelBeta.select(),
+                TestModelGamma.select())
+
+            self.assertEqual(tuple(result),
+                             (alpha_1, alpha_2))
+
+            self.assertEqual(tuple(result[0].betas),
+                             (beta_11, beta_12))
+
+            self.assertEqual(tuple(result[0].betas[0].gammas),
+                             (gamma_111, gamma_112))
+
+        self.run_with_managers(test)
 
 
 ######################

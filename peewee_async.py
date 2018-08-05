@@ -700,48 +700,38 @@ def raw_query(query):
 
 
 @asyncio.coroutine
-def prefetch(query, *subqueries):
+def prefetch(sq, *subqueries):
     """Asynchronous version of the `prefetch()` from peewee.
-
-    Returns Query that has already cached data.
     """
-    # This code is copied from peewee.prefetch and adopted
-    # to use async execute. Also it's a bit hacky, consider
-    # it to be experimental!
-
     if not subqueries:
-        return query
+        result = yield from execute(sq)
+        return result
 
-    fixed_queries = peewee.prefetch_add_subquery(query, subqueries)
-
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
     deps = {}
     rel_map = {}
-    for prefetch_result in reversed(fixed_queries):
-        query_model = prefetch_result.model
-        if prefetch_result.fields:
-            for rel_model in prefetch_result.rel_models:
+
+    for pq in reversed(fixed_queries):
+        query_model = pq.model
+        if pq.fields:
+            for rel_model in pq.rel_models:
                 rel_map.setdefault(rel_model, [])
-                rel_map[rel_model].append(prefetch_result)
+                rel_map[rel_model].append(pq)
 
         deps[query_model] = {}
         id_map = deps[query_model]
         has_relations = bool(rel_map.get(query_model))
 
-        # NOTE! This is hacky, we perform async `execute()` and substitute
-        # result to the initial query:
+        result = yield from execute(pq.query)
 
-        qr = yield from execute(prefetch_result.query)
-        prefetch_result.query._qr = list(qr)
-        prefetch_result.query._dirty = False
-
-        for instance in prefetch_result.query._qr:
-            if prefetch_result.fields:
-                prefetch_result.store_instance(instance, id_map)
+        for instance in result:
+            if pq.fields:
+                pq.store_instance(instance, id_map)
             if has_relations:
                 for rel in rel_map[query_model]:
                     rel.populate_instance(instance, deps[rel.model])
 
-    return prefetch_result.query
+    return result
 
 
 ###################
