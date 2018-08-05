@@ -396,8 +396,7 @@ class Manager:
 #################
 
 
-@asyncio.coroutine
-def execute(query):
+async def execute(query):
     """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
     :param query: peewee query instance created with ``Model.select()``,
@@ -419,8 +418,7 @@ def execute(query):
     return (await coroutine(query))
 
 
-@asyncio.coroutine
-def create_object(model, **data):
+async def create_object(model, **data):
     """Create object asynchronously.
 
     :param model: mode class
@@ -447,8 +445,7 @@ def create_object(model, **data):
     return obj
 
 
-@asyncio.coroutine
-def get_object(source, *args):
+async def get_object(source, *args):
     """Get object asynchronously.
 
     :param source: mode class or query to get object from
@@ -475,8 +472,7 @@ def get_object(source, *args):
     raise model.DoesNotExist
 
 
-@asyncio.coroutine
-def delete_object(obj, recursive=False, delete_nullable=False):
+async def delete_object(obj, recursive=False, delete_nullable=False):
     """Delete object asynchronously.
 
     :param obj: object to delete
@@ -508,8 +504,7 @@ def delete_object(obj, recursive=False, delete_nullable=False):
     return result
 
 
-@asyncio.coroutine
-def update_object(obj, only=None):
+async def update_object(obj, only=None):
     """Update object asynchronously.
 
     :param obj: object to update
@@ -551,8 +546,7 @@ def update_object(obj, only=None):
     return rows
 
 
-@asyncio.coroutine
-def select(query):
+async def select(query):
     """Perform SELECT query asynchronously.
     """
     assert isinstance(query, peewee.SelectQuery),\
@@ -574,8 +568,7 @@ def select(query):
     return result
 
 
-@asyncio.coroutine
-def insert(query):
+async def insert(query):
     """Perform INSERT query asynchronously. Returns last insert ID.
     This function is called by object.create for single objects only.
     """
@@ -599,8 +592,7 @@ def insert(query):
     return result
 
 
-@asyncio.coroutine
-def update(query):
+async def update(query):
     """Perform UPDATE query asynchronously. Returns number of rows updated.
     """
     assert isinstance(query, peewee.Update),\
@@ -614,8 +606,7 @@ def update(query):
     return rowcount
 
 
-@asyncio.coroutine
-def delete(query):
+async def delete(query):
     """Perform DELETE query asynchronously. Returns number of rows deleted.
     """
     assert isinstance(query, peewee.Delete),\
@@ -629,8 +620,7 @@ def delete(query):
     return rowcount
 
 
-@asyncio.coroutine
-def count(query, clear_limit=False):
+async def count(query, clear_limit=False):
     """Perform *COUNT* aggregated query asynchronously.
 
     :return: number of objects in ``select()`` query
@@ -648,8 +638,7 @@ def count(query, clear_limit=False):
         return (await scalar(query)) or 0
 
 
-@asyncio.coroutine
-def scalar(query, as_tuple=False):
+async def scalar(query, as_tuple=False):
     """Get single value from ``select()`` query, i.e. for aggregation.
 
     :return: result is the same as after sync ``query.scalar()`` call
@@ -667,8 +656,7 @@ def scalar(query, as_tuple=False):
         return row
 
 
-@asyncio.coroutine
-def raw_query(query):
+async def raw_query(query):
     assert isinstance(query, peewee.RawQuery),\
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
@@ -687,8 +675,7 @@ def raw_query(query):
     return result
 
 
-@asyncio.coroutine
-def prefetch(sq, *subqueries):
+async def prefetch(sq, *subqueries):
     """Asynchronous version of the `prefetch()` from peewee.
     """
     if not subqueries:
@@ -1446,8 +1433,7 @@ def _query_db(query):
     return query._database
 
 
-@asyncio.coroutine
-def _run_sql(database, operation, *args, **kwargs):
+async def _run_sql(database, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """
     __log__.debug((operation, args, kwargs))
@@ -1464,14 +1450,12 @@ def _run_sql(database, operation, *args, **kwargs):
         return cursor
 
 
-@asyncio.coroutine
-def _run_no_result_sql(database, operation, *args, **kwargs):
+async def _run_no_result_sql(database, operation, *args, **kwargs):
     cursor = await _run_sql(database, operation, *args, **kwargs)
     await cursor.release()
 
 
-@asyncio.coroutine
-def _execute_query_async(query):
+async def _execute_query_async(query):
     """Execute query and return cursor object.
     """
     database = _query_db(query)
