@@ -57,7 +57,9 @@ setup(
             'wheel',
             'aiomysql',
             'aiopg'
-        ]
+        ],
+        'aiopg': ['aiopg>=0.14.0'],
+        'aiomysql': ['aiomysql>=0.0.19'],
     },
     py_modules=[
         'peewee_async',
