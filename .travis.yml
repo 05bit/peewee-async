@@ -1,6 +1,7 @@
 branches:
   only:
     - master
+    - peewee-3.5
 language: python
 python:
   - "3.5"

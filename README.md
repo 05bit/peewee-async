@@ -21,6 +21,8 @@ Overview
 The complete documentation:  
 http://peewee-async.readthedocs.io
 
+Notes on **Python 3.4** support. Starting with ``0.6.0a`` support for Python 3.4 will be probably dropped. In order to preserve backwards compatibility I'm going to freeze changes in ``0.5.xx`` development stream. Also note that Python 3.4 is not supported by the latest ``aiomysql``.
+
 Install
 -------
 
