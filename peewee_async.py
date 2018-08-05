@@ -18,6 +18,7 @@ import uuid
 import contextlib
 import warnings
 import logging
+import functools
 import peewee
 from playhouse.db_url import register_database
 
@@ -353,14 +354,15 @@ class Manager:
         The essential limitation though is that database backend have
         to be **the same type** for model and manager!
         """
-        if query._database == self.database:
+        database = _query_db(query)
+
+        if database == self.database:
             return query
-        elif self._subclassed(peewee.PostgresqlDatabase,
-                              query._database,
-                              self.database):
+
+        if self._subclassed(peewee.PostgresqlDatabase, database,
+                            self.database):
             can_swap = True
-        elif self._subclassed(peewee.MySQLDatabase,
-                              query._database,
+        elif self._subclassed(peewee.MySQLDatabase, database,
                               self.database):
             can_swap = True
         else:
@@ -371,13 +373,13 @@ class Manager:
             query = query.clone()
             query._database = self.database
             return query
-        else:
-            assert False, (
-                "Error, query's database and manager's database are "
-                "different. Query: %s Manager: %s" % (
-                    query._database, self.database
-                )
-            )
+
+        assert False, (
+            "Error, query's database and manager's database are "
+            "different. Query: %s Manager: %s" % (database, self.database)
+        )
+
+        return None
 
     @staticmethod
     def _subclassed(base, *classes):
@@ -579,7 +581,7 @@ def select(query):
     except GeneratorExit:
         pass
     finally:
-        yield from cursor.release
+        yield from cursor.release()
 
     return result
 
@@ -600,10 +602,11 @@ def insert(query):
             row = yield from cursor.fetchone()
             result = row[0]
         else:
-            last_id = yield from query._database.last_insert_id_async(cursor)
+            database = _query_db(query)
+            last_id = yield from database.last_insert_id_async(cursor)
             result = last_id
     finally:
-        yield from cursor.release
+        yield from cursor.release()
 
     return result
 
@@ -619,7 +622,7 @@ def update(query):
     cursor = yield from _execute_query_async(query)
     rowcount = cursor.rowcount
 
-    yield from cursor.release
+    yield from cursor.release()
     return rowcount
 
 
@@ -634,7 +637,7 @@ def delete(query):
     cursor = yield from _execute_query_async(query)
     rowcount = cursor.rowcount
 
-    yield from cursor.release
+    yield from cursor.release()
     return rowcount
 
 
@@ -645,18 +648,14 @@ def count(query, clear_limit=False):
     :return: number of objects in ``select()`` query
     """
     if query._distinct or query._group_by or query._limit or query._offset:
-        # wrapped_count()
-
+        clone = query.clone()
         if clear_limit:
             clone._limit = clone._offset = None
-
         sql, params = clone.sql()
         wrapped = 'SELECT COUNT(1) FROM (%s) AS wrapped_select' % sql
-        raw_query = query.model.raw(wrapped, *params)
-        return (yield from scalar(raw_query)) or 0
+        raw = query.model.raw(wrapped, *params)
+        return (yield from scalar(raw)) or 0
     else:
-        # simple count()
-
         query._returning = [peewee.fn.Count(peewee.SQL('*'))]
         return (yield from scalar(query)) or 0
 
@@ -672,7 +671,7 @@ def scalar(query, as_tuple=False):
     try:
         row = yield from cursor.fetchone()
     finally:
-        yield from cursor.release
+        yield from cursor.release()
 
     if row and not as_tuple:
         return row[0]
@@ -695,7 +694,7 @@ def raw_query(query):
     except GeneratorExit:
         pass
     finally:
-        yield from cursor.release
+        yield from cursor.release()
 
     return result
 
@@ -780,7 +779,6 @@ class AsyncQueryWrapper:
     instance, like you generally iterate over sync results wrapper.
     """
     def __init__(self, *, cursor=None, query=None):
-        self._initialized = False
         self._cursor = cursor
         self._rows = []
         self._result_cache = None
@@ -802,12 +800,13 @@ class AsyncQueryWrapper:
     def _get_result_wrapper(self, query):
         """Get result wrapper class.
         """
-        db = query._database
         cursor = RowsCursor(self._rows, self._cursor.description)
         return query._get_cursor_wrapper(cursor)
 
     @asyncio.coroutine
     def fetchone(self):
+        """Fetch single row from the cursor.
+        """
         row = yield from self._cursor.fetchone()
         if not row:
             raise GeneratorExit
@@ -819,11 +818,11 @@ class AsyncQueryWrapper:
 ############
 
 class AsyncDatabase:
-    _loop = None        # asyncio event loop
+    _loop = None  # asyncio event loop
     _allow_sync = True  # whether sync queries are allowed
     _async_conn = None  # async connection
     _async_wait = None  # connection waiter
-    _task_data = None   # asyncio per-task data
+    _task_data = None  # asyncio per-task data
 
     def __setattr__(self, name, value):
         if name == 'allow_sync':
@@ -1053,17 +1052,13 @@ class AsyncPostgresqlConnection:
         """Get a cursor for the specified transaction connection
         or acquire from the pool.
         """
-        import functools
         in_transaction = conn is not None
         if not conn:
             conn = yield from self.acquire()
         cursor = yield from conn.cursor(*args, **kwargs)
-        # NOTE: `cursor.release` is an awaitable object!
-        cursor.release = self.release_cursor(
-            cursor, in_transaction=in_transaction)
-        # cursor.release = functools.partial(
-        #     self.release_cursor, cursor,
-        #     in_transaction=in_transaction)
+        cursor.release = functools.partial(
+            self.release_cursor, cursor,
+            in_transaction=in_transaction)
         return cursor
 
     @asyncio.coroutine
@@ -1246,9 +1241,9 @@ class AsyncMySQLConnection:
         if not conn:
             conn = yield from self.acquire()
         cursor = yield from conn.cursor(*args, **kwargs)
-        # NOTE: `cursor.release` is an awaitable object!
-        cursor.release = self.release_cursor(
-            cursor, in_transaction=in_transaction)
+        cursor.release = functools.partial(
+            self.release_cursor, cursor,
+            in_transaction=in_transaction)
         return cursor
 
     @asyncio.coroutine
@@ -1493,6 +1488,14 @@ class atomic:
 # Internal helpers #
 ####################
 
+
+def _query_db(query):
+    """Get database instance bound to query. This helper
+    incapsulates internal peewee's access to database.
+    """
+    return query._database
+
+
 @asyncio.coroutine
 def _run_sql(database, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
@@ -1505,7 +1508,7 @@ def _run_sql(database, operation, *args, **kwargs):
         try:
             yield from cursor.execute(operation, *args, **kwargs)
         except:
-            yield from cursor.release
+            yield from cursor.release()
             raise
 
         return cursor
@@ -1514,14 +1517,15 @@ def _run_sql(database, operation, *args, **kwargs):
 @asyncio.coroutine
 def _run_no_result_sql(database, operation, *args, **kwargs):
     cursor = yield from _run_sql(database, operation, *args, **kwargs)
-    yield from cursor.release
+    yield from cursor.release()
 
 
 @asyncio.coroutine
 def _execute_query_async(query):
     """Execute query and return cursor object.
     """
-    return (yield from _run_sql(query._database, *query.sql()))
+    database = _query_db(query)
+    return (yield from _run_sql(database, *query.sql()))
 
 
 class TaskLocals:
@@ -1533,7 +1537,7 @@ class TaskLocals:
     you would to for `dict` but values will be get and set in the context
     of currently running `asyncio` task.
 
-    When task is done, all saved values is removed from stored data.
+    When task is done, all saved values are removed from stored data.
     """
     def __init__(self, loop):
         self.loop = loop
@@ -1547,10 +1551,9 @@ class TaskLocals:
         data = self.get_data()
         if data is not None:
             return data.get(key, *val)
-        elif len(val):
+        if val:
             return val[0]
-        else:
-            raise KeyError(key)
+        raise KeyError(key)
 
     def set(self, key, val):
         """Set value stored for current running task.
@@ -1576,6 +1579,7 @@ class TaskLocals:
                 self.data[task_id] = {}
                 task.add_done_callback(self.del_data)
             return self.data.get(task_id)
+        return None
 
     def del_data(self, task):
         """Delete data for task from stored data dict.
