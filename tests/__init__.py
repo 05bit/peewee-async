@@ -185,6 +185,15 @@ class UUIDTestModel(peewee.Model):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
+class CompositeTestModel(peewee.Model):
+    """A simple "through" table for many-to-many relationship."""
+    uuid = peewee.ForeignKeyField(UUIDTestModel)
+    alpha = peewee.ForeignKeyField(TestModelAlpha)
+
+    class Meta:
+        primary_key = peewee.CompositeKey('uuid', 'alpha')
+
+
 ####################
 # Base tests class #
 ####################
@@ -194,7 +203,7 @@ class BaseManagerTestCase(unittest.TestCase):
     only = None
 
     models = [TestModel, UUIDTestModel, TestModelAlpha,
-              TestModelBeta, TestModelGamma]
+              TestModelBeta, TestModelGamma, CompositeTestModel]
 
     @classmethod
     @contextlib.contextmanager
@@ -254,7 +263,7 @@ class BaseManagerTestCase(unittest.TestCase):
         """
         for key, objects in self.managers.items():
             if exclude is None or (key not in exclude):
-                with self.manager(objects):
+                with self.manager(objects, allow_sync=False):
                     self.loop.run_until_complete(test(objects))
                 with self.manager(objects, allow_sync=True):
                     for model in reversed(self.models):
@@ -340,11 +349,11 @@ class OlderTestCase(unittest.TestCase):
     def tearDownClass(cls, *args, **kwargs):
         """Remove all test tables and close connections.
         """
-        for k, database in cls.databases.items():
+        for _, database in cls.databases.items():
             cls.loop.run_until_complete(database.close_async())
         cls.loop.close()
 
-        for k, database in cls.databases.items():
+        for _, database in cls.databases.items():
             database.set_allow_sync(True)
             with cls.current_database(database):
                 for model in reversed(cls.models):
@@ -768,6 +777,16 @@ class ManagerTestCase(BaseManagerTestCase):
             self.assertEqual(tuple(result[0].betas[0].gammas),
                              (gamma_111, gamma_112))
 
+        self.run_with_managers(test)
+
+    def test_composite_key(self):
+        async def test(objects):
+            obj_uuid = await objects.create(UUIDTestModel, text='UUID')
+            obj_alpha = await objects.create(TestModelAlpha, text='Alpha')
+            comp = await objects.create(CompositeTestModel,
+                                        uuid=obj_uuid,
+                                        alpha=obj_alpha)
+            self.assertEqual((obj_uuid, obj_alpha), comp.get_id())
         self.run_with_managers(test)
 
 

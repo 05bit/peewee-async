@@ -1058,27 +1058,13 @@ class AsyncPostgresqlMixin(AsyncDatabase):
     async def last_insert_id_async(self, cursor):
         """Get ID of last inserted row.
 
-        NOTE: it's a copy-paste, not sure how to make it better
-        https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L2907
+        NOTE: it's not clear, when this code is executed?
         """
+        # try:
+        #     return cursor if query_type else cursor[0][0]
+        # except (IndexError, KeyError, TypeError):
+        #     pass
         return cursor.lastrowid
-        # meta = model._meta
-        # schema = ''
-        # if meta.schema:
-        #     schema = '%s.' % meta.schema
-
-        # if meta.primary_key.sequence:
-        #     seq = meta.primary_key.sequence
-        # elif meta.auto_increment:
-        #     seq = '%s_%s_seq' % (meta.table_name, meta.primary_key.column_name)
-        # else:
-        #     seq = None
-
-        # if seq:
-        #     await cursor.execute("SELECT CURRVAL('%s\"%s\"')" % (schema,
-        #                                                               seq))
-        #     result = (await cursor.fetchone())[0]
-        #     return result
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -1244,8 +1230,6 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         """Get ID of last inserted row.
         """
         return cursor.lastrowid
-        # if model._meta.auto_increment:
-        #     return cursor.lastrowid
 
     @property
     def use_speedups(self):
