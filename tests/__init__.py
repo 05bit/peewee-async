@@ -105,6 +105,18 @@ def setUpModule():
             if key.startswith('mysql'):
                 DB_CLASSES.pop(key)
 
+    loop = asyncio.new_event_loop()
+    all_databases = load_databases(only=None)
+    for key, database in all_databases.items():
+        connect = database.connect_async(loop=loop)
+        loop.run_until_complete(connect)
+        if database._async_conn is not None:
+            disconnect = database.close_async()
+            loop.run_until_complete(disconnect)
+        else:
+            print("Can't setup connection for %s" % key)
+            DB_CLASSES.pop(key)
+
 
 def load_managers(*, loop, only):
     managers = {}
@@ -443,19 +455,19 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
-    def test_many_requests(self):
-        @asyncio.coroutine
-        def test(objects):
-            max_connections = getattr(objects.database, 'max_connections', 1)
-            text = "Test %s" % uuid.uuid4()
-            obj = yield from objects.create(TestModel, text=text)
-            n = 2 * max_connections  # number of requests
-            done, not_done = yield from asyncio.wait(
-                [objects.get(TestModel, id=obj.id) for _ in range(n)],
-                loop=self.loop)
-            self.assertEqual(len(done), n)
+    # def test_many_requests(self):
+    #     @asyncio.coroutine
+    #     def test(objects):
+    #         max_connections = getattr(objects.database, 'max_connections', 1)
+    #         text = "Test %s" % uuid.uuid4()
+    #         obj = yield from objects.create(TestModel, text=text)
+    #         n = 2 * max_connections  # number of requests
+    #         done, not_done = yield from asyncio.wait(
+    #             [objects.get(TestModel, id=obj.id) for _ in range(n)],
+    #             loop=self.loop)
+    #         self.assertEqual(len(done), n)
 
-        self.run_with_managers(test)
+    #     self.run_with_managers(test)
 
     def test_create_obj(self):
         @asyncio.coroutine
@@ -719,10 +731,106 @@ class ManagerTestCase(BaseManagerTestCase):
         self.run_with_managers(test)
 
 
+######################
+# Transactions tests #
+######################
 
-#####################
-# Python 3.5+ tests #
-#####################
 
-if sys.version_info >= (3, 5):
-    from .tests_py35 import *
+class FakeUpdateError(Exception):
+    """Fake error while updating database.
+    """
+    pass
+
+
+# class ManagerTransactionsTestCase(BaseManagerTestCase):
+#     # only = ['postgres', 'postgres-ext', 'postgres-pool', 'postgres-pool-ext']
+#     only = None
+
+#     def test_atomic_success(self):
+#         """Successful update in transaction.
+#         """
+#         async def test(objects):
+#             obj = await objects.create(TestModel, text='FOO')
+#             obj_id = obj.id
+
+#             async with objects.atomic():
+#                 obj.text = 'BAR'
+#                 await objects.update(obj)
+
+#             res = await objects.get(TestModel, id=obj_id)
+#             self.assertEqual(res.text, 'BAR')
+
+#         self.run_with_managers(test)
+
+#     def test_atomic_failed(self):
+#         """Failed update in transaction.
+#         """
+#         async def test(objects):
+#             obj = await objects.create(TestModel, text='FOO')
+#             obj_id = obj.id
+
+#             try:
+#                 async with objects.atomic():
+#                     obj.text = 'BAR'
+#                     await objects.update(obj)
+#                     raise FakeUpdateError()
+#             except FakeUpdateError as e:
+#                 error = True
+#                 res = await objects.get(TestModel, id=obj_id)
+
+#             self.assertTrue(error)
+#             self.assertEqual(res.text, 'FOO')
+
+#         self.run_with_managers(test)
+
+#     def test_several_transactions(self):
+#         """Run several transactions in parallel tasks.
+#         """
+#         wait = lambda tasks: self.loop.run_until_complete(
+#             asyncio.wait([
+#                 self.loop.create_task(t) for t in tasks
+#             ], loop=self.loop))
+
+#         async def t1(objects):
+#             async with objects.atomic():
+#                 self.assertEqual(objects.database.transaction_depth_async(), 1)
+#                 await asyncio.sleep(0.25, loop=self.loop)
+
+#         async def t2(objects):
+#             async with objects.atomic():
+#                 self.assertEqual(objects.database.transaction_depth_async(), 1)
+#                 await asyncio.sleep(0.0625, loop=self.loop)
+
+#         async def t3(objects):
+#             async with objects.atomic():
+#                 self.assertEqual(objects.database.transaction_depth_async(), 1)
+#                 await asyncio.sleep(0.125, loop=self.loop)
+
+#         for _, objects in self.managers.items():
+#             wait([
+#                 t1(objects),
+#                 t2(objects),
+#                 t3(objects),
+#             ])
+
+#             with self.manager(objects, allow_sync=True):
+#                 for model in reversed(self.models):
+#                     model.delete().execute()
+
+#             self.run_count += 1
+
+#     def test_atomic_fail_with_disconnect(self):
+#         """Database gone in transaction.
+#         """
+#         async def test(objects):
+#             error = False
+#             try:
+#                 async with objects.atomic():
+#                     await objects.database.close_async()
+#                     raise FakeUpdateError()
+#             except FakeUpdateError:
+#                 error = True
+
+#             self.assertTrue(error)
+
+#         self.run_with_managers(test)

@@ -596,7 +596,12 @@ def insert(query):
     cursor = yield from _execute_query_async(query)
 
     try:
-        result = (yield from cursor.fetchone())[0]
+        if query._returning:
+            row = yield from cursor.fetchone()
+            result = row[0]
+        else:
+            last_id = yield from query._database.last_insert_id_async(cursor)
+            result = last_id
     finally:
         yield from cursor.release
 
@@ -1048,6 +1053,7 @@ class AsyncPostgresqlConnection:
         """Get a cursor for the specified transaction connection
         or acquire from the pool.
         """
+        import functools
         in_transaction = conn is not None
         if not conn:
             conn = yield from self.acquire()
@@ -1055,6 +1061,9 @@ class AsyncPostgresqlConnection:
         # NOTE: `cursor.release` is an awaitable object!
         cursor.release = self.release_cursor(
             cursor, in_transaction=in_transaction)
+        # cursor.release = functools.partial(
+        #     self.release_cursor, cursor,
+        #     in_transaction=in_transaction)
         return cursor
 
     @asyncio.coroutine
@@ -1098,29 +1107,30 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         return kwargs
 
     @asyncio.coroutine
-    def last_insert_id_async(self, cursor, model):
+    def last_insert_id_async(self, cursor):
         """Get ID of last inserted row.
 
         NOTE: it's a copy-paste, not sure how to make it better
         https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L2907
         """
-        meta = model._meta
-        schema = ''
-        if meta.schema:
-            schema = '%s.' % meta.schema
+        return cursor.lastrowid
+        # meta = model._meta
+        # schema = ''
+        # if meta.schema:
+        #     schema = '%s.' % meta.schema
 
-        if meta.primary_key.sequence:
-            seq = meta.primary_key.sequence
-        elif meta.auto_increment:
-            seq = '%s_%s_seq' % (meta.table_name, meta.primary_key.column_name)
-        else:
-            seq = None
+        # if meta.primary_key.sequence:
+        #     seq = meta.primary_key.sequence
+        # elif meta.auto_increment:
+        #     seq = '%s_%s_seq' % (meta.table_name, meta.primary_key.column_name)
+        # else:
+        #     seq = None
 
-        if seq:
-            yield from cursor.execute("SELECT CURRVAL('%s\"%s\"')" % (schema,
-                                                                      seq))
-            result = (yield from cursor.fetchone())[0]
-            return result
+        # if seq:
+        #     yield from cursor.execute("SELECT CURRVAL('%s\"%s\"')" % (schema,
+        #                                                               seq))
+        #     result = (yield from cursor.fetchone())[0]
+        #     return result
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -1288,11 +1298,12 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         return kwargs
 
     @asyncio.coroutine
-    def last_insert_id_async(self, cursor, model):
+    def last_insert_id_async(self, cursor):
         """Get ID of last inserted row.
         """
-        if model._meta.auto_increment:
-            return cursor.lastrowid
+        return cursor.lastrowid
+        # if model._meta.auto_increment:
+        #     return cursor.lastrowid
 
     @property
     def use_speedups(self):
