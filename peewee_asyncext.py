@@ -14,9 +14,8 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 from playhouse.db_url import register_database
-
+from playhouse import postgres_ext as ext
 from peewee_async import AsyncPostgresqlMixin
-import playhouse.postgres_ext as ext
 
 
 class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
