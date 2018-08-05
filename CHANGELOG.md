@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.5.12 (latest)
+## 0.6.0a (latest)
+
+- #97 pull request is merged, initial implementation of peewee 3.5+ support thanks to @Koos85
+- Dropped support of peewee <= 3.5 and Python <= 3.5
+
+## 0.5.12
 
 - #92 pull request is merged, raise original exception instead of ValueError in atomic on disconnect
 
