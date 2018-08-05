@@ -7,10 +7,20 @@ ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 [![Build Status](https://travis-ci.org/05bit/peewee-async.svg)](https://travis-ci.org/05bit/peewee-async) [![PyPi Version](https://img.shields.io/pypi/v/peewee-async.svg)](https://pypi.python.org/pypi/peewee-async)
  [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://peewee-async.readthedocs.io/en/latest/?badge=latest)
 
+Important notes
+---------------
+
+- Since version `0.6.0a` only **Python 3.5+** is supported
+- Since version `0.6.0a` only **peewee 3.5+** is supported
+- If you still need Python 3.4 support use older versions, i.e. `pip install peewee-async==0.5.12`
+- Python 3.7+ is [not supported yet by aiopg](https://github.com/aio-libs/aiopg/issues/436)
+
+Version `0.6.0a` is published as pre-release, mind the "a" in version identifier. That means in order to install it you should specify `--pre` flag for `pip`.
+
 Overview
 --------
 
-* Requires Python 3.4+
+* Requires Python 3.5+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Single point for high-level async API
@@ -21,21 +31,19 @@ Overview
 The complete documentation:  
 http://peewee-async.readthedocs.io
 
-Notes on **Python 3.4** support. Starting with ``0.6.0a`` support for Python 3.4 will be probably dropped. In order to preserve backwards compatibility I'm going to freeze changes in ``0.5.xx`` development stream. Also note that Python 3.4 is not supported by the latest ``aiomysql``.
-
 Install
 -------
 
 Install with `pip` for PostgreSQL:
 
 ```
-pip install peewee-async aiopg
+pip install --pre peewee-async; pip install aiopg
 ```
 
 or for MySQL:
 
 ```
-pip install peewee-async aiomysql
+pip install --pre peewee-async; pip install aiomysql
 ```
 
 Quickstart
