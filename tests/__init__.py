@@ -730,6 +730,22 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_count_query_with_limit(self):
+        @asyncio.coroutine
+        def test(objects):
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+            text = "Test %s" % uuid.uuid4()
+            yield from objects.create(TestModel, text=text)
+
+            count = yield from objects.count(TestModel.select().limit(1))
+            self.assertEqual(count, 1)
+
+        self.run_with_managers(test)
+
+
 
 ######################
 # Transactions tests #
