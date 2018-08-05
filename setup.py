@@ -31,6 +31,13 @@ The source code is hosted on `GitHub`_.
 .. _GitHub: https://github.com/05bit/peewee-async
 """
 
+# Usage hints:
+#
+#     python setup.py develop
+#     pip install -e .[develop]
+#     python setup.py sdist bdist_wheel upload
+#
+
 setup(
     name="peewee-async",
     version=__version__,
@@ -44,6 +51,14 @@ setup(
     install_requires=(
         'peewee>=3.5.0',
     ),
+    extras_require={
+        'develop': [
+            'pylint',
+            'wheel',
+            'aiomysql',
+            'aiopg'
+        ]
+    },
     py_modules=[
         'peewee_async',
         'peewee_asyncext'
