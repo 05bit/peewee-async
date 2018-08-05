@@ -105,7 +105,7 @@ def setUpModule():
 def load_managers(*, managers=None, loop=None, only=None):
     config = dict(defaults)
     for k in list(config.keys()):
-        if only and not k in only:
+        if only and k not in only:
             continue
         config[k].update(overrides.get(k, {}))
         database = db_classes[k](**config[k])
@@ -115,7 +115,7 @@ def load_managers(*, managers=None, loop=None, only=None):
 def load_databases(*, databases=None, only=None):
     config = dict(defaults)
     for k in list(config.keys()):
-        if only and not k in only:
+        if only and k not in only:
             continue
         config[k].update(overrides.get(k, {}))
         databases[k] = db_classes[k](**config[k])
@@ -224,7 +224,7 @@ class BaseManagerTestCase(unittest.TestCase):
             run_with_managers(test, exclude=['mysql', 'mysql-pool'])
         """
         for k, objects in self.managers.items():
-            if exclude is None or (not k in exclude):
+            if exclude is None or (k not in exclude):
                 with self.manager(objects):
                     self.loop.run_until_complete(test(objects))
                 with self.manager(objects, allow_sync=True):
@@ -347,7 +347,7 @@ class OlderTestCase(unittest.TestCase):
         """Run test coroutine against available databases.
         """
         for k, database in self.databases.items():
-            if exclude is None or (not k in exclude):
+            if exclude is None or (k not in exclude):
                 with self.current_database(database):
                     database.set_allow_sync(False)
                     self.loop.run_until_complete(test(database))
@@ -449,7 +449,7 @@ class ManagerTestCase(BaseManagerTestCase):
             max_connections = getattr(objects.database, 'max_connections', 1)
             text = "Test %s" % uuid.uuid4()
             obj = yield from objects.create(TestModel, text=text)
-            n = 2 * max_connections # number of requests
+            n = 2 * max_connections  # number of requests
             done, not_done = yield from asyncio.wait(
                 [objects.get(TestModel, id=obj.id) for _ in range(n)],
                 loop=self.loop)
@@ -651,7 +651,7 @@ class ManagerTestCase(BaseManagerTestCase):
 
             query = TestModel.update(text="Test update query") \
                              .where(TestModel.id == obj1.id)
-            
+
             upd1 = yield from objects.execute(query)
             self.assertEqual(upd1, 1)
 
@@ -717,80 +717,9 @@ class ManagerTestCase(BaseManagerTestCase):
 
             count = yield from objects.count(TestModel.select())
             self.assertEqual(count, 3)
-            
-        self.run_with_managers(test)
-
-    def test_prefetch(self):
-        @asyncio.coroutine
-        def test(objects):
-            alpha_1 = yield from objects.create(TestModelAlpha,
-                                                text='Alpha 1')
-            alpha_2 = yield from objects.create(TestModelAlpha,
-                                                text='Alpha 2')
-
-            beta_11 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha_1,
-                                                text='Beta 11')
-            beta_12 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha_1,
-                                                text='Beta 12')
-            beta_21 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha_2,
-                                                text='Beta 21')
-            beta_22 = yield from objects.create(TestModelBeta,
-                                                alpha=alpha_2,
-                                                text='Beta 22')
-
-            gamma_111 = yield from objects.create(TestModelGamma,
-                                                  beta=beta_11,
-                                                  text='Gamma 111')
-            gamma_112 = yield from objects.create(TestModelGamma,
-                                                  beta=beta_11,
-                                                  text='Gamma 112')
-            
-            result = yield from objects.prefetch(
-                TestModelAlpha.select(),
-                TestModelBeta.select(),
-                TestModelGamma.select())
-
-            result = tuple(result)
-
-            self.assertEqual(result,
-                             (alpha_1, alpha_2))
-
-            self.assertEqual(tuple(result[0].betas_prefetch),
-                            (beta_11, beta_12))
-
-            self.assertEqual(tuple(result[0].betas_prefetch[0].gammas_prefetch),
-                             (gamma_111, gamma_112))
 
         self.run_with_managers(test)
 
-    def test_aggregate_rows(self):
-        @asyncio.coroutine
-        def test(objects):
-            alpha = yield from objects.create(TestModelAlpha,
-                                              text='Alpha')
-
-            beta_1 = yield from objects.create(TestModelBeta,
-                                               alpha=alpha,
-                                               text='Beta 1')
-            beta_2 = yield from objects.create(TestModelBeta,
-                                               alpha=alpha,
-                                               text='Beta 2')
-
-            result = yield from objects.get((
-                TestModelAlpha
-                .select(TestModelAlpha, TestModelBeta)
-                .join(TestModelBeta)
-                .order_by(TestModelAlpha.text, TestModelBeta.text)
-                .aggregate_rows()))
-
-            self.assertEqual(result, alpha)
-
-            self.assertEqual(result.betas, [beta_1, beta_2])
-
-        self.run_with_managers(test)
 
 
 #####################

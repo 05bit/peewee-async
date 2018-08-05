@@ -23,22 +23,23 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **single async connection** interface.
 
-    JSON fields support is always enabled, HStore supports is enabled by default,
-    but can be disabled with ``register_hstore=False`` argument.
+    JSON fields support is always enabled, HStore supports is enabled by
+    default, but can be disabled with ``register_hstore=False`` argument.
 
     Example::
 
         database = PostgresqlExtDatabase('test', register_hstore=False)
 
     See also:
-    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
+    https://peewee.readthedocs.io/en/latest/peewee/
+        playhouse.html#PostgresqlExtDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = 1
         self.max_connections = 1
         super().init(database, **kwargs)
         self.init_async(enable_json=True,
-                        enable_hstore=self.register_hstore)
+                        enable_hstore=self._register_hstore)
 
     @property
     def use_speedups(self):
@@ -49,15 +50,17 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
         pass
 
 
-register_database(PostgresqlExtDatabase, 'postgresext+async', 'postgresqlext+async')
+register_database(PostgresqlExtDatabase, 'postgresext+async',
+                  'postgresqlext+async')
 
 
-class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
+class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin,
+                                  ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
-    JSON fields support is always enabled, HStore supports is enabled by default,
-    but can be disabled with ``register_hstore=False`` argument.
+    JSON fields support is always enabled, HStore supports is enabled by
+    default, but can be disabled with ``register_hstore=False`` argument.
 
     :param max_connections: connections pool size
 
@@ -67,14 +70,15 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabas
                                                max_connections=20)
 
     See also:
-    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
+    https://peewee.readthedocs.io/en/latest/peewee/
+        playhouse.html#PostgresqlExtDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
         super().init(database, **kwargs)
         self.init_async(enable_json=True,
-                        enable_hstore=self.register_hstore)
+                        enable_hstore=self._register_hstore)
 
     @property
     def use_speedups(self):
@@ -85,4 +89,5 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabas
         pass
 
 
-register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
+register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async',
+                  'postgresqlext+pool+async')
