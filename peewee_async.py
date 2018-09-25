@@ -32,7 +32,7 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.6.0a'
+__version__ = '0.6.1'
 
 __all__ = [
     # High level API ###
@@ -112,13 +112,9 @@ class Manager:
                 "argument or class member.")
 
         self.database = database or self.database
-        self._loop = loop
-
-        attach_callback = getattr(self.database, 'attach_callback', None)
-        if attach_callback:
-            attach_callback(lambda db: setattr(db, '_loop', loop))
-        else:
-            self.database._loop = loop
+        self._loop = None
+        self.loop = loop
+        self._attach_callback()
 
     @property
     def loop(self):
@@ -128,6 +124,20 @@ class Manager:
         the instance, just return the current event loop.
         """
         return self._loop or asyncio.get_event_loop()
+
+    @loop.setter
+    def loop(self, value):
+        """Set the event loop.
+        """
+        self._loop = value
+        self._attach_callback()
+
+    def _attach_callback(self):
+        attach_callback = getattr(self.database, 'attach_callback', None)
+        if attach_callback:
+            attach_callback(lambda db: setattr(db, '_loop', self.loop))
+        else:
+            self.database._loop = self.loop
 
     @property
     def is_connected(self):
