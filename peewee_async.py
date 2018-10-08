@@ -831,8 +831,9 @@ class AsyncDatabase:
 
             try:
                 await conn.connect()
-            except:
-                self._async_wait.cancel()
+            except Exception as e:
+                if not self._async_wait.done():
+                    self._async_wait.set_exception(e)
                 self._async_wait = None
                 raise
             else:
