@@ -1358,7 +1358,7 @@ class savepoint:
     def __init__(self, db, sid=None):
         self.db = db
         self.sid = sid or 's' + uuid.uuid4().hex
-        self.quoted_sid = db.compiler().quote(self.sid)
+        self.quoted_sid = self.sid.join(self.db.quote)
 
     async def commit(self):
         await _run_no_result_sql(
