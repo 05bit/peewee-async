@@ -625,8 +625,8 @@ async def count(query, clear_limit=False):
 
     :return: number of objects in ``select()`` query
     """
+    clone = query.clone()
     if query._distinct or query._group_by or query._limit or query._offset:
-        clone = query.clone()
         if clear_limit:
             clone._limit = clone._offset = None
         sql, params = clone.sql()
@@ -634,8 +634,9 @@ async def count(query, clear_limit=False):
         raw = query.model.raw(wrapped, *params)
         return (await scalar(raw)) or 0
     else:
-        query._returning = [peewee.fn.Count(peewee.SQL('*'))]
-        return (await scalar(query)) or 0
+        clone._returning = [peewee.fn.Count(peewee.SQL('*'))]
+        clone._order_by = None
+        return (await scalar(clone)) or 0
 
 
 async def scalar(query, as_tuple=False):
