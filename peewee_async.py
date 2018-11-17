@@ -14,11 +14,12 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 import asyncio
-import uuid
 import contextlib
-import warnings
-import logging
 import functools
+import logging
+import uuid
+import warnings
+
 import peewee
 from playhouse.db_url import register_database
 
