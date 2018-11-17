@@ -17,6 +17,7 @@ import asyncio
 import contextlib
 import functools
 import logging
+import sys
 import uuid
 import warnings
 
@@ -66,6 +67,12 @@ __all__ = [
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
 
+PY_37 = sys.version_info >= (3, 7)
+
+if PY_37:
+    asyncio_current_task = asyncio.current_task
+else:
+    asyncio_current_task = asyncio.Task.current_task
 
 #################
 # Async manager #
@@ -1328,7 +1335,7 @@ class transaction:
             await _run_no_result_sql(self.db, 'BEGIN')
 
     async def __aenter__(self):
-        if not asyncio.Task.current_task(loop=self.loop):
+        if not asyncio_current_task(loop=self.loop):
             raise RuntimeError("The transaction must run within a task")
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
@@ -1491,7 +1498,7 @@ class TaskLocals:
         :param create: if argument is `True`, create empty dict
                        for task, default: `False`
         """
-        task = asyncio.Task.current_task(loop=self.loop)
+        task = asyncio_current_task(loop=self.loop)
         if task:
             task_id = id(task)
             if create and task_id not in self.data:
