@@ -852,6 +852,8 @@ class AsyncDatabase:
 
         try:
             return (await self._async_conn.cursor(conn=conn))
+        except AttributeError:
+            raise
         except:
             await self.close_async()
             raise
