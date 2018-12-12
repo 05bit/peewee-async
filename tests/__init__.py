@@ -162,7 +162,7 @@ class TestModelAlpha(peewee.Model):
 
 
 class TestModelBeta(peewee.Model):
-    alpha = peewee.ForeignKeyField(TestModelAlpha, related_name='betas')
+    alpha = peewee.ForeignKeyField(TestModelAlpha, backref='betas')
     text = peewee.CharField()
 
     def __str__(self):
@@ -171,7 +171,7 @@ class TestModelBeta(peewee.Model):
 
 class TestModelGamma(peewee.Model):
     text = peewee.CharField()
-    beta = peewee.ForeignKeyField(TestModelBeta, related_name='gammas')
+    beta = peewee.ForeignKeyField(TestModelBeta, backref='gammas')
 
     def __str__(self):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
