@@ -10,10 +10,8 @@ ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 Important notes
 ---------------
 
-- Since version `0.6.0a` only **Python 3.5+** is supported
 - Since version `0.6.0a` only **peewee 3.5+** is supported
 - If you still need Python 3.4 support use older versions, i.e. `pip install peewee-async==0.5.12`
-- Python 3.7+ is [not supported yet by aiopg](https://github.com/aio-libs/aiopg/issues/436)
 
 Version `0.6.0a` is published as pre-release, mind the "a" in version identifier. That means in order to install it you should specify `--pre` flag for `pip`.
 

@@ -1,11 +1,11 @@
 branches:
   only:
     - master
-    - peewee-3.5
 language: python
 python:
   - "3.5"
   - "3.6"
+  - "3.7"
   # TODO: aiopg is not compatible now with python 3.7 (syntax error)
   # Uncomment line bellow when issue fixed: https://github.com/aio-libs/aiopg/issues/436
   # - "nightly" # currently points to 3.7-dev
