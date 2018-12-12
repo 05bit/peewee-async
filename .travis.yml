@@ -2,19 +2,15 @@ branches:
   only:
     - master
 language: python
-python:
-  - "3.5"
-  - "3.6"
-  - "3.7"
-  # - "nightly" # currently points to 3.7-dev
-# Enable 3.7 without globally enabling sudo and dist
 matrix:
   include:
+    - python: "3.5"
+    - python: "3.6"
     - python: "3.7"
       dist: xenial
       sudo: true
 addons:
-  postgresql: "9.3"
+  postgresql: "9.6"
 services:
   - mysql
 before_script:
