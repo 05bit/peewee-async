@@ -32,6 +32,11 @@ try:
 except ImportError:
     aiomysql = None
 
+try:
+    asyncio_current_task = asyncio.current_task
+except AttributeError:
+    asyncio_current_task = asyncio.Task.current_task
+
 __version__ = '0.6.0a'
 
 __all__ = [
@@ -1327,7 +1332,7 @@ class transaction:
             await _run_no_result_sql(self.db, 'BEGIN')
 
     async def __aenter__(self):
-        if not asyncio.Task.current_task(loop=self.loop):
+        if not asyncio_current_task(loop=self.loop):
             raise RuntimeError("The transaction must run within a task")
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
@@ -1490,7 +1495,7 @@ class TaskLocals:
         :param create: if argument is `True`, create empty dict
                        for task, default: `False`
         """
-        task = asyncio.Task.current_task(loop=self.loop)
+        task = asyncio_current_task(loop=self.loop)
         if task:
             task_id = id(task)
             if create and task_id not in self.data:

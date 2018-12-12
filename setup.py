@@ -56,7 +56,8 @@ setup(
             'pylint',
             'wheel',
             'aiomysql',
-            'aiopg'
+            'aiopg',
+            'psycopg2'
         ],
         'aiopg': ['aiopg>=0.14.0'],
         'aiomysql': ['aiomysql>=0.0.19'],
