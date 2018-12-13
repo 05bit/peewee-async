@@ -16,13 +16,11 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 import asyncio
 import uuid
 import contextlib
-import peewee
 import warnings
 import logging
+import functools
+import peewee
 from playhouse.db_url import register_database
-
-logger = logging.getLogger('peewee.async')
-logger.addHandler(logging.NullHandler())
 
 try:
     import aiopg
@@ -34,10 +32,15 @@ try:
 except ImportError:
     aiomysql = None
 
-__version__ = '0.5.12'
+try:
+    asyncio_current_task = asyncio.current_task
+except AttributeError:
+    asyncio_current_task = asyncio.Task.current_task
+
+__version__ = '0.6.0a'
 
 __all__ = [
-    ### High level API ###
+    # High level API ###
 
     'Manager',
     'PostgresqlDatabase',
@@ -45,7 +48,7 @@ __all__ = [
     'MySQLDatabase',
     'PooledMySQLDatabase',
 
-    ### Low level API ###
+    # Low level API ###
 
     'execute',
     'count',
@@ -54,7 +57,7 @@ __all__ = [
     'transaction',
     'savepoint',
 
-    ### Deprecated ###
+    # Deprecated ###
 
     'get_object',
     'create_object',
@@ -64,7 +67,9 @@ __all__ = [
     'UnwantedSyncQueryError',
 ]
 
-log = logging.getLogger('peewee.async')
+__log__ = logging.getLogger('peewee.async')
+__log__.addHandler(logging.NullHandler())
+
 
 #################
 # Async manager #
@@ -135,8 +140,7 @@ class Manager:
         """
         return self.database._async_conn is not None
 
-    @asyncio.coroutine
-    def get(self, source_, *args, **kwargs):
+    async def get(self, source_, *args, **kwargs):
         """Get the model instance.
 
         :param source_: model or base query for lookup
@@ -145,71 +149,64 @@ class Manager:
 
             async def my_async_func():
                 obj1 = await objects.get(MyModel, id=1)
-                obj2 = await objects.get(MyModel, MyModel.id == 1)
-                obj3 = await objects.get(MyModel.select().where(MyModel.id == 1))
+                obj2 = await objects.get(MyModel, MyModel.id==1)
+                obj3 = await objects.get(MyModel.select().where(MyModel.id==1))
 
         All will return `MyModel` instance with `id = 1`
         """
-        yield from self.connect()
+        await self.connect()
 
         if isinstance(source_, peewee.Query):
             query = source_
-            model = query.model_class
+            model = query.model
         else:
             query = source_.select()
             model = source_
 
         conditions = list(args) + [(getattr(model, k) == v)
-            for k, v in kwargs.items()]
+                                   for k, v in kwargs.items()]
 
         if conditions:
             query = query.where(*conditions)
 
         try:
-            result = yield from self.execute(query)
+            result = await self.execute(query)
             return list(result)[0]
         except IndexError:
             raise model.DoesNotExist
 
-    @asyncio.coroutine
-    def create(self, model_, **data):
+    async def create(self, model_, **data):
         """Create a new object saved to database.
         """
         inst = model_(**data)
-        query = model_.insert(**dict(inst._data))
+        query = model_.insert(**dict(inst.__data__))
 
-        pk = yield from self.execute(query)
-        if pk is None:
-            pk = inst._get_pk_value()
-        inst._set_pk_value(pk)
-
-        inst._prepare_instance()
+        pk = await self.execute(query)
+        if inst._pk is None:
+            inst._pk = pk
         return inst
 
-    @asyncio.coroutine
-    def get_or_create(self, model_, defaults=None, **kwargs):
+    async def get_or_create(self, model_, defaults=None, **kwargs):
         """Try to get an object or create it with the specified defaults.
 
         Return 2-tuple containing the model instance and a boolean
         indicating whether the instance was created.
         """
         try:
-            return (yield from self.get(model_, **kwargs)), False
+            return (await self.get(model_, **kwargs)), False
         except model_.DoesNotExist:
             data = defaults or {}
-            data.update({k: v for k, v in kwargs.items()
-                if not '__' in k})
-            return (yield from self.create(model_, **data)), True
+            data.update({k: v for k, v in kwargs.items() if '__' not in k})
+            return (await self.create(model_, **data)), True
 
-    @asyncio.coroutine
-    def update(self, obj, only=None):
+    async def update(self, obj, only=None):
         """Update the object in the database. Optionally, update only
         the specified fields. For creating a new object use :meth:`.create()`
 
         :param only: (optional) the list/tuple of fields or
                      field names to update
         """
-        field_dict = dict(obj._data)
+        field_dict = dict(obj.__data__)
         pk_field = obj._meta.primary_key
 
         if only:
@@ -225,88 +222,80 @@ class Manager:
             field_dict.pop(pk_field.name, None)
 
         query = obj.update(**field_dict).where(obj._pk_expr())
-        result = yield from self.execute(query)
+        result = await self.execute(query)
         obj._dirty.clear()
         return result
 
-    @asyncio.coroutine
-    def delete(self, obj, recursive=False, delete_nullable=False):
+    async def delete(self, obj, recursive=False, delete_nullable=False):
         """Delete object from database.
         """
         if recursive:
             dependencies = obj.dependencies(delete_nullable)
             for cond, fk in reversed(list(dependencies)):
-                model = fk.model_class
+                model = fk.model
                 if fk.null and not delete_nullable:
                     sq = model.update(**{fk.name: None}).where(cond)
                 else:
                     sq = model.delete().where(cond)
-                yield from self.execute(sq)
+                await self.execute(sq)
 
         query = obj.delete().where(obj._pk_expr())
-        return (yield from self.execute(query))
+        return (await self.execute(query))
 
-    @asyncio.coroutine
-    def create_or_get(self, model_, **kwargs):
+    async def create_or_get(self, model_, **kwargs):
         """Try to create new object with specified data. If object already
         exists, then try to get it by unique fields.
         """
         try:
-            return (yield from self.create(model_, **kwargs)), True
+            return (await self.create(model_, **kwargs)), True
         except peewee.IntegrityError:
             query = []
             for field_name, value in kwargs.items():
                 field = getattr(model_, field_name)
                 if field.unique or field.primary_key:
                     query.append(field == value)
-            return (yield from self.get(model_, *query)), False
+            return (await self.get(model_, *query)), False
 
-    @asyncio.coroutine
-    def execute(self, query):
+    async def execute(self, query):
         """Execute query asyncronously.
         """
         query = self._swap_database(query)
-        return (yield from execute(query))
+        return (await execute(query))
 
-    @asyncio.coroutine
-    def prefetch(self, query, *subqueries):
+    async def prefetch(self, query, *subqueries):
         """Asynchronous version of the `prefetch()` from peewee.
 
         :return: Query that has already cached data for subqueries
         """
         query = self._swap_database(query)
         subqueries = map(self._swap_database, subqueries)
-        return (yield from prefetch(query, *subqueries))
+        return (await prefetch(query, *subqueries))
 
-    @asyncio.coroutine
-    def count(self, query, clear_limit=False):
+    async def count(self, query, clear_limit=False):
         """Perform *COUNT* aggregated query asynchronously.
 
         :return: number of objects in ``select()`` query
         """
         query = self._swap_database(query)
-        return (yield from count(query, clear_limit=clear_limit))
+        return (await count(query, clear_limit=clear_limit))
 
-    @asyncio.coroutine
-    def scalar(self, query, as_tuple=False):
+    async def scalar(self, query, as_tuple=False):
         """Get single value from ``select()`` query, i.e. for aggregation.
 
         :return: result is the same as after sync ``query.scalar()`` call
         """
         query = self._swap_database(query)
-        return (yield from scalar(query, as_tuple=as_tuple))
+        return (await scalar(query, as_tuple=as_tuple))
 
-    @asyncio.coroutine
-    def connect(self):
+    async def connect(self):
         """Open database async connection if not connected.
         """
-        yield from self.database.connect_async(loop=self.loop)
+        await self.database.connect_async(loop=self.loop)
 
-    @asyncio.coroutine
-    def close(self):
+    async def close(self):
         """Close database async connection if connected.
         """
-        yield from self.database.close_async()
+        await self.database.close_async()
 
     def atomic(self):
         """Similar to `peewee.Database.atomic()` method, but returns
@@ -358,14 +347,15 @@ class Manager:
         The essential limitation though is that database backend have
         to be **the same type** for model and manager!
         """
-        if query.database == self.database:
+        database = _query_db(query)
+
+        if database == self.database:
             return query
-        elif self._subclassed(peewee.PostgresqlDatabase,
-                              query.database,
-                              self.database):
+
+        if self._subclassed(peewee.PostgresqlDatabase, database,
+                            self.database):
             can_swap = True
-        elif self._subclassed(peewee.MySQLDatabase,
-                              query.database,
+        elif self._subclassed(peewee.MySQLDatabase, database,
                               self.database):
             can_swap = True
         else:
@@ -374,15 +364,15 @@ class Manager:
         if can_swap:
             # **Experimental** database swapping!
             query = query.clone()
-            query.database = self.database
+            query._database = self.database
             return query
-        else:
-            assert False, (
-                "Error, query's database and manager's database are "
-                "different. Query: %s Manager: %s" % (
-                    query.database, self.database
-                )
-            )
+
+        assert False, (
+            "Error, query's database and manager's database are "
+            "different. Query: %s Manager: %s" % (database, self.database)
+        )
+
+        return None
 
     @staticmethod
     def _subclassed(base, *classes):
@@ -401,7 +391,7 @@ class Manager:
         """
         fields = [(isinstance(f, str) and f or f.name) for f in only]
         for f in list(field_dict.keys()):
-            if not f in fields:
+            if f not in fields:
                 field_dict.pop(f)
         return field_dict
 
@@ -411,32 +401,31 @@ class Manager:
 #################
 
 
-@asyncio.coroutine
-def execute(query):
+async def execute(query):
     """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
     :param query: peewee query instance created with ``Model.select()``,
                   ``Model.update()`` etc.
-    :return: result depends on query type, it's the same as for sync ``query.execute()``
+    :return: result depends on query type, it's the same as for sync
+        ``query.execute()``
     """
-    if isinstance(query, peewee.SelectQuery):
+    if isinstance(query, peewee.Select):
         coroutine = select
-    elif isinstance(query, peewee.UpdateQuery):
+    elif isinstance(query, peewee.Update):
         coroutine = update
-    elif isinstance(query, peewee.InsertQuery):
+    elif isinstance(query, peewee.Insert):
         coroutine = insert
-    elif isinstance(query, peewee.DeleteQuery):
+    elif isinstance(query, peewee.Delete):
         coroutine = delete
     else:
         coroutine = raw_query
 
-    return (yield from coroutine(query))
+    return (await coroutine(query))
 
 
-@asyncio.coroutine
-def create_object(model, **data):
+async def create_object(model, **data):
     """Create object asynchronously.
-    
+
     :param model: mode class
     :param data: data for initializing object
     :return: new object saved to database
@@ -454,24 +443,20 @@ def create_object(model, **data):
 
     obj = model(**data)
 
-    pk = yield from insert(model.insert(**dict(obj._data)))
+    pk = await insert(model.insert(**dict(obj.__data__)))
 
-    if pk is None:
-        pk = obj._get_pk_value()
-    obj._set_pk_value(pk)
-    
-    obj._prepare_instance()
-
+    if obj._pk is None:
+        obj._pk = pk
     return obj
 
 
-@asyncio.coroutine
-def get_object(source, *args):
+async def get_object(source, *args):
     """Get object asynchronously.
 
     :param source: mode class or query to get object from
     :param args: lookup parameters
-    :return: model instance or raises ``peewee.DoesNotExist`` if object not found
+    :return: model instance or raises ``peewee.DoesNotExist`` if object not
+        found
     """
     warnings.warn("get_object() is deprecated, Manager.get() "
                   "should be used instead",
@@ -479,30 +464,32 @@ def get_object(source, *args):
 
     if isinstance(source, peewee.Query):
         query = source
-        model = query.model_class
+        model = query.model
     else:
         query = source.select()
         model = source
 
     # Return first object from query
-    for obj in (yield from select(query.where(*args))):
+    for obj in (await select(query.where(*args))):
         return obj
 
     # No objects found
     raise model.DoesNotExist
 
 
-@asyncio.coroutine
-def delete_object(obj, recursive=False, delete_nullable=False):
+async def delete_object(obj, recursive=False, delete_nullable=False):
     """Delete object asynchronously.
 
     :param obj: object to delete
-    :param recursive: if ``True`` also delete all other objects depends on object
-    :param delete_nullable: if `True` and delete is recursive then delete even 'nullable' dependencies
+    :param recursive: if ``True`` also delete all other objects depends on
+        object
+    :param delete_nullable: if `True` and delete is recursive then delete even
+        'nullable' dependencies
 
     For details please check out `Model.delete_instance()`_ in peewee docs.
 
-    .. _Model.delete_instance(): http://peewee.readthedocs.io/en/latest/peewee/api.html#Model.delete_instance
+    .. _Model.delete_instance(): http://peewee.readthedocs.io/en/latest/peewee/
+        api.html#Model.delete_instance
     """
     warnings.warn("delete_object() is deprecated, Manager.delete() "
                   "should be used instead",
@@ -513,27 +500,28 @@ def delete_object(obj, recursive=False, delete_nullable=False):
     if recursive:
         dependencies = obj.dependencies(delete_nullable)
         for query, fk in reversed(list(dependencies)):
-            model = fk.model_class
+            model = fk.model
             if fk.null and not delete_nullable:
-                yield from update(model.update(**{fk.name: None}).where(query))
+                await update(model.update(**{fk.name: None}).where(query))
             else:
-                yield from delete(model.delete().where(query))
-    result = yield from delete(obj.delete().where(obj._pk_expr()))
+                await delete(model.delete().where(query))
+    result = await delete(obj.delete().where(obj._pk_expr()))
     return result
 
 
-@asyncio.coroutine
-def update_object(obj, only=None):
+async def update_object(obj, only=None):
     """Update object asynchronously.
 
     :param obj: object to update
-    :param only: list or tuple of fields to updata, is `None` then all fields updated
+    :param only: list or tuple of fields to updata, is `None` then all fields
+        updated
 
-    This function does the same as `Model.save()`_ for already saved object, but it
-    doesn't invoke ``save()`` method on model class. That is important to know if you
-    overrided save method for your model.
+    This function does the same as `Model.save()`_ for already saved object,
+        but it doesn't invoke ``save()`` method on model class. That is
+        important to know if you overrided save method for your model.
 
-    .. _Model.save(): http://peewee.readthedocs.io/en/latest/peewee/api.html#Model.save
+    .. _Model.save(): http://peewee.readthedocs.io/en/latest/peewee/
+        api.html#Model.save
     """
     # Here are private calls involved:
     #
@@ -547,7 +535,7 @@ def update_object(obj, only=None):
                   "should be used instead",
                   DeprecationWarning)
 
-    field_dict = dict(obj._data)
+    field_dict = dict(obj.__data__)
     pk_field = obj._meta.primary_key
 
     if only:
@@ -557,125 +545,116 @@ def update_object(obj, only=None):
         field_dict.pop(pk_field.name, None)
     else:
         field_dict = obj._prune_fields(field_dict, obj.dirty_fields)
-    rows = yield from update(obj.update(**field_dict).where(obj._pk_expr()))
+    rows = await update(obj.update(**field_dict).where(obj._pk_expr()))
 
     obj._dirty.clear()
     return rows
 
 
-@asyncio.coroutine
-def select(query):
+async def select(query):
     """Perform SELECT query asynchronously.
     """
     assert isinstance(query, peewee.SelectQuery),\
         ("Error, trying to run select coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from _execute_query_async(query)
+    cursor = await _execute_query_async(query)
 
     result = AsyncQueryWrapper(cursor=cursor, query=query)
 
     try:
         while True:
-            yield from result.fetchone()
+            await result.fetchone()
     except GeneratorExit:
         pass
     finally:
-        yield from cursor.release
+        await cursor.release()
 
     return result
 
 
-@asyncio.coroutine
-def insert(query):
+async def insert(query):
     """Perform INSERT query asynchronously. Returns last insert ID.
+    This function is called by object.create for single objects only.
     """
-    assert isinstance(query, peewee.InsertQuery),\
+    assert isinstance(query, peewee.Insert),\
         ("Error, trying to run insert coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from _execute_query_async(query)
+    cursor = await _execute_query_async(query)
 
     try:
-        if query.is_insert_returning:
-            if query._return_id_list:
-                result = map(lambda x: x[0], (yield from cursor.fetchall()))
-            else:
-                result = (yield from cursor.fetchone())[0]
+        if query._returning:
+            row = await cursor.fetchone()
+            result = row[0]
         else:
-            result = yield from query.database.last_insert_id_async(
-                cursor, query.model_class)
+            database = _query_db(query)
+            last_id = await database.last_insert_id_async(cursor)
+            result = last_id
     finally:
-        yield from cursor.release
+        await cursor.release()
 
     return result
 
 
-@asyncio.coroutine
-def update(query):
+async def update(query):
     """Perform UPDATE query asynchronously. Returns number of rows updated.
     """
-    assert isinstance(query, peewee.UpdateQuery),\
+    assert isinstance(query, peewee.Update),\
         ("Error, trying to run update coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from _execute_query_async(query)
+    cursor = await _execute_query_async(query)
     rowcount = cursor.rowcount
 
-    yield from cursor.release
+    await cursor.release()
     return rowcount
 
 
-@asyncio.coroutine
-def delete(query):
+async def delete(query):
     """Perform DELETE query asynchronously. Returns number of rows deleted.
     """
-    assert isinstance(query, peewee.DeleteQuery),\
+    assert isinstance(query, peewee.Delete),\
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from _execute_query_async(query)
+    cursor = await _execute_query_async(query)
     rowcount = cursor.rowcount
 
-    yield from cursor.release
+    await cursor.release()
     return rowcount
 
 
-@asyncio.coroutine
-def count(query, clear_limit=False):
+async def count(query, clear_limit=False):
     """Perform *COUNT* aggregated query asynchronously.
 
     :return: number of objects in ``select()`` query
     """
+    clone = query.clone()
     if query._distinct or query._group_by or query._limit or query._offset:
-        # wrapped_count()
-        clone = query.order_by()
         if clear_limit:
             clone._limit = clone._offset = None
-
         sql, params = clone.sql()
         wrapped = 'SELECT COUNT(1) FROM (%s) AS wrapped_select' % sql
-        raw_query = query.model_class.raw(wrapped, *params)
-        return (yield from scalar(raw_query)) or 0
+        raw = query.model.raw(wrapped, *params)
+        return (await scalar(raw)) or 0
     else:
-        # simple count()
-        query = query.order_by()
-        query._select = [peewee.fn.Count(peewee.SQL('*'))]
-        return (yield from scalar(query)) or 0
+        clone._returning = [peewee.fn.Count(peewee.SQL('*'))]
+        clone._order_by = None
+        return (await scalar(clone)) or 0
 
 
-@asyncio.coroutine
-def scalar(query, as_tuple=False):
+async def scalar(query, as_tuple=False):
     """Get single value from ``select()`` query, i.e. for aggregation.
 
     :return: result is the same as after sync ``query.scalar()`` call
     """
-    cursor = yield from _execute_query_async(query)
+    cursor = await _execute_query_async(query)
 
     try:
-        row = yield from cursor.fetchone()
+        row = await cursor.fetchone()
     finally:
-        yield from cursor.release
+        await cursor.release()
 
     if row and not as_tuple:
         return row[0]
@@ -683,80 +662,62 @@ def scalar(query, as_tuple=False):
         return row
 
 
-@asyncio.coroutine
-def raw_query(query):
+async def raw_query(query):
     assert isinstance(query, peewee.RawQuery),\
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = yield from _execute_query_async(query)
+    cursor = await _execute_query_async(query)
 
-    result = AsyncRawQueryWrapper(cursor=cursor, query=query)
+    result = AsyncQueryWrapper(cursor=cursor, query=query)
     try:
         while True:
-            yield from result.fetchone()
+            await result.fetchone()
     except GeneratorExit:
         pass
     finally:
-        yield from cursor.release
+        await cursor.release()
 
     return result
 
 
-@asyncio.coroutine
-def prefetch(query, *subqueries):
+async def prefetch(sq, *subqueries):
     """Asynchronous version of the `prefetch()` from peewee.
-
-    Returns Query that has already cached data.
     """
-    # This code is copied from peewee.prefetch and adopted
-    # to use async execute. Also it's a bit hacky, consider
-    # it to be experimental!
-
     if not subqueries:
-        return query
+        result = await execute(sq)
+        return result
 
-    fixed_queries = peewee.prefetch_add_subquery(query, subqueries)
-
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
     deps = {}
     rel_map = {}
-    for prefetch_result in reversed(fixed_queries):
-        query_model = prefetch_result.model
-        if prefetch_result.fields:
-            for rel_model in prefetch_result.rel_models:
+
+    for pq in reversed(fixed_queries):
+        query_model = pq.model
+        if pq.fields:
+            for rel_model in pq.rel_models:
                 rel_map.setdefault(rel_model, [])
-                rel_map[rel_model].append(prefetch_result)
+                rel_map[rel_model].append(pq)
 
         deps[query_model] = {}
         id_map = deps[query_model]
         has_relations = bool(rel_map.get(query_model))
 
-        # NOTE! This is hacky, we perform async `execute()` and substitute result
-        # to the initial query:
+        result = await execute(pq.query)
 
-        qr = yield from execute(prefetch_result.query)
-        prefetch_result.query._qr = list(qr)
-        prefetch_result.query._dirty = False
-
-        for instance in prefetch_result.query._qr:
-            if prefetch_result.fields:
-                prefetch_result.store_instance(instance, id_map)
+        for instance in result:
+            if pq.fields:
+                pq.store_instance(instance, id_map)
             if has_relations:
                 for rel in rel_map[query_model]:
                     rel.populate_instance(instance, deps[rel.model])
 
-    return prefetch_result.query
+    return result
 
 
 ###################
 # Result wrappers #
 ###################
-
-RESULTS_NAIVE = peewee.RESULTS_NAIVE
-RESULTS_MODELS = peewee.RESULTS_MODELS
-RESULTS_TUPLES = peewee.RESULTS_TUPLES
-RESULTS_DICTS = peewee.RESULTS_DICTS
-RESULTS_AGGREGATE_MODELS = peewee.RESULTS_AGGREGATE_MODELS
 
 
 class RowsCursor(object):
@@ -789,7 +750,6 @@ class AsyncQueryWrapper:
     instance, like you generally iterate over sync results wrapper.
     """
     def __init__(self, *, cursor=None, query=None):
-        self._initialized = False
         self._cursor = cursor
         self._rows = []
         self._result_cache = None
@@ -811,43 +771,16 @@ class AsyncQueryWrapper:
     def _get_result_wrapper(self, query):
         """Get result wrapper class.
         """
-        db = query.database
-        if query._tuples:
-            QRW = db.get_result_wrapper(RESULTS_TUPLES)
-        elif query._dicts:
-            QRW = db.get_result_wrapper(RESULTS_DICTS)
-        elif query._naive or not query._joins or query.verify_naive():
-            QRW = db.get_result_wrapper(RESULTS_NAIVE)
-        elif query._aggregate_rows:
-            QRW = db.get_result_wrapper(RESULTS_AGGREGATE_MODELS)
-        else:
-            QRW = db.get_result_wrapper(RESULTS_MODELS)
-
         cursor = RowsCursor(self._rows, self._cursor.description)
-        return QRW(query.model_class, cursor, query.get_query_meta())
+        return query._get_cursor_wrapper(cursor)
 
-    @asyncio.coroutine
-    def fetchone(self):
-        row = yield from self._cursor.fetchone()
+    async def fetchone(self):
+        """Fetch single row from the cursor.
+        """
+        row = await self._cursor.fetchone()
         if not row:
             raise GeneratorExit
         self._rows.append(row)
-
-
-class AsyncRawQueryWrapper(AsyncQueryWrapper):
-    def _get_result_wrapper(self, query):
-        """Get raw query result wrapper class.
-        """
-        db = query.database
-        if query._tuples:
-            QRW = db.get_result_wrapper(RESULTS_TUPLES)
-        elif query._dicts:
-            QRW = db.get_result_wrapper(RESULTS_DICTS)
-        else:
-            QRW = db.get_result_wrapper(RESULTS_NAIVE)
-
-        cursor = RowsCursor(self._rows, self._cursor.description)
-        return QRW(query.model_class, cursor, None)
 
 
 ############
@@ -855,11 +788,11 @@ class AsyncRawQueryWrapper(AsyncQueryWrapper):
 ############
 
 class AsyncDatabase:
-    _loop = None        # asyncio event loop
+    _loop = None  # asyncio event loop
     _allow_sync = True  # whether sync queries are allowed
     _async_conn = None  # async connection
     _async_wait = None  # connection waiter
-    _task_data = None   # asyncio per-task data
+    _task_data = None  # asyncio per-task data
 
     def __setattr__(self, name, value):
         if name == 'allow_sync':
@@ -880,8 +813,7 @@ class AsyncDatabase:
         """
         return self._loop or asyncio.get_event_loop()
 
-    @asyncio.coroutine
-    def connect_async(self, loop=None, timeout=None):
+    async def connect_async(self, loop=None, timeout=None):
         """Set up async connection on specified event loop or
         on default event loop.
         """
@@ -892,24 +824,25 @@ class AsyncDatabase:
         if self._async_conn:
             return
         elif self._async_wait:
-            yield from self._async_wait
+            await self._async_wait
         else:
             self._loop = loop
             self._async_wait = asyncio.Future(loop=self._loop)
 
-            connect_kwargs = self.connect_kwargs_async
-            timeout = connect_kwargs.pop('timeout', timeout)
+            connect_params = self.connect_params_async
+            timeout = connect_params.pop('timeout', timeout)
 
             conn = self._async_conn_cls(
                 database=self.database,
                 loop=self._loop,
                 timeout=timeout,
-                **connect_kwargs)
+                **connect_params)
 
             try:
-                yield from conn.connect()
-            except:
-                self._async_wait.cancel()
+                await conn.connect()
+            except Exception as e:
+                if not self._async_wait.done():
+                    self._async_wait.set_exception(e)
                 self._async_wait = None
                 raise
             else:
@@ -917,11 +850,10 @@ class AsyncDatabase:
                 self._async_conn = conn
                 self._async_wait.set_result(True)
 
-    @asyncio.coroutine
-    def cursor_async(self):
+    async def cursor_async(self):
         """Acquire async cursor.
         """
-        yield from self.connect_async(loop=self._loop)
+        await self.connect_async(loop=self._loop)
 
         if self.transaction_depth_async() > 0:
             conn = self.transaction_conn_async()
@@ -929,37 +861,34 @@ class AsyncDatabase:
             conn = None
 
         try:
-            return (yield from self._async_conn.cursor(conn=conn))
+            return (await self._async_conn.cursor(conn=conn))
         except:
-            yield from self.close_async()
+            await self.close_async()
             raise
 
-    @asyncio.coroutine
-    def close_async(self):
+    async def close_async(self):
         """Close async connection.
         """
         if self._async_wait:
-            yield from self._async_wait
+            await self._async_wait
         if self._async_conn:
             conn = self._async_conn
             self._async_conn = None
             self._async_wait = None
             self._task_data = None
-            yield from conn.close()
+            await conn.close()
 
-    @asyncio.coroutine
-    def push_transaction_async(self):
+    async def push_transaction_async(self):
         """Increment async transaction depth.
         """
-        yield from self.connect_async(loop=self.loop)
+        await self.connect_async(loop=self.loop)
         depth = self.transaction_depth_async()
         if not depth:
-            conn = yield from self._async_conn.acquire()
+            conn = await self._async_conn.acquire()
             self._task_data.set('conn', conn)
         self._task_data.set('depth', depth + 1)
 
-    @asyncio.coroutine
-    def pop_transaction_async(self):
+    async def pop_transaction_async(self):
         """Decrement async transaction depth.
         """
         depth = self.transaction_depth_async()
@@ -1027,7 +956,7 @@ class AsyncDatabase:
             try:
                 self.close()
             except self.Error:
-                pass # already closed
+                pass  # already closed
 
         self._allow_sync = old_allow_sync
 
@@ -1057,52 +986,47 @@ class AsyncPostgresqlConnection:
         self.loop = loop
         self.database = database
         self.timeout = timeout or aiopg.DEFAULT_TIMEOUT
-        self.connect_kwargs = kwargs
+        self.connect_params = kwargs
 
-    @asyncio.coroutine
-    def acquire(self):
+    async def acquire(self):
         """Acquire connection from pool.
         """
-        return (yield from self.pool.acquire())
+        return (await self.pool.acquire())
 
     def release(self, conn):
         """Release connection to pool.
         """
         self.pool.release(conn)
 
-    @asyncio.coroutine
-    def connect(self):
+    async def connect(self):
         """Create connection pool asynchronously.
         """
-        self.pool = yield from aiopg.create_pool(
+        self.pool = await aiopg.create_pool(
             loop=self.loop,
             timeout=self.timeout,
             database=self.database,
-            **self.connect_kwargs)
+            **self.connect_params)
 
-    @asyncio.coroutine
-    def close(self):
+    async def close(self):
         """Terminate all pool connections.
         """
         self.pool.terminate()
-        yield from self.pool.wait_closed()
+        await self.pool.wait_closed()
 
-    @asyncio.coroutine
-    def cursor(self, conn=None, *args, **kwargs):
+    async def cursor(self, conn=None, *args, **kwargs):
         """Get a cursor for the specified transaction connection
         or acquire from the pool.
         """
         in_transaction = conn is not None
         if not conn:
-            conn = yield from self.acquire()
-        cursor = yield from conn.cursor(*args, **kwargs)
-        # NOTE: `cursor.release` is an awaitable object!
-        cursor.release = self.release_cursor(
-            cursor, in_transaction=in_transaction)
+            conn = await self.acquire()
+        cursor = await conn.cursor(*args, **kwargs)
+        cursor.release = functools.partial(
+            self.release_cursor, cursor,
+            in_transaction=in_transaction)
         return cursor
 
-    @asyncio.coroutine
-    def release_cursor(self, cursor, in_transaction=False):
+    async def release_cursor(self, cursor, in_transaction=False):
         """Release cursor coroutine. Unless in transaction,
         the connection is also released back to the pool.
         """
@@ -1129,10 +1053,10 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         self._enable_hstore = enable_hstore
 
     @property
-    def connect_kwargs_async(self):
+    def connect_params_async(self):
         """Connection parameters for `aiopg.Connection`
         """
-        kwargs = self.connect_kwargs.copy()
+        kwargs = self.connect_params.copy()
         kwargs.update({
             'minsize': self.min_connections,
             'maxsize': self.max_connections,
@@ -1141,29 +1065,16 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         })
         return kwargs
 
-    @asyncio.coroutine
-    def last_insert_id_async(self, cursor, model):
+    async def last_insert_id_async(self, cursor):
         """Get ID of last inserted row.
 
-        NOTE: it's a copy-paste, not sure how to make it better
-        https://github.com/05bit/peewee/blob/2.3.2/peewee.py#L2907
+        NOTE: it's not clear, when this code is executed?
         """
-        meta = model._meta
-        schema = ''
-        if meta.schema:
-            schema = '%s.' % meta.schema
-
-        if meta.primary_key.sequence:
-            seq = meta.primary_key.sequence
-        elif meta.auto_increment:
-            seq = '%s_%s_seq' % (meta.db_table, meta.primary_key.db_column)
-        else:
-            seq = None
-
-        if seq:
-            yield from cursor.execute("SELECT CURRVAL('%s\"%s\"')" % (schema, seq))
-            result = (yield from cursor.fetchone())[0]
-            return result
+        # try:
+        #     return cursor if query_type else cursor[0][0]
+        # except (IndexError, KeyError, TypeError):
+        #     pass
+        return cursor.lastrowid
 
 
 class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
@@ -1195,7 +1106,8 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
 register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
 
 
-class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(AsyncPostgresqlMixin,
+                               peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -1223,7 +1135,8 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         pass
 
 
-register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
+register_database(PooledPostgresqlDatabase, 'postgres+pool+async',
+                  'postgresql+pool+async')
 
 
 #########
@@ -1239,56 +1152,51 @@ class AsyncMySQLConnection:
         self.loop = loop
         self.database = database
         self.timeout = timeout
-        self.connect_kwargs = kwargs
+        self.connect_params = kwargs
 
-    @asyncio.coroutine
-    def acquire(self):
+    async def acquire(self):
         """Acquire connection from pool.
         """
-        return (yield from self.pool.acquire())
+        return (await self.pool.acquire())
 
     def release(self, conn):
         """Release connection to pool.
         """
         self.pool.release(conn)
 
-    @asyncio.coroutine
-    def connect(self):
+    async def connect(self):
         """Create connection pool asynchronously.
         """
-        self.pool = yield from aiomysql.create_pool(
+        self.pool = await aiomysql.create_pool(
             loop=self.loop,
             db=self.database,
             connect_timeout=self.timeout,
-            **self.connect_kwargs)
+            **self.connect_params)
 
-    @asyncio.coroutine
-    def close(self):
+    async def close(self):
         """Terminate all pool connections.
         """
         self.pool.terminate()
-        yield from self.pool.wait_closed()
+        await self.pool.wait_closed()
 
-    @asyncio.coroutine
-    def cursor(self, conn=None, *args, **kwargs):
+    async def cursor(self, conn=None, *args, **kwargs):
         """Get cursor for connection from pool.
         """
         in_transaction = conn is not None
         if not conn:
-            conn = yield from self.acquire()
-        cursor = yield from conn.cursor(*args, **kwargs)
-        # NOTE: `cursor.release` is an awaitable object!
-        cursor.release = self.release_cursor(
-            cursor, in_transaction=in_transaction)
+            conn = await self.acquire()
+        cursor = await conn.cursor(*args, **kwargs)
+        cursor.release = functools.partial(
+            self.release_cursor, cursor,
+            in_transaction=in_transaction)
         return cursor
 
-    @asyncio.coroutine
-    def release_cursor(self, cursor, in_transaction=False):
+    async def release_cursor(self, cursor, in_transaction=False):
         """Release cursor coroutine. Unless in transaction,
         the connection is also released back to the pool.
         """
         conn = cursor.connection
-        yield from cursor.close()
+        await cursor.close()
         if not in_transaction:
             self.release(conn)
 
@@ -1317,10 +1225,10 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         super().init(database, **kwargs)
 
     @property
-    def connect_kwargs_async(self):
+    def connect_params_async(self):
         """Connection parameters for `aiomysql.Connection`
         """
-        kwargs = self.connect_kwargs.copy()
+        kwargs = self.connect_params.copy()
         kwargs.update({
             'minsize': self.min_connections,
             'maxsize': self.max_connections,
@@ -1328,12 +1236,10 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         })
         return kwargs
 
-    @asyncio.coroutine
-    def last_insert_id_async(self, cursor, model):
+    async def last_insert_id_async(self, cursor):
         """Get ID of last inserted row.
         """
-        if model._meta.auto_increment:
-            return cursor.lastrowid
+        return cursor.lastrowid
 
     @property
     def use_speedups(self):
@@ -1420,43 +1326,39 @@ class transaction:
         self.db = db
         self.loop = db.loop
 
-    @asyncio.coroutine
-    def commit(self, begin=True):
-        yield from _run_no_result_sql(self.db, 'COMMIT')
+    async def commit(self, begin=True):
+        await _run_no_result_sql(self.db, 'COMMIT')
         if begin:
-            yield from _run_no_result_sql(self.db, 'BEGIN')
+            await _run_no_result_sql(self.db, 'BEGIN')
 
-    @asyncio.coroutine
-    def rollback(self, begin=True):
-        yield from _run_no_result_sql(self.db, 'ROLLBACK')
+    async def rollback(self, begin=True):
+        await _run_no_result_sql(self.db, 'ROLLBACK')
         if begin:
-            yield from _run_no_result_sql(self.db, 'BEGIN')
+            await _run_no_result_sql(self.db, 'BEGIN')
 
-    @asyncio.coroutine
-    def __aenter__(self):
-        if not asyncio.Task.current_task(loop=self.loop):
+    async def __aenter__(self):
+        if not asyncio_current_task(loop=self.loop):
             raise RuntimeError("The transaction must run within a task")
-        yield from self.db.push_transaction_async()
+        await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
-            yield from _run_no_result_sql(self.db, 'BEGIN')
+            await _run_no_result_sql(self.db, 'BEGIN')
         return self
 
-    @asyncio.coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         try:
             if exc_type:
-                yield from self.rollback(False)
+                await self.rollback(False)
             elif self.db.transaction_depth_async() == 1:
                 try:
-                    yield from self.commit(False)
+                    await self.commit(False)
                 except:
-                    yield from self.rollback(False)
+                    await self.rollback(False)
                     raise
         finally:
             # transaction depth may be zero if database gone
             depth = self.db.transaction_depth_async()
             if depth > 0:
-                yield from self.db.pop_transaction_async()
+                await self.db.pop_transaction_async()
 
 
 class savepoint:
@@ -1466,31 +1368,30 @@ class savepoint:
     def __init__(self, db, sid=None):
         self.db = db
         self.sid = sid or 's' + uuid.uuid4().hex
-        self.quoted_sid = db.compiler().quote(self.sid)
+        self.quoted_sid = self.sid.join(self.db.quote)
 
-    @asyncio.coroutine
-    def commit(self):
-        yield from _run_no_result_sql(self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
+    async def commit(self):
+        await _run_no_result_sql(
+            self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
 
-    @asyncio.coroutine
-    def rollback(self):
-        yield from _run_no_result_sql(self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+    async def rollback(self):
+        await _run_no_result_sql(
+            self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
 
-    @asyncio.coroutine
-    def __aenter__(self):
-        yield from _run_no_result_sql(self.db, 'SAVEPOINT %s;' % self.quoted_sid)
+    async def __aenter__(self):
+        await _run_no_result_sql(
+            self.db, 'SAVEPOINT %s;' % self.quoted_sid)
         return self
 
-    @asyncio.coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         try:
             if exc_type:
-                yield from self.rollback()
+                await self.rollback()
             else:
                 try:
-                    yield from self.commit()
+                    await self.commit()
                 except:
-                    yield from self.rollback()
+                    await self.rollback()
                     raise
         finally:
             pass
@@ -1503,62 +1404,56 @@ class atomic:
     def __init__(self, db):
         self.db = db
 
-    @asyncio.coroutine
-    def __aenter__(self):
+    async def __aenter__(self):
         if self.db.transaction_depth_async() > 0:
             self._ctx = self.db.savepoint_async()
         else:
             self._ctx = self.db.transaction_async()
-        return (yield from self._ctx.__aenter__())
+        return (await self._ctx.__aenter__())
 
-    @asyncio.coroutine
-    def __aexit__(self, exc_type, exc_val, exc_tb):
-        yield from self._ctx.__aexit__(exc_type, exc_val, exc_tb)
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self._ctx.__aexit__(exc_type, exc_val, exc_tb)
 
 
 ####################
 # Internal helpers #
 ####################
 
-def _get_exception_wrapper(database):
-    """Get peewee exceptions context manager for database
-    in backward compatible manner.
+
+def _query_db(query):
+    """Get database instance bound to query. This helper
+    incapsulates internal peewee's access to database.
     """
-    if isinstance(database.exception_wrapper, peewee.ExceptionWrapper):
-        return database.exception_wrapper
-    else:
-        return database.exception_wrapper()
+    return query._database
 
 
-@asyncio.coroutine
-def _run_sql(database, operation, *args, **kwargs):
+async def _run_sql(database, operation, *args, **kwargs):
     """Run SQL operation (query or command) against database.
     """
-    logger.debug((operation, args, kwargs))
+    __log__.debug((operation, args, kwargs))
 
-    with _get_exception_wrapper(database):
-        cursor = yield from database.cursor_async()
+    with peewee.__exception_wrapper__:
+        cursor = await database.cursor_async()
 
         try:
-            yield from cursor.execute(operation, *args, **kwargs)
+            await cursor.execute(operation, *args, **kwargs)
         except:
-            yield from cursor.release
+            await cursor.release()
             raise
 
         return cursor
 
 
-@asyncio.coroutine
-def _run_no_result_sql(database, operation, *args, **kwargs):
-    cursor = yield from _run_sql(database, operation, *args, **kwargs)
-    yield from cursor.release
+async def _run_no_result_sql(database, operation, *args, **kwargs):
+    cursor = await _run_sql(database, operation, *args, **kwargs)
+    await cursor.release()
 
 
-@asyncio.coroutine
-def _execute_query_async(query):
+async def _execute_query_async(query):
     """Execute query and return cursor object.
     """
-    return (yield from _run_sql(query.database, *query.sql()))
+    database = _query_db(query)
+    return (await _run_sql(database, *query.sql()))
 
 
 class TaskLocals:
@@ -1570,7 +1465,7 @@ class TaskLocals:
     you would to for `dict` but values will be get and set in the context
     of currently running `asyncio` task.
 
-    When task is done, all saved values is removed from stored data.
+    When task is done, all saved values are removed from stored data.
     """
     def __init__(self, loop):
         self.loop = loop
@@ -1584,10 +1479,9 @@ class TaskLocals:
         data = self.get_data()
         if data is not None:
             return data.get(key, *val)
-        elif len(val):
+        if val:
             return val[0]
-        else:
-            raise KeyError(key)
+        raise KeyError(key)
 
     def set(self, key, val):
         """Set value stored for current running task.
@@ -1606,13 +1500,14 @@ class TaskLocals:
         :param create: if argument is `True`, create empty dict
                        for task, default: `False`
         """
-        task = asyncio.Task.current_task(loop=self.loop)
+        task = asyncio_current_task(loop=self.loop)
         if task:
             task_id = id(task)
-            if create and not task_id in self.data:
+            if create and task_id not in self.data:
                 self.data[task_id] = {}
                 task.add_done_callback(self.del_data)
             return self.data.get(task_id)
+        return None
 
     def del_data(self, task):
         """Delete data for task from stored data dict.
