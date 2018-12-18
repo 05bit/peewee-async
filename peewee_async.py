@@ -409,7 +409,7 @@ async def execute(query):
     :return: result depends on query type, it's the same as for sync
         ``query.execute()``
     """
-    if isinstance(query, [peewee.Select, peewee.ModelCompoundSelectQuery]):
+    if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
         coroutine = select
     elif isinstance(query, peewee.Update):
         coroutine = update
