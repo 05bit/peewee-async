@@ -37,7 +37,7 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = '0.6.0a'
+__version__ = '0.6.1a'
 
 __all__ = [
     # High level API ###
@@ -409,7 +409,7 @@ async def execute(query):
     :return: result depends on query type, it's the same as for sync
         ``query.execute()``
     """
-    if isinstance(query, peewee.Select):
+    if isinstance(query, [peewee.Select, peewee.ModelCompoundSelectQuery]):
         coroutine = select
     elif isinstance(query, peewee.Update):
         coroutine = update
@@ -664,7 +664,7 @@ async def scalar(query, as_tuple=False):
 
 async def raw_query(query):
     assert isinstance(query, peewee.RawQuery),\
-        ("Error, trying to run delete coroutine"
+        ("Error, trying to run raw_query coroutine"
          "with wrong query class %s" % str(query))
 
     cursor = await _execute_query_async(query)
