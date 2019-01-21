@@ -194,6 +194,10 @@ class CompositeTestModel(peewee.Model):
         primary_key = peewee.CompositeKey('uuid', 'alpha')
 
 
+class TestModelWithoutDatabase(peewee.Model):
+    text = peewee.CharField()
+
+
 ####################
 # Base tests class #
 ####################
@@ -787,6 +791,13 @@ class ManagerTestCase(BaseManagerTestCase):
                                         uuid=obj_uuid,
                                         alpha=obj_alpha)
             self.assertEqual((obj_uuid, obj_alpha), comp.get_id())
+        self.run_with_managers(test)
+
+    def test_query_with_only_manager_database(self):
+        async def test(objects):
+            await objects.create(TestModelWithoutDatabase, text='NO-DB')
+            count = await objects.count(TestModelWithoutDatabase.select())
+            self.assertEqual(count, 1)
         self.run_with_managers(test)
 
 
