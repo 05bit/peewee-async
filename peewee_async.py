@@ -352,8 +352,13 @@ class Manager:
         if database == self.database:
             return query
 
-        if self._subclassed(peewee.PostgresqlDatabase, database,
-                            self.database):
+        if not database and self.database:
+            # If database is not set on the Model, but it is set on
+            # the Manager, we can swap the database as we asume
+            # that the Manager one is the correct one.
+            can_swap = True
+        elif self._subclassed(peewee.PostgresqlDatabase, database,
+                              self.database):
             can_swap = True
         elif self._subclassed(peewee.MySQLDatabase, database,
                               self.database):
