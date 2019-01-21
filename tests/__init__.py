@@ -795,11 +795,24 @@ class ManagerTestCase(BaseManagerTestCase):
 
     def test_query_with_only_manager_database(self):
         async def test(objects):
+            assert TestModelWithoutDatabase._meta.database is None
             await objects.create(TestModelWithoutDatabase, text='NO-DB')
             count = await objects.count(TestModelWithoutDatabase.select())
             self.assertEqual(count, 1)
-        self.run_with_managers(test)
 
+        for key, objects in self.managers.items():
+            with objects.allow_sync():
+                TestModelWithoutDatabase._meta.database = objects.database
+                TestModelWithoutDatabase.create_table(True)
+                TestModelWithoutDatabase.delete().execute()
+                TestModelWithoutDatabase._meta.database = None
+            with self.manager(objects, allow_sync=False):
+                self.loop.run_until_complete(test(objects))
+
+            with self.manager(objects, allow_sync=True):
+                for model in reversed(self.models):
+                    model.delete().execute()
+            self.run_count += 1
 
 ######################
 # Transactions tests #
