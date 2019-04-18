@@ -22,10 +22,14 @@ import functools
 import peewee
 from playhouse.db_url import register_database
 
+IntegrityErrors = (peewee.IntegrityError,)
+
 try:
     import aiopg
+    import psycopg2
 except ImportError:
     aiopg = None
+    IntegrityErrors += (psycopg2.errors.UniqueViolation,)
 
 try:
     import aiomysql
@@ -37,7 +41,7 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = '0.6.1a'
+__version__ = '0.6.2a'
 
 __all__ = [
     # High level API ###
@@ -248,7 +252,7 @@ class Manager:
         """
         try:
             return (await self.create(model_, **kwargs)), True
-        except peewee.IntegrityError:
+        except IntegrityErrors:
             query = []
             for field_name, value in kwargs.items():
                 field = getattr(model_, field_name)
