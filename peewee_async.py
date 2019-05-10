@@ -27,21 +27,24 @@ IntegrityErrors = (peewee.IntegrityError,)
 try:
     import aiopg
     import psycopg2
+    IntegrityErrors += (psycopg2.errors.UniqueViolation,)
 except ImportError:
     aiopg = None
-    IntegrityErrors += (psycopg2.errors.UniqueViolation,)
+    psycopg2 = None
 
 try:
     import aiomysql
+    import pymysql
 except ImportError:
     aiomysql = None
+    pymysql = None
 
 try:
     asyncio_current_task = asyncio.current_task
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = '0.6.2a'
+__version__ = '0.6.3a'
 
 __all__ = [
     # High level API ###
@@ -1041,8 +1044,7 @@ class AsyncPostgresqlMixin(AsyncDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
-    if aiopg:
-        import psycopg2
+    if psycopg2:
         Error = psycopg2.Error
 
     def init_async(self, conn_cls=AsyncPostgresqlConnection,
@@ -1213,8 +1215,7 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
-    if aiomysql:
-        import pymysql
+    if pymysql:
         Error = pymysql.Error
 
     def init(self, database, **kwargs):
