@@ -182,6 +182,26 @@ class Manager:
         except IndexError:
             raise model.DoesNotExist
 
+    async def get_or_none(self, source_, *args, **kwargs):
+        await self.connect()
+
+        if isinstance(source_, peewee.Query):
+            query = source_
+            model = query.model
+        else:
+            query = source_.select()
+            model = source_
+
+        conditions = list(args) + [(getattr(model, k) == v)
+                                   for k, v in kwargs.items()]
+
+        if conditions:
+            query = query.where(*conditions)
+
+        result = await self.execute(query)
+        result = list(result)
+        return result[0] if result else None
+
     async def create(self, model_, **data):
         """Create a new object saved to database.
         """
