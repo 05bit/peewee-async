@@ -15,7 +15,7 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 """
 from playhouse.db_url import register_database
 from playhouse import postgres_ext as ext
-from peewee_async import AsyncPostgresqlMixin
+from peewee_async import AsyncPostgresqlMixin, aiopg
 
 
 class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
@@ -75,6 +75,7 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin,
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
+        self._timeout = kwargs.pop('connection_timeout', aiopg.DEFAULT_TIMEOUT)
         super().init(database, **kwargs)
         self.init_async(enable_json=True,
                         enable_hstore=self._register_hstore)

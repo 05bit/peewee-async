@@ -125,6 +125,7 @@ class Manager:
 
         self.database = database or self.database
         self._loop = loop
+        self._timeout = getattr(database, 'timeout', None)
 
         attach_callback = getattr(self.database, 'attach_callback', None)
         if attach_callback:
@@ -297,7 +298,7 @@ class Manager:
     async def connect(self):
         """Open database async connection if not connected.
         """
-        await self.database.connect_async(loop=self.loop)
+        await self.database.connect_async(loop=self.loop, timeout=self._timeout)
 
     async def close(self):
         """Close database async connection if connected.
@@ -796,6 +797,7 @@ class AsyncQueryWrapper:
 
 class AsyncDatabase:
     _loop = None  # asyncio event loop
+    _timeout = None  # connection timeout
     _allow_sync = True  # whether sync queries are allowed
     _async_conn = None  # async connection
     _async_wait = None  # connection waiter
@@ -835,6 +837,9 @@ class AsyncDatabase:
         else:
             self._loop = loop
             self._async_wait = asyncio.Future(loop=self._loop)
+
+            if not timeout and self._timeout:
+                timeout = self._timeout
 
             conn = self._async_conn_cls(
                 database=self.database,
@@ -1126,6 +1131,7 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin,
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
+        self._timeout = kwargs.pop('connection_timeout', aiopg.DEFAULT_TIMEOUT)
         super().init(database, **kwargs)
         self.init_async()
 
