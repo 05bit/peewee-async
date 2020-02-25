@@ -13,15 +13,15 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
+
+import peewee_async
 
 docs_dir = os.path.dirname(__file__)
 root_dir = os.path.realpath(os.path.join(docs_dir, '..'))
 sys.path.insert(0, root_dir)
 
-import peewee_async
-import peewee_asyncext
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the

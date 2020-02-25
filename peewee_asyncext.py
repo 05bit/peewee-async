@@ -13,8 +13,9 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
-from playhouse.db_url import register_database
 from playhouse import postgres_ext as ext
+from playhouse.db_url import register_database
+
 from peewee_async import AsyncPostgresqlMixin, aiopg
 
 
