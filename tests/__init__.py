@@ -5,15 +5,17 @@ peewee-async tests
 Create tests.ini file to configure tests.
 
 """
-import os
-import sys
-import json
-import logging
 import asyncio
 import contextlib
+import json
+import logging
+import os
+import sys
 import unittest
 import uuid
+
 import peewee
+
 import peewee_async
 import peewee_asyncext
 

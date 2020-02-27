@@ -12,12 +12,16 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2016, Alexey Kinëv <rudy@05bit.com>
 
 """
+import asyncio
+import logging
+
+import peewee
+
+import peewee_async
 # Start example [marker for docs]
 import tornado.web
-import logging
-import peewee
-import asyncio
-import peewee_async
+# Set up Tornado application on asyncio
+from tornado.platform.asyncio import AsyncIOMainLoop
 
 # Set up database and manager
 database = peewee_async.PooledPostgresqlDatabase('test')
@@ -38,8 +42,6 @@ TestNameModel.get_or_create(id=2, defaults={'name': "TestNameModel id=2"})
 TestNameModel.get_or_create(id=3, defaults={'name': "TestNameModel id=3"})
 database.close()
 
-# Set up Tornado application on asyncio
-from tornado.platform.asyncio import AsyncIOMainLoop
 AsyncIOMainLoop().install()
 app = tornado.web.Application(debug=True)
 app.listen(port=8888)
