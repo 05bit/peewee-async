@@ -49,7 +49,7 @@ setup(
     license='MIT',
     zip_safe=False,
     install_requires=(
-        'peewee>=3.5.0',
+        'peewee>=3.5.0,<4.0',
     ),
     extras_require={
         'develop': [

@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.6.0a (latest)
+## 0.7.0 (latest)
+
+- Switching from alpha to main release version number
+- #66 pull request is merged, allow to pass timeout database connection
+
+## 0.6.0a
 
 - #97 pull request is merged, initial implementation of peewee 3.5+ support thanks to @Koos85
 - Dropped support of peewee <= 3.5 and Python <= 3.5
