@@ -788,7 +788,8 @@ class ManagerTestCase(BaseManagerTestCase):
             comp = await objects.create(CompositeTestModel,
                                         uuid=obj_uuid,
                                         alpha=obj_alpha)
-            self.assertEqual((obj_uuid, obj_alpha), comp.get_id())
+            self.assertEqual((obj_uuid, obj_alpha), 
+                             (comp.uuid, comp.alpha))
         self.run_with_managers(test)
 
 
