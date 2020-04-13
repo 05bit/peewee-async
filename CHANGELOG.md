@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.7.0 (latest)
+## 0.7.1 (latest)
+
+- #139 pull request is merged fixing #138, compatibility with newer `psycopg2`
+- test_composite_key() is updated, compatibility with newer `peewee`
+
+## 0.7.0
 
 - Switching from alpha to main release version number
 - #66 pull request is merged, allow to pass timeout database connection
