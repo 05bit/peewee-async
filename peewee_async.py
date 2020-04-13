@@ -28,7 +28,7 @@ IntegrityErrors = (peewee.IntegrityError,)
 try:
     import aiopg
     import psycopg2
-    IntegrityErrors += (psycopg2.errors.UniqueViolation,)
+    IntegrityErrors += (psycopg2.IntegrityError,)
 except ImportError:
     aiopg = None
     psycopg2 = None
