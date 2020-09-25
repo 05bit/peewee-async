@@ -4,6 +4,7 @@
 
 - #139 pull request is merged fixing #138, compatibility with newer `psycopg2`
 - test_composite_key() is updated, compatibility with newer `peewee`
+- #142 pull request is merged: support for UPDATE..RETURNING
 
 ## 0.7.0
 
