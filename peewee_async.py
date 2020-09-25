@@ -418,7 +418,8 @@ async def execute(query):
     :return: result depends on query type, it's the same as for sync
         ``query.execute()``
     """
-    if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
+    if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery))\
+            or (isinstance(query, peewee.Update) and query._returning):
         coroutine = select
     elif isinstance(query, peewee.Update):
         coroutine = update
@@ -563,7 +564,8 @@ async def update_object(obj, only=None):
 async def select(query):
     """Perform SELECT query asynchronously.
     """
-    assert isinstance(query, peewee.SelectQuery),\
+    assert isinstance(query, peewee.SelectQuery)\
+            or (isinstance(query, peewee.Update) and query._returning),\
         ("Error, trying to run select coroutine"
          "with wrong query class %s" % str(query))
 
@@ -612,6 +614,9 @@ async def update(query):
     assert isinstance(query, peewee.Update),\
         ("Error, trying to run update coroutine"
          "with wrong query class %s" % str(query))
+
+    if query._returning:
+        return await select(query)
 
     cursor = await _execute_query_async(query)
     rowcount = cursor.rowcount
