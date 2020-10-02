@@ -496,6 +496,23 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_create_many(self):
+        async def test(objects):
+            text1 = "Test1 %s" % uuid.uuid4()
+            text2 = "Test2 %s" % uuid.uuid4()
+            data = [{'text': text1}, {'text': text2}]
+
+            obj = await objects.create_many(TestModel, data, fields=[TestModel.text])
+
+            obj1 = await objects.get(TestModel, text=text1)
+            obj2 = await objects.get(TestModel, text=text2)
+
+            self.assertTrue(obj is not None)
+            self.assertEqual(obj1.text, text1)
+            self.assertEqual(obj2.text, text2)
+
+        self.run_with_managers(test)
+
     def test_create_or_get(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()

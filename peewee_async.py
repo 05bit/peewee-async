@@ -195,6 +195,12 @@ class Manager:
             inst._pk = pk
         return inst
 
+    async def create_many(self, model_, rows, fields=None):
+        """Create many new objects saved to database.
+        """
+        query = model_.insert_many(rows=rows, fields=fields)
+        return await self.execute(query)
+
     async def get_or_create(self, model_, defaults=None, **kwargs):
         """Try to get an object or create it with the specified defaults.
 
