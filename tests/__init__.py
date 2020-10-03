@@ -31,12 +31,14 @@ DB_DEFAULTS = {
         'host': '127.0.0.1',
         # 'port': 5432,
         'user': 'postgres',
+        'password' : 'mysecretpassword'
     },
     'postgres-ext': {
         'database': 'test',
         'host': '127.0.0.1',
         # 'port': 5432,
         'user': 'postgres',
+        'password' : 'mysecretpassword'
     },
     'postgres-pool': {
         'database': 'test',
@@ -44,6 +46,7 @@ DB_DEFAULTS = {
         # 'port': 5432,
         'user': 'postgres',
         'max_connections': 4,
+        'password' : 'mysecretpassword'
     },
     'postgres-pool-ext': {
         'database': 'test',
@@ -51,18 +54,21 @@ DB_DEFAULTS = {
         # 'port': 5432,
         'user': 'postgres',
         'max_connections': 4,
+        'password' : 'mysecretpassword'
     },
     'mysql': {
         'database': 'test',
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
+        'password' : 'dnflEkdehreh!'
     },
     'mysql-pool': {
         'database': 'test',
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
+        'password' : 'dnflEkdehreh!'
     }
 }
 
@@ -792,6 +798,24 @@ class ManagerTestCase(BaseManagerTestCase):
                              (comp.uuid, comp.alpha))
         self.run_with_managers(test)
 
+
+class MysqlTestCase(BaseManagerTestCase):
+    only = ['mysql', 'mysql-pool']
+
+    def test_create_on_conflict(self):
+        async def test(objects):
+            text1 = "Test %s" % uuid.uuid4()
+            text2 = "Test %s" % uuid.uuid4()
+            obj1 = await objects.create(UUIDTestModel, text=text1)
+            await objects.create_on_conflict_ignore(UUIDTestModel, id=obj1.id,  text=text2)
+            obj2 = await objects.get(UUIDTestModel, id=obj1.id)
+            await objects.create_on_conflict_replace(UUIDTestModel, id=obj1.id,  text=text2)
+            obj3 = await objects.get(UUIDTestModel, id=obj1.id)
+
+            self.assertEqual(obj1.text, obj2.text)
+            self.assertEqual(obj3.text, text2)
+
+        self.run_with_managers(test)
 
 ######################
 # Transactions tests #

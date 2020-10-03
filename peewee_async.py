@@ -195,6 +195,32 @@ class Manager:
             inst._pk = pk
         return inst
 
+    async def create_on_conflict_ignore(self, model_, **data):
+        """Specify IGNORE conflict resolution strategy.
+        Postgresql and SQLite (3.24.0 and newer) not supported as a different syntax. 
+        """
+        inst = model_(**data)
+        query = model_.insert(**dict(inst.__data__)).on_conflict_ignore()
+
+        pk = await self.execute(query)
+        if inst._pk is None:
+            inst._pk = pk
+
+        return inst
+    
+    async def create_on_conflict_replace(self, model_, **data):
+        """Specify REPLACE conflict resolution strategy.
+        Postgresql and SQLite (3.24.0 and newer) not supported as a different syntax. 
+        """
+        inst = model_(**data)
+        query = model_.insert(**dict(inst.__data__)).on_conflict_replace()
+
+        pk = await self.execute(query)
+        if inst._pk is None:
+            inst._pk = pk
+
+        return inst
+    
     async def get_or_create(self, model_, defaults=None, **kwargs):
         """Try to get an object or create it with the specified defaults.
 
