@@ -968,12 +968,11 @@ class AsyncDatabase:
         except:
             raise
         finally:
+            self._allow_sync = old_allow_sync
             try:
                 self.close()
             except self.Error:
                 pass  # already closed
-
-        self._allow_sync = old_allow_sync
 
     def execute_sql(self, *args, **kwargs):
         """Sync execute SQL query, `allow_sync` must be set to True.
