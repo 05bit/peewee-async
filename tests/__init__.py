@@ -487,6 +487,19 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_allow_sync_is_reverted_for_exc(self):
+        async def test(objects):
+            try:
+                with objects.allow_sync():
+                    ununique_text = "ununique_text"
+                    await objects.create(TestModel, text=ununique_text)
+                    await objects.create(TestModel, text=ununique_text)
+            except peewee.IntegrityError:
+                pass
+            self.assertFalse(objects.database._allow_sync)
+
+        self.run_with_managers(test)
+
     def test_create_obj(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()
