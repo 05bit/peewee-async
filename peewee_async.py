@@ -884,14 +884,17 @@ class AsyncDatabase:
     async def close_async(self):
         """Close async connection.
         """
-        if self._async_wait:
-            await self._async_wait
-        if self._async_conn:
-            conn = self._async_conn
-            self._async_conn = None
-            self._async_wait = None
-            self._task_data = None
-            await conn.close()
+        wait = self._async_wait
+        conn = self._async_conn
+        self._async_conn = None
+        self._async_wait = None
+        self._task_data = None
+        try:
+            if wait:
+                await wait
+        finally:
+            if conn:
+                await conn.close()
 
     async def push_transaction_async(self):
         """Increment async transaction depth.
