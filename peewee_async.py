@@ -597,7 +597,10 @@ async def insert(query):
     try:
         if query._returning:
             row = await cursor.fetchone()
-            result = row[0]
+            if row is not None:
+                result = row[0]
+            else:
+                result = None
         else:
             database = _query_db(query)
             last_id = await database.last_insert_id_async(cursor)
