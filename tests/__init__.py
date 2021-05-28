@@ -677,6 +677,21 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
 
+    def test_insert_on_conflict_ignore(self):
+        async def test(objects):
+            query = TestModel.insert(text="text").on_conflict_ignore()
+            last_id = await objects.execute(query)
+            self.assertIsNotNone(last_id)
+
+            last_id = await objects.execute(query)
+            self.assertIsNone(last_id)
+
+            fn = peewee.fn.Count(TestModel.id)
+            count = await objects.scalar(TestModel.select(fn))
+            self.assertEqual(count, 1)
+
+        self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
+
     def test_update_query(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()
