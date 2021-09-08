@@ -1,4 +1,5 @@
 .DS_Store
+.idea/
 
 # Local config
 tests.json
@@ -13,6 +14,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 env/
+venv/
 build/
 develop-eggs/
 dist/
@@ -58,3 +60,4 @@ docs/_build/
 
 # PyBuilder
 target/
+

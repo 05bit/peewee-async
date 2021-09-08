@@ -27,42 +27,48 @@ import peewee_asyncext
 
 DB_DEFAULTS = {
     'postgres': {
-        'database': 'test',
+        'database': 'postgres',
         'host': '127.0.0.1',
-        # 'port': 5432,
+        'port': 5432,
+        'password': 'postgres',
         'user': 'postgres',
     },
     'postgres-ext': {
-        'database': 'test',
+        'database': 'postgres',
         'host': '127.0.0.1',
-        # 'port': 5432,
+        'port': 5432,
+        'password': 'postgres',
         'user': 'postgres',
     },
     'postgres-pool': {
-        'database': 'test',
+        'database': 'postgres',
         'host': '127.0.0.1',
-        # 'port': 5432,
+        'port': 5432,
+        'password': 'postgres',
         'user': 'postgres',
         'max_connections': 4,
     },
     'postgres-pool-ext': {
-        'database': 'test',
+        'database': 'postgres',
         'host': '127.0.0.1',
-        # 'port': 5432,
+        'port': 5432,
+        'password': 'postgres',
         'user': 'postgres',
         'max_connections': 4,
     },
     'mysql': {
-        'database': 'test',
+        'database': 'mysql',
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
+        'password': 'mysql'
     },
     'mysql-pool': {
-        'database': 'test',
+        'database': 'mysql',
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
+        'password': 'mysql'
     }
 }
 
