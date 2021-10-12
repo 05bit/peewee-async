@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.7.1 (latest)
+## 0.7.2 (latest)
+
+- #152 pull request is merged fixing #127, Type error when using on_conflict_ignore clause
+- #157 pull request is merged fixing #146, Fixing context manager allow_sync
+
+## 0.7.1
 
 - #139 pull request is merged fixing #138, compatibility with newer `psycopg2`
 - test_composite_key() is updated, compatibility with newer `peewee`
