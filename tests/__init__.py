@@ -464,11 +464,7 @@ class ManagerTestCase(BaseManagerTestCase):
             await objects.close()
             self.assertTrue(not objects.is_connected)
 
-            done, not_done = await asyncio.wait([
-                get_conn(objects),
-                get_conn(objects),
-                get_conn(objects),
-            ], loop=self.loop)
+            done, not_done = await asyncio.wait({self.loop.create_task(get_conn(objects)) for _ in range(3)})
 
             conn = next(iter(done)).result()
             self.assertEqual(len(done), 3)
@@ -487,8 +483,8 @@ class ManagerTestCase(BaseManagerTestCase):
             obj = await objects.create(TestModel, text=text)
             n = 2 * max_connections  # number of requests
             done, not_done = await asyncio.wait(
-                [objects.get(TestModel, id=obj.id) for _ in range(n)],
-                loop=self.loop)
+                {self.loop.create_task(objects.get(TestModel, id=obj.id)) for _ in range(n)}
+            )
             self.assertEqual(len(done), n)
 
         self.run_with_managers(test)
@@ -890,17 +886,17 @@ class ManagerTransactionsTestCase(BaseManagerTestCase):
         async def t1(objects):
             async with objects.atomic():
                 self.assertEqual(objects.database.transaction_depth_async(), 1)
-                await asyncio.sleep(0.25, loop=self.loop)
+                await asyncio.sleep(0.25)
 
         async def t2(objects):
             async with objects.atomic():
                 self.assertEqual(objects.database.transaction_depth_async(), 1)
-                await asyncio.sleep(0.0625, loop=self.loop)
+                await asyncio.sleep(0.0625)
 
         async def t3(objects):
             async with objects.atomic():
                 self.assertEqual(objects.database.transaction_depth_async(), 1)
-                await asyncio.sleep(0.125, loop=self.loop)
+                await asyncio.sleep(0.125)
 
         for _, objects in self.managers.items():
             wait([
