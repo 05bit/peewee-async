@@ -202,6 +202,10 @@ class CompositeTestModel(peewee.Model):
         primary_key = peewee.CompositeKey('uuid', 'alpha')
 
 
+class TestModelWithoutDatabase(peewee.Model):
+    text = peewee.CharField()
+
+
 ####################
 # Base tests class #
 ####################
@@ -822,6 +826,26 @@ class ManagerTestCase(BaseManagerTestCase):
                              (comp.uuid, comp.alpha))
         self.run_with_managers(test)
 
+    def test_query_with_only_manager_database(self):
+        async def test(objects):
+            assert TestModelWithoutDatabase._meta.database is None
+            await objects.create(TestModelWithoutDatabase, text='NO-DB')
+            count = await objects.count(TestModelWithoutDatabase.select())
+            self.assertEqual(count, 1)
+
+        for key, objects in self.managers.items():
+            with objects.allow_sync():
+                TestModelWithoutDatabase._meta.database = objects.database
+                TestModelWithoutDatabase.create_table(True)
+                TestModelWithoutDatabase.delete().execute()
+                TestModelWithoutDatabase._meta.database = None
+            with self.manager(objects, allow_sync=False):
+                self.loop.run_until_complete(test(objects))
+
+            with self.manager(objects, allow_sync=True):
+                for model in reversed(self.models):
+                    model.delete().execute()
+            self.run_count += 1
 
 ######################
 # Transactions tests #
