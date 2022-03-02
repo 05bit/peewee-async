@@ -206,7 +206,14 @@ class Manager:
         except model_.DoesNotExist:
             data = defaults or {}
             data.update({k: v for k, v in kwargs.items() if '__' not in k})
-            return (await self.create(model_, **data)), True
+            try:
+                return (await self.create(model_, **data)), True
+            except peewee.IntegrityError:
+                try:
+                    return (await self.get(model_, **kwargs)), False
+                except model_.DoesNotExist:
+                    pass
+                raise
 
     async def update(self, obj, only=None):
         """Update the object in the database. Optionally, update only
