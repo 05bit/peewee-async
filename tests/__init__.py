@@ -545,28 +545,40 @@ class ManagerTestCase(BaseManagerTestCase):
         self.run_with_managers(test)
 
     def test_get_or_create_concurrently(self):
-        async def test_case(objects, text, data, commit_flag):
-            async with objects.atomic():
+        async def trn1(objects, text, commit_flag, wait_for_insert):
+            async with objects.transaction():
                 obj, created = await objects.get_or_create(
-                    TestModel, text=text, defaults={'data': data})
+                    TestModel, text=text, defaults={'data': 'Data 1'})
 
+                wait_for_insert.set()
                 await commit_flag.wait()
 
-                return obj, created
+            return obj, created
+
+        async def trn2(objects, text, wait_for_lock, wait_for_trn1_insert):
+            async with objects.transaction():
+                await wait_for_trn1_insert.wait()
+                wait_for_lock.set()
+                obj, created = await objects.get_or_create(
+                    TestModel, text=text, defaults={'data': 'Data 2'})
+
+            return obj, created
 
         async def test(objects):
-            commit_flag = asyncio.Event()
+            commit_trn1 = asyncio.Event()
+            wait_for_trn1_insert = asyncio.Event()
+            wait_for_trn2_lock = asyncio.Event()
             text = "Test %s" % uuid.uuid4()
 
-            tasks = [
-                asyncio.create_task(test_case(objects, text, data, commit_flag))
-                for data in ("Data 1", "Data 2")
-            ]
+            task1 = asyncio.ensure_future(trn1(objects, text, commit_trn1, wait_for_trn1_insert))
+            task2 = asyncio.ensure_future(trn2(objects, text, wait_for_trn2_lock, wait_for_trn1_insert))
 
-            commit_flag.set()
+            await wait_for_trn1_insert.wait()
+            await wait_for_trn2_lock.wait()
 
-            obj1, created1 = await tasks[0]
-            obj2, created2 = await tasks[1]
+            commit_trn1.set()
+            obj1, created1 = await task1
+            obj2, created2 = await task2
 
             self.assertTrue(created1)
             self.assertTrue(not created2)
@@ -574,7 +586,7 @@ class ManagerTestCase(BaseManagerTestCase):
             self.assertEqual(obj1.data, "Data 1")
             self.assertEqual(obj2.data, "Data 1")
 
-        self.run_with_managers(test)
+        self.run_with_managers(test, exclude=['postgres', 'postgres-ext', 'mysql'])
 
     def test_create_uuid_obj(self):
         async def test(objects):
