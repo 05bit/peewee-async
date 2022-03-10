@@ -544,6 +544,47 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_get_or_create_concurrently(self):
+        wait_timeout = 0.1
+
+        async def test_case(objects, text, data, commit_flag):
+            async with objects.transaction():
+                obj, created = await objects.get_or_create(
+                    TestModel, text=text, defaults={'data': data})
+
+                await commit_flag.wait()
+
+            return obj, created
+
+        async def test(objects):
+            commit_flag = asyncio.Event()
+            text = "Test %s" % uuid.uuid4()
+
+            tasks = [
+                asyncio.ensure_future(test_case(objects, text, data, commit_flag))
+                for data in ('Data 1', 'Data 2')
+            ]
+
+            await asyncio.sleep(wait_timeout)
+            commit_flag.set()
+            results = await asyncio.gather(*tasks)
+            obj1, created1 = results[0]
+            obj2, created2 = results[1]
+
+            # transactions execution order is not predictable so
+            # one of the flag is True and vice versa
+            self.assertFalse(created1 and created2)
+            self.assertTrue(created1 or created2)
+            self.assertEqual(obj1, obj2)
+
+        # Exclude mysql-pool due to mysql default transaction isolation level
+        # is REPEATABLE READ and there is no standard way to override  transaction
+        # isolation level
+        self.run_with_managers(
+            test=test,
+            exclude=['postgres', 'postgres-ext', 'mysql', 'mysql-pool'],
+        )
+
     def test_create_uuid_obj(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()
