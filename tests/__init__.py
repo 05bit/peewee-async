@@ -545,38 +545,26 @@ class ManagerTestCase(BaseManagerTestCase):
         self.run_with_managers(test)
 
     def test_get_or_create_concurrently(self):
-        async def trn1(objects, text, commit_flag, wait_for_insert):
-            async with objects.atomic():
-                obj, created = await objects.get_or_create(
-                    TestModel, text=text, defaults={'data': 'Data 1'})
+        wait_timeout = 0.1
 
-                wait_for_insert.set()
+        async def test_case(objects, text, data, commit_flag):
+            async with objects.transaction():
+                obj, created = await objects.get_or_create(
+                    TestModel, text=text, defaults={'data': data})
+
                 await commit_flag.wait()
 
             return obj, created
 
-        async def trn2(objects, text, wait_for_lock, wait_for_trn1_insert):
-            async with objects.atomic():
-                await wait_for_trn1_insert.wait()
-                wait_for_lock.set()
-                obj, created = await objects.get_or_create(
-                    TestModel, text=text, defaults={'data': 'Data 2'})
-
-            return obj, created
-
         async def test(objects):
-            commit_trn1 = asyncio.Event()
-            wait_for_trn1_insert = asyncio.Event()
-            wait_for_trn2_lock = asyncio.Event()
+            commit_flag = asyncio.Event()
             text = "Test %s" % uuid.uuid4()
 
-            task1 = asyncio.ensure_future(trn1(objects, text, commit_trn1, wait_for_trn1_insert))
-            task2 = asyncio.ensure_future(trn2(objects, text, wait_for_trn2_lock, wait_for_trn1_insert))
+            task1 = asyncio.ensure_future(test_case(objects, text, 'Data 1', commit_flag))
+            task2 = asyncio.ensure_future(test_case(objects, text, 'Data 2', commit_flag))
 
-            await wait_for_trn1_insert.wait()
-            await wait_for_trn2_lock.wait()
-
-            commit_trn1.set()
+            await asyncio.sleep(wait_timeout)
+            commit_flag.set()
             obj1, created1 = await task1
             obj2, created2 = await task2
 
