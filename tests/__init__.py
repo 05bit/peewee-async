@@ -544,6 +544,38 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_get_or_create_concurrently(self):
+        async def test_case(objects, text, data, commit_flag):
+            async with objects.atomic():
+                obj, created = await objects.get_or_create(
+                    TestModel, text=text, defaults={'data': data})
+
+                await commit_flag.wait()
+
+                return obj, created
+
+        async def test(objects):
+            commit_flag = asyncio.Event()
+            text = "Test %s" % uuid.uuid4()
+
+            tasks = [
+                asyncio.create_task(test_case(objects, text, data, commit_flag))
+                for data in ("Data 1", "Data 2")
+            ]
+
+            commit_flag.set()
+
+            obj1, created1 = await tasks[0]
+            obj2, created2 = await tasks[1]
+
+            self.assertTrue(created1)
+            self.assertTrue(not created2)
+            self.assertEqual(obj1, obj2)
+            self.assertEqual(obj1.data, "Data 1")
+            self.assertEqual(obj2.data, "Data 1")
+
+        self.run_with_managers(test)
+
     def test_create_uuid_obj(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()
