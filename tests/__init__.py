@@ -560,19 +560,22 @@ class ManagerTestCase(BaseManagerTestCase):
             commit_flag = asyncio.Event()
             text = "Test %s" % uuid.uuid4()
 
-            task1 = asyncio.ensure_future(test_case(objects, text, 'Data 1', commit_flag))
-            task2 = asyncio.ensure_future(test_case(objects, text, 'Data 2', commit_flag))
+            tasks = [
+                asyncio.ensure_future(test_case(objects, text, data, commit_flag))
+                for data in ('Data 1', 'Data 2')
+            ]
 
             await asyncio.sleep(wait_timeout)
             commit_flag.set()
-            obj1, created1 = await task1
-            obj2, created2 = await task2
+            results = await asyncio.gather(*tasks)
+            obj1, created1 = results[0]
+            obj2, created2 = results[1]
 
-            self.assertTrue(created1)
-            self.assertTrue(not created2)
+            # transactions execution order is not predictable so
+            # one of the flag is True and vice versa
+            self.assertFalse(created1 and created2)
+            self.assertTrue(created1 or created2)
             self.assertEqual(obj1, obj2)
-            self.assertEqual(obj1.data, "Data 1")
-            self.assertEqual(obj2.data, "Data 1")
 
         # Exclude mysql-pool due to mysql default transaction isolation level
         # is REPEATABLE READ and there is no standard way to override  transaction
