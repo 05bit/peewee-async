@@ -546,7 +546,7 @@ class ManagerTestCase(BaseManagerTestCase):
 
     def test_get_or_create_concurrently(self):
         async def trn1(objects, text, commit_flag, wait_for_insert):
-            async with objects.transaction():
+            async with objects.atomic():
                 obj, created = await objects.get_or_create(
                     TestModel, text=text, defaults={'data': 'Data 1'})
 
@@ -556,7 +556,7 @@ class ManagerTestCase(BaseManagerTestCase):
             return obj, created
 
         async def trn2(objects, text, wait_for_lock, wait_for_trn1_insert):
-            async with objects.transaction():
+            async with objects.atomic():
                 await wait_for_trn1_insert.wait()
                 wait_for_lock.set()
                 obj, created = await objects.get_or_create(
@@ -586,7 +586,13 @@ class ManagerTestCase(BaseManagerTestCase):
             self.assertEqual(obj1.data, "Data 1")
             self.assertEqual(obj2.data, "Data 1")
 
-        self.run_with_managers(test, exclude=['postgres', 'postgres-ext', 'mysql'])
+        # Exclude mysql-pool due to mysql default transaction isolation level
+        # is REPEATABLE READ and there is no standard way to override  transaction
+        # isolation level
+        self.run_with_managers(
+            test=test,
+            exclude=['postgres', 'postgres-ext', 'mysql', 'mysql-pool'],
+        )
 
     def test_create_uuid_obj(self):
         async def test(objects):

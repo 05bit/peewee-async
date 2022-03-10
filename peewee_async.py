@@ -200,6 +200,11 @@ class Manager:
 
         Return 2-tuple containing the model instance and a boolean
         indicating whether the instance was created.
+
+        WARNING: Be careful with transaction isolation level. On level
+        REPEATABLE READ and SERIALIZABLE may be peewee.IntegrityError or
+        model_.DoesNotExist.
+        MySQL uses REPEATABLE READ by default.
         """
         try:
             return (await self.get(model_, **kwargs)), False
@@ -207,7 +212,8 @@ class Manager:
             data = defaults or {}
             data.update({k: v for k, v in kwargs.items() if '__' not in k})
             try:
-                return (await self.create(model_, **data)), True
+                async with self.atomic():
+                    return (await self.create(model_, **data)), True
             except peewee.IntegrityError:
                 try:
                     return (await self.get(model_, **kwargs)), False
