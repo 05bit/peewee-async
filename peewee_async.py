@@ -418,8 +418,7 @@ async def execute(query):
     :return: result depends on query type, it's the same as for sync
         ``query.execute()``
     """
-    if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery))\
-            or (isinstance(query, peewee.Update) and query._returning):
+    if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
         coroutine = select
     elif isinstance(query, peewee.Update):
         coroutine = update
@@ -561,27 +560,24 @@ async def update_object(obj, only=None):
     return rows
 
 
+async def _execute_with_returning(query):
+    cursor = await _execute_query_async(query)
+    result = AsyncQueryWrapper(cursor=cursor, query=query)
+    try:
+        await result.fetchall()
+    finally:
+        await cursor.release()
+    return result
+
+
 async def select(query):
     """Perform SELECT query asynchronously.
     """
-    assert isinstance(query, peewee.SelectQuery)\
-            or (isinstance(query, peewee.Update) and query._returning),\
+    assert isinstance(query, peewee.SelectQuery),\
         ("Error, trying to run select coroutine"
          "with wrong query class %s" % str(query))
 
-    cursor = await _execute_query_async(query)
-
-    result = AsyncQueryWrapper(cursor=cursor, query=query)
-
-    try:
-        while True:
-            await result.fetchone()
-    except GeneratorExit:
-        pass
-    finally:
-        await cursor.release()
-
-    return result
+    return await _execute_with_returning(query)
 
 
 async def insert(query):
@@ -619,7 +615,7 @@ async def update(query):
          "with wrong query class %s" % str(query))
 
     if query._returning:
-        return await select(query)
+        return await _execute_with_returning(query)
 
     cursor = await _execute_query_async(query)
     rowcount = cursor.rowcount
@@ -798,6 +794,13 @@ class AsyncQueryWrapper:
         if not row:
             raise GeneratorExit
         self._rows.append(row)
+
+    async def fetchall(self):
+        try:
+            while True:
+                await self.fetchone()
+        except GeneratorExit:
+            pass
 
 
 ############
