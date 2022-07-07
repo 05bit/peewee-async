@@ -5,6 +5,7 @@ services:
     image: postgres
     ports:
       - '5432:5432'
+    command: postgres -c log_statement=all
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres

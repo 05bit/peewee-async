@@ -704,6 +704,20 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_update_returning_query(self):
+        async def test(objects):
+            await objects.create(TestModel, text="text1", data="data")
+            await objects.create(TestModel, text="text2", data="data")
+
+            new_data = "New_data"
+            query = TestModel.update(data=new_data).where(TestModel.data == "data").returning(TestModel)
+
+            wrapper = await objects.execute(query)
+            result = [m.data for m in wrapper]
+            self.assertEqual([new_data, new_data], result)
+
+        self.run_with_managers(test)
+
     def test_update_obj(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()
