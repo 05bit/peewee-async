@@ -43,7 +43,8 @@ setup(
             'twine',
             'aiomysql',
             'aiopg',
-            'psycopg2'
+            'pytest',
+            'pytest-asyncio'
         ],
         'aiopg': ['aiopg>=0.14.0'],
         'aiomysql': ['aiomysql>=0.0.19'],
@@ -60,6 +61,4 @@ setup(
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
     ],
-    test_suite='tests',
-    test_loader='unittest:TestLoader',
 )
