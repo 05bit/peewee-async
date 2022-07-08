@@ -11,14 +11,13 @@ Important notes
 ---------------
 
 - Since version `0.6.0a` only **peewee 3.5+** is supported
-- If you still need Python 3.4 support use older versions, i.e. `pip install peewee-async==0.5.12`
+- If you still need Python 3.5 support use older versions, i.e. `pip install peewee-async==0.7.2`
 
-Version `0.6.0a` is published as pre-release, mind the "a" in version identifier. That means in order to install it you should specify `--pre` flag for `pip`.
 
 Overview
 --------
 
-* Requires Python 3.5+
+* Requires Python 3.6+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Single point for high-level async API
@@ -51,8 +50,7 @@ Create 'test' PostgreSQL database for running this snippet:
 
     createdb -E utf-8 test
 
-The code below is using new Python 3.5 `async` / `await` syntax, but older `yield from` will also work!
-
+The code below is using new Python 3.6 `async` / `await` syntax
 ```python
 import asyncio
 import peewee
@@ -111,6 +109,14 @@ Documentation
 -------------
 
 http://peewee-async.readthedocs.io
+
+Developing
+-------------
+
+Run tests with the command:
+```
+pytest tests -v -s
+```
 
 Discuss
 -------
