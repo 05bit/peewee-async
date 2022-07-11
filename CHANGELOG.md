@@ -1,7 +1,14 @@
 # Changelog
 
-## 0.7.2 (latest)
+## 0.8.0 (latest)
 
+- #168 pull request. Support for returning models from insert and delete queries
+- #167 pull request. Switched to pytest. Refactoring queries
+- Drop python 3.5 support
+
+## 0.7.2
+
+- Support for returning models from update queries
 - #152 pull request is merged fixing #127, Type error when using on_conflict_ignore clause
 - #157 pull request is merged fixing #146, Fixing context manager allow_sync
 

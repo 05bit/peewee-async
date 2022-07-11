@@ -112,11 +112,10 @@ http://peewee-async.readthedocs.io
 
 Developing
 -------------
+Install dependencies:
+```pip install -e .[develop]```
 
-Run tests with the command:
-```
-pytest tests -v -s
-```
+Run tests: ``` pytest tests -v -s```
 
 Discuss
 -------
