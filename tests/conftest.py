@@ -25,7 +25,7 @@ def event_loop():
 
 
 @pytest.fixture
-def manager(request):
+async def manager(request):
     db = request.param
     if db.startswith('postgres') and aiopg is None:
         pytest.skip("aiopg is not installed")
@@ -43,6 +43,7 @@ def manager(request):
             model.create_table(True)
 
     yield peewee_async.Manager(database)
+    await database.close_async()
     for model in reversed(models):
         model.drop_table(fail_silently=True)
         model._meta.database = None

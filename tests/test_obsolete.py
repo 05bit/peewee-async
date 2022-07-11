@@ -511,56 +511,6 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
-    def test_insert_many_rows_query(self):
-        async def test(objects):
-            select1 = await objects.execute(TestModel.select())
-            self.assertEqual(len(select1), 0)
-
-            query = TestModel.insert_many([
-                {'text': "Test %s" % uuid.uuid4()},
-                {'text': "Test %s" % uuid.uuid4()},
-            ])
-            last_id = await objects.execute(query)
-            self.assertTrue(last_id is not None)
-
-            select2 = await objects.execute(TestModel.select())
-            self.assertEqual(len(select2), 2)
-
-        self.run_with_managers(test)
-
-    def test_insert_one_row_query(self):
-        async def test(objects):
-            query = TestModel.insert(text="Test %s" % uuid.uuid4())
-            last_id = await objects.execute(query)
-            self.assertTrue(last_id is not None)
-            select1 = await objects.execute(TestModel.select())
-            self.assertEqual(len(select1), 1)
-
-        self.run_with_managers(test)
-
-    def test_insert_one_row_uuid_query(self):
-        async def test(objects):
-            query = UUIDTestModel.insert(text="Test %s" % uuid.uuid4())
-            last_id = await objects.execute(query)
-            self.assertEqual(len(str(last_id)), 36)
-
-        self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
-
-    def test_insert_on_conflict_ignore(self):
-        async def test(objects):
-            query = TestModel.insert(text="text").on_conflict_ignore()
-            last_id = await objects.execute(query)
-            self.assertIsNotNone(last_id)
-
-            last_id = await objects.execute(query)
-            self.assertIsNone(last_id)
-
-            fn = peewee.fn.Count(TestModel.id)
-            count = await objects.scalar(TestModel.select(fn))
-            self.assertEqual(count, 1)
-
-        self.run_with_managers(test, exclude=['mysql', 'mysql-pool'])
-
     def test_update_obj(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()
