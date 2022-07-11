@@ -588,6 +588,9 @@ async def insert(query):
         ("Error, trying to run insert coroutine"
          "with wrong query class %s" % str(query))
 
+    if query._returning is not None and len(query._returning) > 1:
+        return await _execute_with_returning(query)
+
     cursor = await _execute_query_async(query)
 
     try:
@@ -630,6 +633,8 @@ async def delete(query):
     assert isinstance(query, peewee.Delete),\
         ("Error, trying to run delete coroutine"
          "with wrong query class %s" % str(query))
+    if query._returning:
+        return await _execute_with_returning(query)
 
     cursor = await _execute_query_async(query)
     rowcount = cursor.rowcount
