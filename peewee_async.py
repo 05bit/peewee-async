@@ -13,6 +13,7 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
+from inspect import iscoroutinefunction
 import asyncio
 import contextlib
 import functools
@@ -923,7 +924,10 @@ class AsyncDatabase:
             self._task_data.set('depth', depth)
             if depth == 0:
                 conn = self._task_data.get('conn')
-                self._async_conn.release(conn)
+                if iscoroutinefunction(self._async_conn.release)
+                    await self._async_conn.release(conn)
+                else:
+                    self._async_conn.release(conn)
         else:
             raise ValueError("Invalid async transaction depth value")
 
