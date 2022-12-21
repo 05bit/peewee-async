@@ -924,7 +924,7 @@ class AsyncDatabase:
             self._task_data.set('depth', depth)
             if depth == 0:
                 conn = self._task_data.get('conn')
-                if iscoroutinefunction(self._async_conn.release)
+                if iscoroutinefunction(self._async_conn.release):
                     await self._async_conn.release(conn)
                 else:
                     self._async_conn.release(conn)
