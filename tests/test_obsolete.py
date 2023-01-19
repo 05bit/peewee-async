@@ -602,19 +602,22 @@ class ManagerTestCase(BaseManagerTestCase):
             gamma_112 = await objects.create(
                 TestModelGamma, beta=beta_11, text='Gamma 112')
 
-            result = await objects.prefetch(
-                TestModelAlpha.select(),
-                TestModelBeta.select(),
-                TestModelGamma.select())
+            for prefetch_type in peewee.PREFETCH_TYPE.values():
+                result = await objects.prefetch(
+                    TestModelAlpha.select().order_by(TestModelAlpha.id),
+                    TestModelBeta.select().order_by(TestModelBeta.id),
+                    TestModelGamma.select().order_by(TestModelGamma.id),
+                    prefetch_type=prefetch_type,
+                )
 
-            self.assertEqual(tuple(result),
-                             (alpha_1, alpha_2))
+                self.assertEqual(tuple(result),
+                                 (alpha_1, alpha_2))
 
-            self.assertEqual(tuple(result[0].betas),
-                             (beta_11, beta_12))
+                self.assertEqual(tuple(result[0].betas),
+                                 (beta_11, beta_12))
 
-            self.assertEqual(tuple(result[0].betas[0].gammas),
-                             (gamma_111, gamma_112))
+                self.assertEqual(tuple(result[0].betas[0].gammas),
+                                 (gamma_111, gamma_112))
 
         self.run_with_managers(test)
 

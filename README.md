@@ -111,11 +111,15 @@ Documentation
 http://peewee-async.readthedocs.io
 
 Developing
--------------
+----------
 Install dependencies:
 ```pip install -e .[develop]```
 
-Run tests: ``` pytest tests -v -s```
+Run databases:
+```docker-compose up -d```
+
+Run tests:
+```pytest tests -v -s```
 
 Discuss
 -------
