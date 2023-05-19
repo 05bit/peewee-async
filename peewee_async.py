@@ -64,15 +64,6 @@ __all__ = [
     'atomic',
     'transaction',
     'savepoint',
-
-    # Deprecated ###
-
-    'get_object',
-    'create_object',
-    'delete_object',
-    'update_object',
-    'sync_unwanted',
-    'UnwantedSyncQueryError',
 ]
 
 __log__ = logging.getLogger('peewee.async')
@@ -430,134 +421,6 @@ async def execute(query):
         coroutine = raw_query
 
     return (await coroutine(query))
-
-
-async def create_object(model, **data):
-    """Create object asynchronously.
-
-    :param model: mode class
-    :param data: data for initializing object
-    :return: new object saved to database
-    """
-    # NOTE! Here are internals involved:
-    #
-    # - obj._data
-    # - obj._get_pk_value()
-    # - obj._set_pk_value()
-    # - obj._prepare_instance()
-    #
-    warnings.warn("create_object() is deprecated, Manager.create() "
-                  "should be used instead",
-                  DeprecationWarning)
-
-    obj = model(**data)
-
-    pk = await insert(model.insert(**dict(obj.__data__)))
-
-    if obj._pk is None:
-        obj._pk = pk
-    return obj
-
-
-async def get_object(source, *args):
-    """Get object asynchronously.
-
-    :param source: mode class or query to get object from
-    :param args: lookup parameters
-    :return: model instance or raises ``peewee.DoesNotExist`` if object not
-        found
-    """
-    warnings.warn("get_object() is deprecated, Manager.get() "
-                  "should be used instead",
-                  DeprecationWarning)
-
-    if isinstance(source, peewee.Query):
-        query = source
-        model = query.model
-    else:
-        query = source.select()
-        model = source
-
-    # Return first object from query
-    for obj in (await select(query.where(*args))):
-        return obj
-
-    # No objects found
-    raise model.DoesNotExist
-
-
-async def delete_object(obj, recursive=False, delete_nullable=False):
-    """Delete object asynchronously.
-
-    :param obj: object to delete
-    :param recursive: if ``True`` also delete all other objects depends on
-        object
-    :param delete_nullable: if `True` and delete is recursive then delete even
-        'nullable' dependencies
-
-    For details please check out `Model.delete_instance()`_ in peewee docs.
-
-    .. _Model.delete_instance(): http://peewee.readthedocs.io/en/latest/peewee/
-        api.html#Model.delete_instance
-    """
-    warnings.warn("delete_object() is deprecated, Manager.delete() "
-                  "should be used instead",
-                  DeprecationWarning)
-
-    # Here are private calls involved:
-    # - obj._pk_expr()
-    if recursive:
-        dependencies = obj.dependencies(delete_nullable)
-        for query, fk in reversed(list(dependencies)):
-            model = fk.model
-            if fk.null and not delete_nullable:
-                await update(model.update(**{fk.name: None}).where(query))
-            else:
-                await delete(model.delete().where(query))
-    result = await delete(obj.delete().where(obj._pk_expr()))
-    return result
-
-
-async def update_object(obj, only=None):
-    """Update object asynchronously.
-
-    :param obj: object to update
-    :param only: list or tuple of fields to updata, is `None` then all fields
-        updated
-
-    This function does the same as `Model.save()`_ for already saved object,
-        but it doesn't invoke ``save()`` method on model class. That is
-        important to know if you overrided save method for your model.
-
-    .. _Model.save(): http://peewee.readthedocs.io/en/latest/peewee/
-        api.html#Model.save
-    """
-    # Here are private calls involved:
-    #
-    # - obj._data
-    # - obj._meta
-    # - obj._prune_fields()
-    # - obj._pk_expr()
-    # - obj._dirty.clear()
-    #
-    warnings.warn("update_object() is deprecated, Manager.update() "
-                  "should be used instead",
-                  DeprecationWarning)
-
-    field_dict = dict(obj.__data__)
-    pk_field = obj._meta.primary_key
-
-    if only:
-        field_dict = obj._prune_fields(field_dict, only)
-
-    if not isinstance(pk_field, peewee.CompositeKey):
-        field_dict.pop(pk_field.name, None)
-    else:
-        field_dict = obj._prune_fields(field_dict, obj.dirty_fields)
-    rows = await update(obj.update(**field_dict).where(obj._pk_expr()))
-
-    obj._dirty.clear()
-    return rows
 
 
 async def _execute_with_returning(query):
@@ -1299,41 +1162,6 @@ class PooledMySQLDatabase(MySQLDatabase):
 
 
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
-
-
-##############
-# Sync utils #
-##############
-
-
-@contextlib.contextmanager
-def sync_unwanted(database):
-    """Context manager for preventing unwanted sync queries.
-    `UnwantedSyncQueryError` exception will raise on such query.
-
-    NOTE: sync_unwanted() context manager is **deprecated**, use
-    database's `.allow_sync()` context manager or `Manager.allow_sync()`
-    context manager.
-    """
-    warnings.warn("sync_unwanted() context manager is deprecated, "
-                  "use database's `.allow_sync()` context manager or "
-                  "`Manager.allow_sync()` context manager. ",
-                  DeprecationWarning)
-    old_allow_sync = database._allow_sync
-    database._allow_sync = False
-    yield
-    database._allow_sync = old_allow_sync
-
-
-class UnwantedSyncQueryError(Exception):
-    """Exception which is raised when performing unwanted sync query.
-
-    NOTE: UnwantedSyncQueryError is deprecated, `assert` is used instead.
-    """
-    def __init__(self, *args, **kwargs):
-        warnings.warn("UnwantedSyncQueryError is deprecated, "
-                      "assert is used instead.",
-                      DeprecationWarning)
 
 
 ################
