@@ -85,7 +85,7 @@ __log__.addHandler(logging.NullHandler())
 
 
 class Manager:
-    """Async peewee models manager.
+    """Async peewee model's manager.
 
     :param loop: (optional) asyncio event loop
     :param database: (optional) async database driver
@@ -271,14 +271,14 @@ class Manager:
         query = self._swap_database(query)
         return (await execute(query))
 
-    async def prefetch(self, query, *subqueries):
+    async def prefetch(self, query, *subqueries, prefetch_type=peewee.PREFETCH_TYPE.JOIN):
         """Asynchronous version of the `prefetch()` from peewee.
 
         :return: Query that has already cached data for subqueries
         """
         query = self._swap_database(query)
         subqueries = map(self._swap_database, subqueries)
-        return (await prefetch(query, *subqueries))
+        return (await prefetch(query, *subqueries, prefetch_type=prefetch_type))
 
     async def count(self, query, clear_limit=False):
         """Perform *COUNT* aggregated query asynchronously.
@@ -699,14 +699,14 @@ async def raw_query(query):
     return result
 
 
-async def prefetch(sq, *subqueries):
+async def prefetch(sq, *subqueries, prefetch_type):
     """Asynchronous version of the `prefetch()` from peewee.
     """
     if not subqueries:
         result = await execute(sq)
         return result
 
-    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
     deps = {}
     rel_map = {}
 

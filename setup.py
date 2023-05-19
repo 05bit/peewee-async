@@ -34,7 +34,7 @@ setup(
     license='MIT',
     zip_safe=False,
     install_requires=(
-        'peewee>=3.5.0,<4.0',
+        'peewee>=3.15.4,<4.0',
     ),
     extras_require={
         'develop': [
@@ -44,14 +44,14 @@ setup(
             'aiomysql',
             'aiopg',
             'pytest',
-            'pytest-asyncio'
+            'pytest-asyncio',
         ],
         'aiopg': ['aiopg>=0.14.0'],
         'aiomysql': ['aiomysql>=0.0.19'],
     },
     py_modules=[
         'peewee_async',
-        'peewee_asyncext'
+        'peewee_asyncext',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',

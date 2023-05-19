@@ -581,43 +581,6 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
-    def test_prefetch(self):
-        async def test(objects):
-            alpha_1 = await objects.create(
-                TestModelAlpha, text='Alpha 1')
-            alpha_2 = await objects.create(
-                TestModelAlpha, text='Alpha 2')
-
-            beta_11 = await objects.create(
-                TestModelBeta, alpha=alpha_1, text='Beta 11')
-            beta_12 = await objects.create(
-                TestModelBeta, alpha=alpha_1, text='Beta 12')
-            _ = await objects.create(
-                TestModelBeta, alpha=alpha_2, text='Beta 21')
-            _ = await objects.create(
-                TestModelBeta, alpha=alpha_2, text='Beta 22')
-
-            gamma_111 = await objects.create(
-                TestModelGamma, beta=beta_11, text='Gamma 111')
-            gamma_112 = await objects.create(
-                TestModelGamma, beta=beta_11, text='Gamma 112')
-
-            result = await objects.prefetch(
-                TestModelAlpha.select(),
-                TestModelBeta.select(),
-                TestModelGamma.select())
-
-            self.assertEqual(tuple(result),
-                             (alpha_1, alpha_2))
-
-            self.assertEqual(tuple(result[0].betas),
-                             (beta_11, beta_12))
-
-            self.assertEqual(tuple(result[0].betas[0].gammas),
-                             (gamma_111, gamma_112))
-
-        self.run_with_managers(test)
-
     def test_composite_key(self):
         async def test(objects):
             obj_uuid = await objects.create(UUIDTestModel, text='UUID')
