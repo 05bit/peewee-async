@@ -11,8 +11,6 @@ Also there's no need to connect and re-connect before executing async queries wi
 .. _Django: https://www.djangoproject.com
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 
-**Note:** code examples below are written for Python 3.5.x, it is possible to adapt them for Python 3.4.x by replacing `await` with `yield from` and `async def` with `@asyncio.coroutine` decorator. And async context managers like ``transaction()`` etc, are only possible in Python 3.5+
-
 OK, let's provide an example::
 
     import asyncio
