@@ -17,7 +17,7 @@ Important notes
 Overview
 --------
 
-* Requires Python 3.6+
+* Requires Python 3.7+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Single point for high-level async API
