@@ -7,12 +7,6 @@ ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 ![CI workflow](https://github.com/05bit/peewee-async/actions/workflows/ci.yml/badge.svg) [![PyPi Version](https://img.shields.io/pypi/v/peewee-async.svg)](https://pypi.python.org/pypi/peewee-async)
  [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://peewee-async.readthedocs.io/en/latest/?badge=latest)
 
-Important notes
----------------
-
-- Since version `0.6.0a` only **peewee 3.5+** is supported
-- If you still need Python 3.5 support use older versions, i.e. `pip install peewee-async==0.7.2`
-
 
 Overview
 --------
@@ -50,7 +44,7 @@ Create 'test' PostgreSQL database for running this snippet:
 
     createdb -E utf-8 test
 
-The code below is using new Python 3.6 `async` / `await` syntax
+
 ```python
 import asyncio
 import peewee
