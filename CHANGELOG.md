@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.8.0 (latest)
+## 0.8.1
+
+- #181 pull request. fixed prefetch for peeweee version >= 3.15.4
+- Up minimal peewee version to 3.15.4 in dependencies
+- Drop python 3.6 support added python 3.11 support
+
+## 0.8.0
 
 - #168 pull request. Support for returning models from insert and delete queries
 - #167 pull request. Switched to pytest. Refactoring queries
