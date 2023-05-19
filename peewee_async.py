@@ -78,8 +78,6 @@ __all__ = [
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
 
-peewee_version = tuple(map(int, peewee.__version__.split('.')))
-
 
 #################
 # Async manager #
@@ -708,11 +706,7 @@ async def prefetch(sq, *subqueries, prefetch_type):
         result = await execute(sq)
         return result
 
-    if peewee_version > (3, 15, 3):
-        fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
-    else:
-        fixed_queries = peewee.prefetch_add_subquery(sq, subqueries)
-
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
     deps = {}
     rel_map = {}
 
