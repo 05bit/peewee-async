@@ -199,6 +199,13 @@ class Manager:
             data.update({k: v for k, v in kwargs.items() if '__' not in k})
             return (await self.create(model_, **data)), True
 
+    async def get_or_none(self, model_, *args, **kwargs):
+        """Try to get an object and return None if it doesn't exist."""
+        try:
+            return (await self.get(model_, *args, **kwargs))
+        except model_.DoesNotExist:
+            pass
+
     async def update(self, obj, only=None):
         """Update the object in the database. Optionally, update only
         the specified fields. For creating a new object use :meth:`.create()`

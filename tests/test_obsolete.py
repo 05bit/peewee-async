@@ -297,6 +297,22 @@ class ManagerTestCase(BaseManagerTestCase):
 
         self.run_with_managers(test)
 
+    def test_get_or_none(self):
+        async def test(objects):
+            text1 = "Test %s" % uuid.uuid4()
+            text2 = "Test %s" % uuid.uuid4()
+
+            obj1 = await objects.create(TestModel, text=text1)
+            obj2 = await objects.get_or_none(TestModel, text=text1)
+            obj3 = await objects.get_or_none(TestModel, text=text2)
+
+            self.assertEqual(obj1, obj2)
+            self.assertIsNotNone(obj1)
+            self.assertIsNotNone(obj2)
+            self.assertIsNone(obj3)
+
+        self.run_with_managers(test)
+
     def test_create_uuid_obj(self):
         async def test(objects):
             text = "Test %s" % uuid.uuid4()

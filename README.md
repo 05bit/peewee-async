@@ -107,13 +107,19 @@ http://peewee-async.readthedocs.io
 Developing
 ----------
 Install dependencies:
-```pip install -e .[develop]```
+```bash
+pip install -e .[develop]
+```
 
 Run databases:
-```docker-compose up -d```
+```bash
+docker-compose up -d
+```
 
 Run tests:
-```pytest tests -v -s```
+```bash
+pytest tests -v -s
+```
 
 Discuss
 -------
