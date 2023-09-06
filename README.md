@@ -106,14 +106,21 @@ http://peewee-async.readthedocs.io
 
 Developing
 ----------
-Install dependencies:
-* install [poetry](https://python-poetry.org/docs/)
-* ```poetry install```
+Install dependencies using pip: 
+
+```pip install -e .[develop]```
+
+Or using [poetry](https://python-poetry.org/docs/): 
+
+```poetry install -E develop```
+
 
 Run databases:
+
 ```docker-compose up -d```
 
 Run tests:
+
 ```pytest tests -v -s```
 
 Discuss

@@ -9,13 +9,17 @@ readme = "README.md"
 python = "^3.7"
 peewee = "^3.15.4"
 
+aiopg = { version = "^1.4.0", optional = true }
+aiomysql = { version = "^0.2.0", optional = true }
+cryptography = { version = "^41.0.3", optional = true }
+pytest = { version = "^7.4.1", optional = true }
+pytest-asyncio = { version = "^0.21.1", optional = true }
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.1"
-pytest-asyncio = "^0.21.1"
-aiopg = "^1.4.0"
-aiomysql = "^0.2.0"
-cryptography = "^41.0.3"
+
+[tool.poetry.extras]
+postgresql = ["aiopg"]
+mysql = ["aiomysql", "cryptography"]
+develop = ["aiopg", "aiomysql", "cryptography", "mysql", "pytest", "pytest-asyncio"]
 
 [build-system]
 requires = ["poetry-core"]
