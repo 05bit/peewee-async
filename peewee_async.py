@@ -16,11 +16,11 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 import asyncio
 import contextlib
 import functools
-import importlib.metadata
 import logging
 import uuid
 import warnings
 
+import importlib_metadata
 import peewee
 from playhouse.db_url import register_database
 
@@ -46,7 +46,7 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = importlib.metadata.version("peewee-async")
+__version__ = importlib_metadata.version("peewee-async")
 
 
 __all__ = [
