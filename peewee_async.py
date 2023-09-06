@@ -16,6 +16,7 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 import asyncio
 import contextlib
 import functools
+import importlib.metadata
 import logging
 import uuid
 import warnings
@@ -45,7 +46,8 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = '0.8.1'
+__version__ = importlib.metadata.version("peewee-async")
+
 
 __all__ = [
     # High level API ###
