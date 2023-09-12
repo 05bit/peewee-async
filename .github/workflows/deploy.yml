@@ -1,0 +1,28 @@
+name: Deploy to PyPI
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      POETRY_VIRTUALENVS_CREATE: "false"
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install poetry
+        run: |
+          pipx install poetry
+          pipx inject poetry poetry-bumpversion
+
+      - name: Build
+        run: |
+          poetry version ${{ github.ref_name }}
+          poetry build
+
+      - name: Publish
+        run: |
+          poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
+          poetry publish
