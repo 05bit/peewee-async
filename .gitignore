@@ -61,3 +61,5 @@ target/
 # poetry
 poetry.lock
 
+# pytest
+.pytest_cache/

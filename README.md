@@ -27,13 +27,13 @@ Install
 
 Install with `pip` for PostgreSQL:
 
-```
+```bash
 pip install --pre peewee-async; pip install aiopg
 ```
 
 or for MySQL:
 
-```
+```bash
 pip install --pre peewee-async; pip install aiomysql
 ```
 
@@ -57,7 +57,7 @@ database = peewee_async.PostgresqlDatabase(
     user='user',
     host='127.0.0.1',
     port='5432',
-    password='password'
+    password='password',
 )
 
 class TestModel(peewee.Model):
@@ -106,22 +106,25 @@ http://peewee-async.readthedocs.io
 
 Developing
 ----------
-Install dependencies using pip: 
+Install dependencies using pip:
+```bash
+pip install -e .[develop]
+```
 
-```pip install -e .[develop]```
-
-Or using [poetry](https://python-poetry.org/docs/): 
-
-```poetry install -E develop```
-
+Or using [poetry](https://python-poetry.org/docs/):
+```bash
+poetry install -E develop
+```
 
 Run databases:
-
-```docker-compose up -d```
+```bash
+docker-compose up -d
+```
 
 Run tests:
-
-```pytest tests -v -s```
+```bash
+pytest tests -v -s
+```
 
 Discuss
 -------
