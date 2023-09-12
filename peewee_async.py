@@ -20,6 +20,7 @@ import logging
 import uuid
 import warnings
 
+import importlib_metadata
 import peewee
 from playhouse.db_url import register_database
 
@@ -45,7 +46,8 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = '0.8.1'
+__version__ = importlib_metadata.version("peewee-async")
+
 
 __all__ = [
     # High level API ###

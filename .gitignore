@@ -1,9 +1,6 @@
 .DS_Store
 .idea/
 
-# Local config
-tests.json
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -60,6 +57,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# poetry
+poetry.lock
 
 # pytest
 .pytest_cache/
