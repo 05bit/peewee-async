@@ -4,6 +4,10 @@ version = "0.9.0"
 description = "Asynchronous interface for peewee ORM powered by asyncio."
 authors = ["Alexey Kinev <rudy@05bit.com>", "Gorshkov Nikolay(contributor) <nogamemorebrain@gmail.com>"]
 readme = "README.md"
+packages = [
+    { include = "peewee_async.py" },
+    { include = "peewee_asyncext.py" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.7"
@@ -20,7 +24,7 @@ pytest-asyncio = { version = "^0.21.1", optional = true }
 [tool.poetry.extras]
 postgresql = ["aiopg"]
 mysql = ["aiomysql", "cryptography"]
-develop = ["aiopg", "aiomysql", "cryptography", "importlib-metadata", "pytest", "pytest-asyncio"]
+develop = ["aiopg", "aiomysql", "cryptography", "pytest", "pytest-asyncio"]
 
 [build-system]
 requires = ["poetry-core"]
