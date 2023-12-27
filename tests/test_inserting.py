@@ -14,7 +14,6 @@ async def test_insert_many(manager):
 
     last_id = await manager.execute(query)
 
-    TestModel.get()
     res = await manager.execute(TestModel.select())
     assert len(res) == 2
     assert last_id in [m.id for m in res]
