@@ -13,6 +13,7 @@ class TestModel(peewee.Model):
 
 
 class TestModelAlpha(peewee.Model):
+    __test__ = False
     text = peewee.CharField()
 
     def __str__(self):
@@ -20,6 +21,7 @@ class TestModelAlpha(peewee.Model):
 
 
 class TestModelBeta(peewee.Model):
+    __test__ = False
     alpha = peewee.ForeignKeyField(TestModelAlpha, backref='betas')
     text = peewee.CharField()
 
@@ -28,6 +30,7 @@ class TestModelBeta(peewee.Model):
 
 
 class TestModelGamma(peewee.Model):
+    __test__ = False
     text = peewee.CharField()
     beta = peewee.ForeignKeyField(TestModelBeta, backref='gammas')
 
@@ -50,3 +53,9 @@ class CompositeTestModel(peewee.Model):
 
     class Meta:
         primary_key = peewee.CompositeKey('uuid', 'alpha')
+
+
+ALL_MODELS = (
+    TestModel, UUIDTestModel, TestModelAlpha,
+    TestModelBeta, TestModelGamma, CompositeTestModel
+)

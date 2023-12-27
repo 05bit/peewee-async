@@ -1,10 +1,11 @@
 import asyncio
 
 import pytest
+from peewee import sort_models
 
 import peewee_async
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
-from tests.models import TestModel, UUIDTestModel, TestModelAlpha, TestModelBeta, TestModelGamma, CompositeTestModel
+from tests.models import ALL_MODELS
 
 try:
     import aiopg
@@ -34,19 +35,20 @@ async def manager(request):
 
     params = DB_DEFAULTS[db]
     database = DB_CLASSES[db](**params)
-    models = [TestModel, UUIDTestModel, TestModelAlpha,
-              TestModelBeta, TestModelGamma, CompositeTestModel]
+    database._allow_sync = False
     manager = peewee_async.Manager(database)
     with manager.allow_sync():
-        for model in models:
+        for model in ALL_MODELS:
             model._meta.database = database
             model.create_table(True)
 
     yield peewee_async.Manager(database)
+
+    with manager.allow_sync():
+        for model in reversed(sort_models(ALL_MODELS)):
+            model.delete().execute()
+            model._meta.database = None
     await database.close_async()
-    for model in reversed(models):
-        model.drop_table(fail_silently=True)
-        model._meta.database = None
 
 
 PG_DBS = [
