@@ -1374,3 +1374,99 @@ class TaskLocals:
         """Delete data for task from stored data dict.
         """
         del self.data[id(task)]
+
+
+class AioQueryMixin:
+    @peewee.database_required
+    async def aio_execute(self, database):
+        return await execute(self)
+
+
+class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
+    pass
+
+
+class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
+    pass
+
+
+class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
+    pass
+
+
+class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
+
+    async def aio_get(self, database=None):
+        clone = self.paginate(1, 1)
+        try:
+            return (await clone.aio_execute(database))[0]
+        except IndexError:
+            sql, params = clone.sql()
+            raise self.model.DoesNotExist('%s instance matching query does '
+                                          'not exist:\nSQL: %s\nParams: %s' %
+                                          (clone.model, sql, params))
+
+
+class AioModel(peewee.Model):
+    """
+    Implementation of most methods is copied from sync versions with replacement to async calls
+    """
+
+    @classmethod
+    def select(cls, *fields):
+        is_default = not fields
+        if not fields:
+            fields = cls._meta.sorted_fields
+        return AioModelSelect(cls, fields, is_default=is_default)
+
+    @classmethod
+    def update(cls, __data=None, **update):
+        return AioModelUpdate(cls, cls._normalize_data(__data, update))
+
+    @classmethod
+    def insert(cls, __data=None, **insert):
+        return AioModelInsert(cls, cls._normalize_data(__data, insert))
+
+    @classmethod
+    def insert_many(cls, rows, fields=None):
+        return AioModelInsert(cls, insert=rows, columns=fields)
+
+    @classmethod
+    def insert_from(cls, query, fields):
+        columns = [getattr(cls, field) if isinstance(field, str)
+                   else field for field in fields]
+        return AioModelInsert(cls, insert=query, columns=columns)
+
+    @classmethod
+    def delete(cls):
+        return AioModelDelete(cls)
+
+    @classmethod
+    async def aio_get(cls, *query, **filters):
+        sq = cls.select()
+        if query:
+            if len(query) == 1 and isinstance(query[0], int):
+                sq = sq.where(cls._meta.primary_key == query[0])
+            else:
+                sq = sq.where(*query)
+        if filters:
+            sq = sq.filter(**filters)
+        return await sq.aio_get()
+
+    @classmethod
+    async def aio_get_or_none(cls, *query, **filters):
+        try:
+            return await cls.aio_get(*query, **filters)
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
+    async def aio_create(cls, **data):
+        """
+        the implementation is different from sync create method
+        """
+        inst = cls(**data)
+        pk = await cls.insert(**dict(inst.__data__)).aio_execute()
+        if inst._pk is None:
+            inst._pk = pk
+        return inst
