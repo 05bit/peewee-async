@@ -10,9 +10,8 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 peewee = "^3.15.4"
-importlib-metadata = "^6.7.0"
 
 aiopg = { version = "^1.4.0", optional = true }
 aiomysql = { version = "^0.2.0", optional = true }
