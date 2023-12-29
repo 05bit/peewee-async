@@ -20,8 +20,8 @@ import logging
 import uuid
 import warnings
 
-import importlib_metadata
 import peewee
+from importlib.metadata import version
 from playhouse.db_url import register_database
 
 IntegrityErrors = (peewee.IntegrityError,)
@@ -46,7 +46,7 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = importlib_metadata.version("peewee-async")
+__version__ = version("peewee-async")
 
 
 __all__ = [
