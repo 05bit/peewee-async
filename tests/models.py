@@ -2,8 +2,10 @@ import uuid
 
 import peewee
 
+from peewee_async import AioModel
 
-class TestModel(peewee.Model):
+
+class TestModel(AioModel):
     __test__ = False  # disable pytest warnings
     text = peewee.CharField(max_length=100, unique=True)
     data = peewee.TextField(default='')
@@ -12,7 +14,7 @@ class TestModel(peewee.Model):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
-class TestModelAlpha(peewee.Model):
+class TestModelAlpha(AioModel):
     __test__ = False
     text = peewee.CharField()
 
@@ -20,7 +22,7 @@ class TestModelAlpha(peewee.Model):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
-class TestModelBeta(peewee.Model):
+class TestModelBeta(AioModel):
     __test__ = False
     alpha = peewee.ForeignKeyField(TestModelAlpha, backref='betas')
     text = peewee.CharField()
@@ -29,7 +31,7 @@ class TestModelBeta(peewee.Model):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
-class TestModelGamma(peewee.Model):
+class TestModelGamma(AioModel):
     __test__ = False
     text = peewee.CharField()
     beta = peewee.ForeignKeyField(TestModelBeta, backref='gammas')
@@ -38,7 +40,7 @@ class TestModelGamma(peewee.Model):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
-class UUIDTestModel(peewee.Model):
+class UUIDTestModel(AioModel):
     id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
     text = peewee.CharField()
 
@@ -46,7 +48,7 @@ class UUIDTestModel(peewee.Model):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
-class CompositeTestModel(peewee.Model):
+class CompositeTestModel(AioModel):
     """A simple "through" table for many-to-many relationship."""
     uuid = peewee.ForeignKeyField(UUIDTestModel)
     alpha = peewee.ForeignKeyField(TestModelAlpha)
