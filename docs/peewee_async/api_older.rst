@@ -7,10 +7,6 @@ Select, update, delete
 ----------------------
 
 .. autofunction:: peewee_async.execute
-.. autofunction:: peewee_async.get_object
-.. autofunction:: peewee_async.create_object
-.. autofunction:: peewee_async.delete_object
-.. autofunction:: peewee_async.update_object
 .. autofunction:: peewee_async.prefetch
 
 Transactions
