@@ -31,8 +31,7 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
         database = PostgresqlExtDatabase('test', register_hstore=False)
 
     See also:
-    https://peewee.readthedocs.io/en/latest/peewee/
-        playhouse.html#PostgresqlExtDatabase
+    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = 1
@@ -70,8 +69,7 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin,
                                                max_connections=20)
 
     See also:
-    https://peewee.readthedocs.io/en/latest/peewee/
-        playhouse.html#PostgresqlExtDatabase
+    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
