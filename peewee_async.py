@@ -1408,8 +1408,21 @@ class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
 
 
 class AioModel(peewee.Model):
-    """
-    Implementation of most methods is copied from sync versions with replacement to async calls
+    """Async version of **peewee.Model** that allows to execute queries asynchronously
+    with **aio_execute** method
+
+    Example::
+
+        class User(peewee_async.AioModel):
+            username = peewee.CharField(max_length=40, unique=True)
+
+        await User.select().where(User.username == 'admin').aio_execute()
+
+    Also it provides async versions of **peewee.Model** shortcuts
+
+    Example::
+
+        user = await User.aio_get(User.username == 'user')
     """
 
     @classmethod
@@ -1443,6 +1456,10 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_get(cls, *query, **filters):
+        """
+        Async version of **peewee.Model.get**
+        """
+
         sq = cls.select()
         if query:
             if len(query) == 1 and isinstance(query[0], int):
@@ -1455,6 +1472,9 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_get_or_none(cls, *query, **filters):
+        """
+        Async version of **peewee.Model.get_or_none**
+        """
         try:
             return await cls.aio_get(*query, **filters)
         except cls.DoesNotExist:
@@ -1463,7 +1483,7 @@ class AioModel(peewee.Model):
     @classmethod
     async def aio_create(cls, **data):
         """
-        the implementation is different from sync create method
+        INSERT new row into table and return corresponding model instance.
         """
         inst = cls(**data)
         pk = await cls.insert(**dict(inst.__data__)).aio_execute()

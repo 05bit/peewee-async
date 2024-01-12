@@ -26,14 +26,14 @@ OK, let's provide an example::
 
 Let's define a simple model::
 
-    class PageBlock(peewee.Model):
+    class PageBlock(peewee_async.AioModel):
         key = peewee.CharField(max_length=40, unique=True)
         text = peewee.TextField(default='')
 
         class Meta:
             database = database
 
--- as you can see, nothing special in this code, just plain ``peewee.Model`` definition.
+-- as you can see, nothing special in this code, just plain ``peewee_async.AioModel`` definition.
 
 Now we need to create a table for model::
 
@@ -41,27 +41,20 @@ Now we need to create a table for model::
 
 -- this code is **sync**, and will do **absolutely the same thing** as would do code with regular ``peewee.PostgresqlDatabase``. This is intentional, I believe there's just no need to run database initialization code asynchronously! *Less code, less errors*.
 
-From now we may want **only async** calls and treat sync as unwanted or as errors::
-
-    objects.database.allow_sync = False # this will raise AssertionError on ANY sync call
-
--- alternatevely we can set ``ERROR`` or ``WARNING`` loggin level to ``database.allow_sync``::
-
-    objects.database.allow_sync = logging.ERROR
-
 Finally, let's do something async::
 
     async def my_async_func():
         # Add new page block
-        await objects.create_or_get(
-            PageBlock, key='title',
-            text="Peewee is AWESOME with async!")
+        await PageBlock.aio_create(
+            key='title',
+            text="Peewee is AWESOME with async!"
+        )
 
         # Get one by key
-        title = await objects.get(PageBlock, key='title')
+        title = await PageBlock.aio_get(PageBlock, key='title')
         print("Was:", title.text)
 
-        # Save with new text
+        # Save with new text using manager
         title.text = "Peewee is SUPER awesome with async!"
         await objects.update(title)
         print("New:", title.text)
@@ -71,7 +64,8 @@ Finally, let's do something async::
 
 **That's it!**
 
-Other methods for operations like selecting, deleting etc. are listed below.
+As you may notice you can use methods from **Manager** or from **AioModel** for operations like selecting, deleting etc.
+All of them are listed below.
 
 Manager
 -------
@@ -133,3 +127,14 @@ Databases
 
 .. autoclass:: peewee_async.PooledMySQLDatabase
     :members: init
+
+AioModel
+--------
+
+.. autoclass:: peewee_async.AioModel
+
+.. automethod:: peewee_async.AioModel.aio_get
+
+.. automethod:: peewee_async.AioModel.aio_get_or_none
+
+.. automethod:: peewee_async.AioModel.aio_create
