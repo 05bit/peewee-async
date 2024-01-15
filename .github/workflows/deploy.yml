@@ -14,8 +14,8 @@ jobs:
 
       - name: Install poetry
         run: |
-          pipx install poetry
-          pipx inject poetry poetry-bumpversion
+          python -m pip install --upgrade pip
+          pip install poetry
 
       - name: Build
         run: |
