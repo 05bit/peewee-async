@@ -11,9 +11,7 @@ peewee-async
 .. _peewee: https://github.com/coleifer/peewee
 .. _asyncio: https://docs.python.org/3/library/asyncio.html
 
-Current state: **alpha**, yet API seems fine and mostly stable.
-
-In current version new-high level API is introduced while older low-level API partially marked as deprecated.
+Current state: **beta**, API is fine and mostly stable.
 
 * Works on Python 3.8+
 * Has support for PostgreSQL via `aiopg`
