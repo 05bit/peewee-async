@@ -265,6 +265,62 @@ class Manager:
                     query.append(field == value)
             return (await self.get(model_, *query)), False
 
+    async def get_or_none(self, source_, *args, **kwargs):
+        """Get the model instance. Returns None if object matching criteria not found in database
+
+        :param source_: model or base query for lookup
+
+        Example::
+
+            async def my_async_func():
+                obj1 = await objects.get_or_none(MyModel, id=1)
+                obj2 = await objects.get_or_none(MyModel, MyModel.id==1)
+                obj3 = await objects.get_or_none(MyModel.select().where(MyModel.id==1))
+
+        All will return `MyModel` instance with `id = 1` or None if object matching criteria not found in database
+        """
+        try:
+            return await self.get(source_, *args, **kwargs)
+        except peewee.DoesNotExist:
+            return None
+
+    async def _peek(self, query, n: int = 1):
+        """
+        Migrated directly from peewee.
+        Executes query and returns single model if n=1 and list of models if n > 1
+        """
+        await self.connect()
+        rows = (await self.execute(query))[:n]
+
+        if rows:
+            return rows[0] if n == 1 else rows
+
+    # This method is much faster than get(...) with large tables because get will query all items
+    async def first(self, source_, n: int = 1):
+        """Get first N model instances matching criteria.
+
+        :param source_: model or base query for lookup
+        :param n: maximum count of models to return
+
+        Example::
+
+            async def get_five_oldest_bobs():
+                query = User.select().where(User.name == 'Bob').order_by(User.age.desc())
+                users = await objects.first(query, n=5)
+
+        Will return five oldest users with name Bob
+        """
+        if isinstance(source_, peewee.Query):
+            query = source_
+        else:
+            query = source_.select()
+
+        if query._limit != n:
+            query._limit = n
+            query._cursor_wrapper = None
+
+        return await self._peek(query, n=n)
+
     async def execute(self, query):
         """Execute query asyncronously.
         """
