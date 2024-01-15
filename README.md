@@ -20,7 +20,7 @@ Overview
 * Transactions support is present, yet not heavily tested
 
 The complete documentation:  
-http://peewee-async.readthedocs.io
+http://peewee-async-lib.readthedocs.io
 
 Install
 -------
@@ -28,13 +28,13 @@ Install
 Install with `pip` for PostgreSQL:
 
 ```bash
-pip install --pre peewee-async; pip install aiopg
+pip install peewee-async[postgresql]
 ```
 
 or for MySQL:
 
 ```bash
-pip install --pre peewee-async; pip install aiomysql
+pip install peewee-async[mysql]
 ```
 
 Quickstart
@@ -102,7 +102,9 @@ with objects.allow_sync():
 Documentation
 -------------
 
-http://peewee-async.readthedocs.io
+http://peewee-async-lib.readthedocs.io
+
+http://peewee-async.readthedocs.io - **DEPRECATED**
 
 Developing
 ----------
