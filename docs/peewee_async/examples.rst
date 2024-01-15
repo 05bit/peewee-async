@@ -1,7 +1,6 @@
 More examples
 =============
 
-**TODO:** update examples to high-level API.
 
 Using both sync and async calls
 -------------------------------
@@ -15,7 +14,7 @@ Using both sync and async calls
     database = peewee_async.PostgresqlDatabase('test')
     loop = asyncio.get_event_loop()
 
-    class TestModel(peewee.Model):
+    class TestModel(peewee_async.AioModel):
         text = peewee.CharField()
 
         class Meta:
@@ -26,17 +25,15 @@ Using both sync and async calls
     # This is optional: close sync connection
     database.close()
 
-    @asyncio.coroutine
-    def my_handler():
+    async def my_handler():
         obj1 = TestModel.create(text="Yo, I can do it sync!")
-        obj2 = yield from peewee_async.create_object(TestModel, text="Not bad. Watch this, I'm async!")
+        obj2 = await TestModel.aio_create(text="Not bad. Watch this, I'm async!")
 
-        all_objects = yield from peewee_async.execute(TestModel.select())
+        all_objects = await TestModel.select().aio_execute()
         for obj in all_objects:
             print(obj.text)
 
-        obj1.delete_instance()
-        yield from peewee_async.delete_object(obj2)
+        await TestModel.delete().aio_execute()
 
     loop.run_until_complete(database.connect_async(loop=loop))
     loop.run_until_complete(my_handler())
@@ -54,16 +51,15 @@ Using transactions
     # ... some init code ...
 
     async def test():
-        obj = await create_object(TestModel, text='FOO')
+        obj = await TestModel.aio_create(text='FOO')
         obj_id = obj.id
 
         try:
             async with database.atomic_async():
-                obj.text = 'BAR'
-                await update_object(obj)
+                await TestModel.update(text='BAR').where(TestModel.id == obj_id).aio_execute()
                 raise Exception('Fake error')
         except:
-            res = await get_object(TestModel, TestModel.id == obj_id)
+            res = await TestModel.aio_get(TestModel.id == obj_id)
 
         print(res.text) # Should print 'FOO', not 'BAR'
 

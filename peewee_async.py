@@ -20,8 +20,8 @@ import logging
 import uuid
 import warnings
 
-import importlib_metadata
 import peewee
+from importlib.metadata import version
 from playhouse.db_url import register_database
 
 IntegrityErrors = (peewee.IntegrityError,)
@@ -46,7 +46,7 @@ try:
 except AttributeError:
     asyncio_current_task = asyncio.Task.current_task
 
-__version__ = importlib_metadata.version("peewee-async")
+__version__ = version("peewee-async")
 
 
 __all__ = [
@@ -1374,3 +1374,119 @@ class TaskLocals:
         """Delete data for task from stored data dict.
         """
         del self.data[id(task)]
+
+
+class AioQueryMixin:
+    @peewee.database_required
+    async def aio_execute(self, database):
+        return await execute(self)
+
+
+class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
+    pass
+
+
+class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
+    pass
+
+
+class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
+    pass
+
+
+class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
+
+    async def aio_get(self, database=None):
+        clone = self.paginate(1, 1)
+        try:
+            return (await clone.aio_execute(database))[0]
+        except IndexError:
+            sql, params = clone.sql()
+            raise self.model.DoesNotExist('%s instance matching query does '
+                                          'not exist:\nSQL: %s\nParams: %s' %
+                                          (clone.model, sql, params))
+
+
+class AioModel(peewee.Model):
+    """Async version of **peewee.Model** that allows to execute queries asynchronously
+    with **aio_execute** method
+
+    Example::
+
+        class User(peewee_async.AioModel):
+            username = peewee.CharField(max_length=40, unique=True)
+
+        await User.select().where(User.username == 'admin').aio_execute()
+
+    Also it provides async versions of **peewee.Model** shortcuts
+
+    Example::
+
+        user = await User.aio_get(User.username == 'user')
+    """
+
+    @classmethod
+    def select(cls, *fields):
+        is_default = not fields
+        if not fields:
+            fields = cls._meta.sorted_fields
+        return AioModelSelect(cls, fields, is_default=is_default)
+
+    @classmethod
+    def update(cls, __data=None, **update):
+        return AioModelUpdate(cls, cls._normalize_data(__data, update))
+
+    @classmethod
+    def insert(cls, __data=None, **insert):
+        return AioModelInsert(cls, cls._normalize_data(__data, insert))
+
+    @classmethod
+    def insert_many(cls, rows, fields=None):
+        return AioModelInsert(cls, insert=rows, columns=fields)
+
+    @classmethod
+    def insert_from(cls, query, fields):
+        columns = [getattr(cls, field) if isinstance(field, str)
+                   else field for field in fields]
+        return AioModelInsert(cls, insert=query, columns=columns)
+
+    @classmethod
+    def delete(cls):
+        return AioModelDelete(cls)
+
+    @classmethod
+    async def aio_get(cls, *query, **filters):
+        """
+        Async version of **peewee.Model.get**
+        """
+
+        sq = cls.select()
+        if query:
+            if len(query) == 1 and isinstance(query[0], int):
+                sq = sq.where(cls._meta.primary_key == query[0])
+            else:
+                sq = sq.where(*query)
+        if filters:
+            sq = sq.filter(**filters)
+        return await sq.aio_get()
+
+    @classmethod
+    async def aio_get_or_none(cls, *query, **filters):
+        """
+        Async version of **peewee.Model.get_or_none**
+        """
+        try:
+            return await cls.aio_get(*query, **filters)
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
+    async def aio_create(cls, **data):
+        """
+        INSERT new row into table and return corresponding model instance.
+        """
+        inst = cls(**data)
+        pk = await cls.insert(**dict(inst.__data__)).aio_execute()
+        if inst._pk is None:
+            inst._pk = pk
+        return inst

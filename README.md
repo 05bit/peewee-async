@@ -5,13 +5,13 @@ Asynchronous interface for **[peewee](https://github.com/coleifer/peewee)**
 ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 
 ![CI workflow](https://github.com/05bit/peewee-async/actions/workflows/ci.yml/badge.svg) [![PyPi Version](https://img.shields.io/pypi/v/peewee-async.svg)](https://pypi.python.org/pypi/peewee-async)
- [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://peewee-async.readthedocs.io/en/latest/?badge=latest)
+ [![Documentation Status](https://readthedocs.org/projects/peewee-async-lib/badge/?version=latest)](https://peewee-async-lib.readthedocs.io/en/latest/?badge=latest)
 
 
 Overview
 --------
 
-* Requires Python 3.7+
+* Requires Python 3.8+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Single point for high-level async API
@@ -20,7 +20,7 @@ Overview
 * Transactions support is present, yet not heavily tested
 
 The complete documentation:  
-http://peewee-async.readthedocs.io
+http://peewee-async-lib.readthedocs.io
 
 Install
 -------
@@ -28,13 +28,13 @@ Install
 Install with `pip` for PostgreSQL:
 
 ```bash
-pip install --pre peewee-async; pip install aiopg
+pip install peewee-async[postgresql]
 ```
 
 or for MySQL:
 
 ```bash
-pip install --pre peewee-async; pip install aiomysql
+pip install peewee-async[mysql]
 ```
 
 Quickstart
@@ -102,7 +102,9 @@ with objects.allow_sync():
 Documentation
 -------------
 
-http://peewee-async.readthedocs.io
+http://peewee-async-lib.readthedocs.io
+
+http://peewee-async.readthedocs.io - **DEPRECATED**
 
 Developing
 ----------

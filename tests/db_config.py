@@ -26,7 +26,6 @@ DB_DEFAULTS = {
     'mysql': MYSQL_DEFAULTS,
     'mysql-pool': MYSQL_DEFAULTS
 }
-DB_OVERRIDES = {}
 DB_CLASSES = {
     'postgres': peewee_async.PostgresqlDatabase,
     'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
