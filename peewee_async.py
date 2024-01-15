@@ -356,6 +356,10 @@ class Manager:
         The essential limitation though is that database backend have
         to be **the same type** for model and manager!
         """
+        if isinstance(query, tuple):
+            _query, _target = query
+            return (super()._swap_database(_query), _target)
+
         database = _query_db(query)
 
         if database == self.database:
