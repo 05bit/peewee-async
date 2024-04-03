@@ -26,22 +26,6 @@ async def test_atomic_success(manager):
 
 
 @all_dbs
-async def test_atomic_fail_with_disconnect(manager):
-    """Database gone in transaction.
-    """
-
-    error = False
-    try:
-        async with manager.atomic():
-            await manager.database.close_async()
-            raise FakeUpdateError()
-    except FakeUpdateError:
-        error = True
-
-    assert error is True
-
-
-@all_dbs
 async def test_atomic_failed(manager):
     """Failed update in transaction.
     """
@@ -86,9 +70,7 @@ async def test_several_transactions(manager):
 
 
 @all_dbs
-@pytest.mark.skip
 async def test_acid_when_connetion_has_been_brooken(manager):
-    # TODO make this test passed
     async def restart_connections(event_for_lock: asyncio.Event) -> None:
         event_for_lock.set()
         # С этого момента БД доступна, пулл в порядке, всё хорошо. Таски могут работать работу
@@ -149,6 +131,6 @@ async def test_acid_when_connetion_has_been_brooken(manager):
     # (!) Убеждаемся, что атомарность работает (!)
     # Т.е. у нас должны либо закоммититься 2 записи, либо ни одной
     a = list(await manager.execute(TestModel.select()))
-    assert len(a) in (0, 2), f'WTF, peewee-async ?! Saved rows: {a}'
+    assert len(a) == 0, f'WTF, peewee-async ?! Saved rows: {a}'
     # Если assert выше упал, то в БД оказалась 1 запись, а не 0 или 2.
     # Хотя мы на уровне кода пытались гарантировать, что такого не будет

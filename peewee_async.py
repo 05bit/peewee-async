@@ -59,8 +59,6 @@ __all__ = [
     'PooledMySQLDatabase',
 
     # Low level API ###
-
-    'execute',
     'count',
     'scalar',
     'atomic',
@@ -268,8 +266,7 @@ class Manager:
     async def execute(self, query):
         """Execute query asyncronously.
         """
-        query = self._swap_database(query)
-        return (await execute(query))
+        return await self.database.aio_execute(query)
 
     async def prefetch(self, query, *subqueries, prefetch_type=peewee.PREFETCH_TYPE.JOIN):
         """Asynchronous version of the `prefetch()` from peewee.
@@ -408,28 +405,6 @@ class Manager:
 #################
 # Async queries #
 #################
-
-
-async def execute(query):
-    """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
-
-    :param query: peewee query instance created with ``Model.select()``,
-                  ``Model.update()`` etc.
-    :return: result depends on query type, it's the same as for sync
-        ``query.execute()``
-    """
-    if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
-        coroutine = select
-    elif isinstance(query, peewee.Update):
-        coroutine = update
-    elif isinstance(query, peewee.Insert):
-        coroutine = insert
-    elif isinstance(query, peewee.Delete):
-        coroutine = delete
-    else:
-        coroutine = raw_query
-
-    return (await coroutine(query))
 
 
 async def _execute_with_returning(query):
@@ -574,8 +549,9 @@ async def raw_query(query):
 async def prefetch(sq, *subqueries, prefetch_type):
     """Asynchronous version of the `prefetch()` from peewee.
     """
+    database = _query_db(sq)
     if not subqueries:
-        result = await execute(sq)
+        result = await database.aio_execute(sq)
         return result
 
     fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
@@ -592,8 +568,8 @@ async def prefetch(sq, *subqueries, prefetch_type):
         deps[query_model] = {}
         id_map = deps[query_model]
         has_relations = bool(rel_map.get(query_model))
-
-        result = await execute(pq.query)
+        database = _query_db(pq.query)
+        result = await database.aio_execute(pq.query)
 
         for instance in result:
             if pq.fields:
@@ -689,8 +665,12 @@ class AsyncDatabase:
     _timeout = None  # connection timeout
     _allow_sync = True  # whether sync queries are allowed
     _async_conn = None  # async connection
-    _async_wait = None  # connection waiter
     _task_data = None  # asyncio per-task data
+
+    def __init__(self, database, **kwargs):
+        self._async_lock = asyncio.Lock()
+        super().__init__(database, **kwargs)
+
 
     def __setattr__(self, name, value):
         if name == 'allow_sync':
@@ -718,35 +698,22 @@ class AsyncDatabase:
         if self.deferred:
             raise Exception("Error, database not properly initialized "
                             "before opening connection")
-
-        if self._async_conn:
-            return
-        elif self._async_wait:
-            await self._async_wait
-        else:
+        async with self._async_lock:
+            if self._async_conn:
+                return
+            if self._task_data is None:
+                self._task_data = TaskLocals(loop=self._loop)
             self._loop = loop
-            self._async_wait = asyncio.Future(loop=self._loop)
-
             if not timeout and self._timeout:
                 timeout = self._timeout
-
             conn = self._async_conn_cls(
                 database=self.database,
                 loop=self._loop,
                 timeout=timeout,
-                **self.connect_params_async)
-
-            try:
-                await conn.connect()
-            except Exception as e:
-                if not self._async_wait.done():
-                    self._async_wait.set_exception(e)
-                self._async_wait = None
-                raise
-            else:
-                self._task_data = TaskLocals(loop=self._loop)
-                self._async_conn = conn
-                self._async_wait.set_result(True)
+                **self.connect_params_async
+            )
+            await conn.connect()
+            self._async_conn = conn
 
     async def cursor_async(self):
         """Acquire async cursor.
@@ -758,23 +725,16 @@ class AsyncDatabase:
         else:
             conn = None
 
-        try:
-            return (await self._async_conn.cursor(conn=conn))
-        except:
-            await self.close_async()
-            raise
+        return await self._async_conn.cursor(conn=conn)
 
     async def close_async(self):
         """Close async connection.
         """
-        if self._async_wait:
-            await self._async_wait
-        if self._async_conn:
-            conn = self._async_conn
-            self._async_conn = None
-            self._async_wait = None
-            self._task_data = None
-            await conn.close()
+        async with self._async_lock:
+            if self._async_conn:
+                conn = self._async_conn
+                self._async_conn = None
+                await conn.close()
 
     async def push_transaction_async(self):
         """Increment async transaction depth.
@@ -869,6 +829,27 @@ class AsyncDatabase:
                         (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
+    async def aio_execute(self, query):
+        """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
+
+        :param query: peewee query instance created with ``Model.select()``,
+                      ``Model.update()`` etc.
+        :return: result depends on query type, it's the same as for sync
+            ``query.execute()``
+        """
+        if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
+            coroutine = select
+        elif isinstance(query, peewee.Update):
+            coroutine = update
+        elif isinstance(query, peewee.Insert):
+            coroutine = insert
+        elif isinstance(query, peewee.Delete):
+            coroutine = delete
+        else:
+            coroutine = raw_query
+
+        return (await coroutine(query))
+
 
 ##############
 # PostgreSQL #
@@ -917,7 +898,12 @@ class AsyncPostgresqlConnection:
         in_transaction = conn is not None
         if not conn:
             conn = await self.acquire()
-        cursor = await conn.cursor(*args, **kwargs)
+        try:
+            cursor = await conn.cursor(*args, **kwargs)
+        except:
+            if not in_transaction:
+                self.release(conn)
+            raise
         cursor.release = functools.partial(
             self.release_cursor, cursor,
             in_transaction=in_transaction)
@@ -1082,7 +1068,12 @@ class AsyncMySQLConnection:
         in_transaction = conn is not None
         if not conn:
             conn = await self.acquire()
-        cursor = await conn.cursor(*args, **kwargs)
+        try:
+            cursor = await conn.cursor(*args, **kwargs)
+        except:
+            if not in_transaction:
+                self.release(conn)
+            raise
         cursor.release = functools.partial(
             self.release_cursor, cursor,
             in_transaction=in_transaction)
@@ -1202,8 +1193,17 @@ class transaction:
             raise RuntimeError("The transaction must run within a task")
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
-            await _run_no_result_sql(self.db, 'BEGIN')
+            try:
+                await _run_no_result_sql(self.db, 'BEGIN')
+            except:
+                await self.pop_transaction()
         return self
+
+    async def pop_transaction(self):
+        # transaction depth may be zero if database gone
+        depth = self.db.transaction_depth_async()
+        if depth > 0:
+            await self.db.pop_transaction_async()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         try:
@@ -1216,10 +1216,7 @@ class transaction:
                     await self.rollback(False)
                     raise
         finally:
-            # transaction depth may be zero if database gone
-            depth = self.db.transaction_depth_async()
-            if depth > 0:
-                await self.db.pop_transaction_async()
+            await self.pop_transaction()
 
 
 class savepoint:
@@ -1379,7 +1376,7 @@ class TaskLocals:
 class AioQueryMixin:
     @peewee.database_required
     async def aio_execute(self, database):
-        return await execute(self)
+        return await database.aio_execute(self)
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):

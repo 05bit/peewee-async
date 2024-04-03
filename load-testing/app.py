@@ -1,50 +1,55 @@
-import peewee
-from fastapi import FastAPI
 import logging
-import uvicorn
 import random
+from contextlib import asynccontextmanager
+
+import peewee
+import uvicorn
+from aiopg.connection import Connection
+from aiopg.pool import Pool
+from fastapi import FastAPI
+
+acquire = Pool.acquire
+cursor = Connection.cursor
+
+
+def new_acquire(self):
+    choice = random.randint(1, 5)
+    if choice == 5:
+        raise Exception("some network error")  # network error imitation
+    return acquire(self)
+
+
+def new_cursor(self):
+    choice = random.randint(1, 5)
+    if choice == 5:
+        raise Exception("some network error")  # network error imitation
+    return cursor(self)
+
+Connection.cursor = new_cursor
+Pool.acquire = new_acquire
 
 import peewee_async
-from contextlib import asynccontextmanager
-import functools
+
 
 logging.basicConfig()
-pg_db = peewee_async.PooledPostgresqlDatabase(None)
+pg_db = peewee_async.PooledPostgresqlDatabase(
+    database='postgres',
+    user='postgres',
+    password='postgres',
+    host='localhost',
+    port=5432,
+    max_connections=3
+)
 
 
 class Manager(peewee_async.Manager):
     """Async models manager."""
 
-    database = peewee_async.PooledPostgresqlDatabase(
-        database='postgres',
-        user='postgres',
-        password='postgres',
-        host='localhost',
-        port=5432,
-    )
+    database = pg_db
 
 
 manager = Manager()
 
-
-def patch_manager(manager):
-    async def cursor(self, conn=None, *args, **kwargs):
-
-        choice = random.randint(1, 5)
-        if choice == 5:
-            raise Exception("some network error")  # network error imitation
-
-        # actual code
-        in_transaction = conn is not None
-        if not conn:
-            conn = await self.acquire()
-        cursor = await conn.cursor(*args, **kwargs)
-        cursor.release = functools.partial(
-            self.release_cursor, cursor,
-            in_transaction=in_transaction)
-        return cursor
-
-    manager.database._async_conn_cls.cursor = cursor
 
 def setup_logging():
     logger = logging.getLogger("uvicorn.error")
@@ -70,7 +75,6 @@ async def lifespan(app: FastAPI):
         operation='TRUNCATE TABLE MySimplestModel;',
     )
     setup_logging()
-    patch_manager(manager)
     yield
     # Clean up the ML models and release the resources
     await manager.close()
@@ -88,6 +92,46 @@ async def test():
         errors.add(str(e))
         raise
     return errors
+
+
+async def nested_transaction():
+    async with manager.transaction():
+        await manager.execute(MySimplestModel.update(id=1))
+
+
+async def nested_atomic():
+    async with manager.atomic():
+        await manager.execute(MySimplestModel.update(id=1))
+
+
+@app.get("/transaction")
+async def test():
+    try:
+        async with manager.transaction():
+            await manager.execute(MySimplestModel.update(id=1))
+            await nested_transaction()
+    except Exception as e:
+        errors.add(str(e))
+        raise
+    return errors
+
+
+@app.get("/atomic")
+async def test():
+    try:
+        async with manager.atomic():
+            await manager.execute(MySimplestModel.update(id=1))
+            await nested_atomic()
+    except Exception as e:
+        errors.add(str(e))
+        raise
+    return errors
+
+
+@app.get("/recreate_pool")
+async def test():
+    await manager.database.close_async()
+    await manager.database.connect_async()
 
 
 if __name__ == "__main__":

@@ -21,5 +21,5 @@ uvicorn app:app
 Run yandex-tank:
 
 ```bash
-docker run     -v $(pwd):/var/loadtest     --net host     -it yandex/yandex-tank
+docker run -v $(pwd):/var/loadtest --net host -it yandex/yandex-tank
 ```

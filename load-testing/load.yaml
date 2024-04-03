@@ -4,7 +4,7 @@ phantom:
     - /select
   load_profile:
     load_type: rps # schedule load by defining requests per second
-    schedule: const(50, 10m) # starting from 1rps growing linearly to 10rps during 10 minutes
+    schedule: const(100, 10m) # starting from 1rps growing linearly to 10rps during 10 minutes
 console:
   enabled: true # enable console output
 telegraf:
