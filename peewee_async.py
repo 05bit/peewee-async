@@ -59,6 +59,7 @@ __all__ = [
     'PooledMySQLDatabase',
 
     # Low level API ###
+    "execute",
     'count',
     'scalar',
     'atomic',
@@ -407,87 +408,14 @@ class Manager:
 #################
 
 
-async def _execute_with_returning(query):
-    cursor = await _execute_query_async(query)
-    result = AsyncQueryWrapper(cursor=cursor, query=query)
-    try:
-        await result.fetchall()
-    finally:
-        await cursor.release()
-    return result
+async def execute(query):
+    warnings.warn(
+        "`execute` is deprecated, `database.aio_execute` method.",
+        DeprecationWarning
+    )
+    database = _query_db(query)
+    return await database.aio_execute(query)
 
-
-async def select(query):
-    """Perform SELECT query asynchronously.
-    """
-    assert isinstance(query, peewee.SelectQuery),\
-        ("Error, trying to run select coroutine"
-         "with wrong query class %s" % str(query))
-
-    return await _execute_with_returning(query)
-
-
-async def insert(query):
-    """Perform INSERT query asynchronously. Returns last insert ID.
-    This function is called by object.create for single objects only.
-    """
-    assert isinstance(query, peewee.Insert),\
-        ("Error, trying to run insert coroutine"
-         "with wrong query class %s" % str(query))
-
-    if query._returning is not None and len(query._returning) > 1:
-        return await _execute_with_returning(query)
-
-    cursor = await _execute_query_async(query)
-
-    try:
-        if query._returning:
-            row = await cursor.fetchone()
-            if row is not None:
-                result = row[0]
-            else:
-                result = None
-        else:
-            database = _query_db(query)
-            last_id = await database.last_insert_id_async(cursor)
-            result = last_id
-    finally:
-        await cursor.release()
-
-    return result
-
-
-async def update(query):
-    """Perform UPDATE query asynchronously. Returns number of rows updated.
-    """
-    assert isinstance(query, peewee.Update),\
-        ("Error, trying to run update coroutine"
-         "with wrong query class %s" % str(query))
-
-    if query._returning:
-        return await _execute_with_returning(query)
-
-    cursor = await _execute_query_async(query)
-    rowcount = cursor.rowcount
-
-    await cursor.release()
-    return rowcount
-
-
-async def delete(query):
-    """Perform DELETE query asynchronously. Returns number of rows deleted.
-    """
-    assert isinstance(query, peewee.Delete),\
-        ("Error, trying to run delete coroutine"
-         "with wrong query class %s" % str(query))
-    if query._returning:
-        return await _execute_with_returning(query)
-
-    cursor = await _execute_query_async(query)
-    rowcount = cursor.rowcount
-
-    await cursor.release()
-    return rowcount
 
 
 async def count(query, clear_limit=False):
@@ -525,25 +453,6 @@ async def scalar(query, as_tuple=False):
         return row[0]
     else:
         return row
-
-
-async def raw_query(query):
-    assert isinstance(query, peewee.RawQuery),\
-        ("Error, trying to run raw_query coroutine"
-         "with wrong query class %s" % str(query))
-
-    cursor = await _execute_query_async(query)
-
-    result = AsyncQueryWrapper(cursor=cursor, query=query)
-    try:
-        while True:
-            await result.fetchone()
-    except GeneratorExit:
-        pass
-    finally:
-        await cursor.release()
-
-    return result
 
 
 async def prefetch(sq, *subqueries, prefetch_type):
@@ -829,6 +738,45 @@ class AsyncDatabase:
                         (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
+    async def as_async_query_wrapper(self, cursor, query):
+        result = AsyncQueryWrapper(cursor=cursor, query=query)
+        await result.fetchall()
+        return result
+
+    async def fetch_results(self, cursor, query):
+        sql = query.sql()
+        __log__.debug(sql)
+        await cursor.execute(*sql)
+        if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
+            return await self.as_async_query_wrapper(cursor=cursor, query=query)
+        if isinstance(query, peewee.Update):
+            if query._returning:
+                return await self.as_async_query_wrapper(cursor=cursor, query=query)
+            return cursor.rowcount
+        if isinstance(query, peewee.Insert):
+            if query._returning is not None and len(query._returning) > 1:
+                return await self.as_async_query_wrapper(cursor=cursor, query=query)
+
+            if query._returning:
+                row = await cursor.fetchone()
+                if row is not None:
+                    result = row[0]
+                else:
+                    result = None
+            else:
+                last_id = await self.last_insert_id_async(cursor)
+                result = last_id
+
+            return result
+        if isinstance(query, peewee.Delete):
+            if query._returning:
+                return await self.as_async_query_wrapper(cursor=cursor, query=query)
+
+            return cursor.rowcount
+        if isinstance(query, peewee.RawQuery):
+            return await self.as_async_query_wrapper(cursor=cursor, query=query)
+        raise Exception("Unknown type of query")
+
     async def aio_execute(self, query):
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
@@ -837,18 +785,12 @@ class AsyncDatabase:
         :return: result depends on query type, it's the same as for sync
             ``query.execute()``
         """
-        if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
-            coroutine = select
-        elif isinstance(query, peewee.Update):
-            coroutine = update
-        elif isinstance(query, peewee.Insert):
-            coroutine = insert
-        elif isinstance(query, peewee.Delete):
-            coroutine = delete
-        else:
-            coroutine = raw_query
-
-        return (await coroutine(query))
+        with peewee.__exception_wrapper__:
+            cursor = await self.cursor_async()
+            try:
+                return await self.fetch_results(cursor, query)
+            finally:
+                await cursor.release()
 
 
 ##############

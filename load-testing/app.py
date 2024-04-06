@@ -85,7 +85,7 @@ errors = set()
 
 
 @app.get("/select")
-async def test():
+async def select():
     try:
         await manager.execute(MySimplestModel.select())
     except Exception as e:
@@ -105,7 +105,7 @@ async def nested_atomic():
 
 
 @app.get("/transaction")
-async def test():
+async def transaction():
     try:
         async with manager.transaction():
             await manager.execute(MySimplestModel.update(id=1))
@@ -117,7 +117,7 @@ async def test():
 
 
 @app.get("/atomic")
-async def test():
+async def atomic():
     try:
         async with manager.atomic():
             await manager.execute(MySimplestModel.update(id=1))
@@ -129,7 +129,7 @@ async def test():
 
 
 @app.get("/recreate_pool")
-async def test():
+async def atomic():
     await manager.database.close_async()
     await manager.database.connect_async()
 
