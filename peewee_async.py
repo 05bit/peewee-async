@@ -713,7 +713,7 @@ class AsyncDatabase:
                 timeout=timeout,
                 **self.connect_params_async
             )
-            await conn.connect()
+            await conn.create()
             self._async_conn = conn
 
     async def cursor_async(self):
@@ -735,7 +735,7 @@ class AsyncDatabase:
             if self._async_conn:
                 conn = self._async_conn
                 self._async_conn = None
-                await conn.close()
+                await conn.terminate()
 
     async def push_transaction_async(self):
         """Increment async transaction depth.
@@ -852,7 +852,7 @@ class AsyncDatabase:
         return (await coroutine(query))
 
 
-class AsyncConnectionPool(metaclass=abc.ABCMeta):
+class AioPool(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
     def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
@@ -873,12 +873,12 @@ class AsyncConnectionPool(metaclass=abc.ABCMeta):
         self.pool.release(conn)
 
     @abc.abstractmethod
-    async def connect(self):
+    async def create(self):
         """Create connection pool asynchronously.
         """
         raise NotImplementedError
 
-    async def close(self):
+    async def terminate(self):
         """Terminate all pool connections.
         """
         self.pool.terminate()
@@ -906,9 +906,14 @@ class AsyncConnectionPool(metaclass=abc.ABCMeta):
         the connection is also released back to the pool.
         """
         conn = cursor.connection
-        await cursor.close()
+        await self.close_cursor(cursor)
         if not in_transaction:
             self.release(conn)
+
+    @abc.abstractmethod
+    async def close_cursor(self, cursor):
+        raise NotImplementedError
+
 
 
 ##############
@@ -916,7 +921,7 @@ class AsyncConnectionPool(metaclass=abc.ABCMeta):
 ##############
 
 
-class AsyncPostgresqlConnection(AsyncConnectionPool):
+class AioPostgresqlPool(AioPool):
     """Asynchronous database connection pool.
     """
     def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
@@ -927,7 +932,7 @@ class AsyncPostgresqlConnection(AsyncConnectionPool):
             **kwargs,
         )
 
-    async def connect(self):
+    async def create(self):
         """Create connection pool asynchronously.
         """
         self.pool = await aiopg.create_pool(
@@ -936,14 +941,8 @@ class AsyncPostgresqlConnection(AsyncConnectionPool):
             database=self.database,
             **self.connect_params)
 
-    async def release_cursor(self, cursor, in_transaction=False):
-        """Release cursor coroutine. Unless in transaction,
-        the connection is also released back to the pool.
-        """
-        conn = cursor.connection
+    async def close_cursor(self, cursor):
         cursor.close()
-        if not in_transaction:
-            self.release(conn)
 
 
 class AsyncPostgresqlMixin(AsyncDatabase):
@@ -953,7 +952,7 @@ class AsyncPostgresqlMixin(AsyncDatabase):
     if psycopg2:
         Error = psycopg2.Error
 
-    def init_async(self, conn_cls=AsyncPostgresqlConnection,
+    def init_async(self, conn_cls=AioPostgresqlPool,
                    enable_json=False, enable_hstore=False):
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
@@ -1054,11 +1053,11 @@ register_database(PooledPostgresqlDatabase, 'postgres+pool+async',
 #########
 
 
-class AsyncMySQLConnection(AsyncConnectionPool):
+class AioMysqlPool(AioPool):
     """Asynchronous database connection pool.
     """
 
-    async def connect(self):
+    async def create(self):
         """Create connection pool asynchronously.
         """
         self.pool = await aiomysql.create_pool(
@@ -1066,6 +1065,9 @@ class AsyncMySQLConnection(AsyncConnectionPool):
             db=self.database,
             connect_timeout=self.timeout,
             **self.connect_params)
+
+    async def close_cursor(self, cursor):
+        await cursor.close()
 
 
 class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
@@ -1087,7 +1089,7 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
             raise Exception("Error, aiomysql is not installed!")
         self.min_connections = 1
         self.max_connections = 1
-        self._async_conn_cls = kwargs.pop('async_conn', AsyncMySQLConnection)
+        self._async_conn_cls = kwargs.pop('async_conn', AioMysqlPool)
         super().init(database, **kwargs)
 
     @property
