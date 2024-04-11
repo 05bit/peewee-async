@@ -743,30 +743,6 @@ class AsyncDatabase:
     async def fetch_results(self, query, cursor):
         if isinstance(query, peewee.ModelCompoundSelectQuery):
             return await self.as_async_query_wrapper(cursor=cursor, query=query)
-        if isinstance(query, peewee.Update):
-            if query._returning:
-                return await self.as_async_query_wrapper(cursor=cursor, query=query)
-            return cursor.rowcount
-        if isinstance(query, peewee.Insert):
-            if query._returning is not None and len(query._returning) > 1:
-                return await self.as_async_query_wrapper(cursor=cursor, query=query)
-
-            if query._returning:
-                row = await cursor.fetchone()
-                if row is not None:
-                    result = row[0]
-                else:
-                    result = None
-            else:
-                last_id = await self.last_insert_id_async(cursor)
-                result = last_id
-
-            return result
-        if isinstance(query, peewee.Delete):
-            if query._returning:
-                return await self.as_async_query_wrapper(cursor=cursor, query=query)
-
-            return cursor.rowcount
         if isinstance(query, peewee.RawQuery):
             return await self.as_async_query_wrapper(cursor=cursor, query=query)
         raise Exception("Unknown type of query")
@@ -1304,15 +1280,36 @@ class AioQueryMixin:
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
-    pass
+    async def fetch_results(self, cursor):
+        if self._returning:
+            return await self.as_async_query_wrapper(cursor=cursor)
+        return cursor.rowcount
 
 
 class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
-    pass
+
+    async def fetch_results(self, cursor):
+        if self._returning:
+            return await self.as_async_query_wrapper(cursor=cursor)
+        return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
-    pass
+    async def fetch_results(self, cursor):
+        if self._returning is not None and len(self._returning) > 1:
+            return await self.as_async_query_wrapper(cursor=cursor)
+
+        if self._returning:
+            row = await cursor.fetchone()
+            if row is not None:
+                result = row[0]
+            else:
+                result = None
+        else:
+            last_id = await self._database.last_insert_id_async(cursor)
+            result = last_id
+
+        return result
 
 
 class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
