@@ -417,20 +417,26 @@ async def execute(query):
     return await database.aio_execute(query)
 
 
-
 async def count(query, clear_limit=False):
     """Perform *COUNT* aggregated query asynchronously.
 
     :return: number of objects in ``select()`` query
     """
     clone = query.clone()
+    database = _query_db(query)
     if query._distinct or query._group_by or query._limit or query._offset:
         if clear_limit:
             clone._limit = clone._offset = None
         sql, params = clone.sql()
         wrapped = 'SELECT COUNT(1) FROM (%s) AS wrapped_select' % sql
-        raw = query.model.raw(wrapped, *params)
-        return (await scalar(raw)) or 0
+        async def fetch_results(cursor):
+            row = await cursor.fetchone()
+            if row:
+                return row[0]
+            else:
+                return row
+        result = await database.aio_execute_sql(wrapped, params, fetch_results)
+        return result or 0
     else:
         clone._returning = [peewee.fn.Count(peewee.SQL('*'))]
         clone._order_by = None
@@ -438,21 +444,11 @@ async def count(query, clear_limit=False):
 
 
 async def scalar(query, as_tuple=False):
-    """Get single value from ``select()`` query, i.e. for aggregation.
-
-    :return: result is the same as after sync ``query.scalar()`` call
-    """
-    cursor = await _execute_query_async(query)
-
-    try:
-        row = await cursor.fetchone()
-    finally:
-        await cursor.release()
-
-    if row and not as_tuple:
-        return row[0]
-    else:
-        return row
+    warnings.warn(
+        "`scalar` is deprecated, use `query.aio_scalar` method.",
+        DeprecationWarning
+    )
+    return await query.aio_scalar(as_tuple=as_tuple)
 
 
 async def prefetch(sq, *subqueries, prefetch_type):
@@ -743,11 +739,8 @@ class AsyncDatabase:
         await result.fetchall()
         return result
 
-    async def fetch_results(self, cursor, query):
-        sql = query.sql()
-        __log__.debug(sql)
-        await cursor.execute(*sql)
-        if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
+    async def fetch_results(self, query, cursor):
+        if isinstance(query, peewee.ModelCompoundSelectQuery):
             return await self.as_async_query_wrapper(cursor=cursor, query=query)
         if isinstance(query, peewee.Update):
             if query._returning:
@@ -777,20 +770,30 @@ class AsyncDatabase:
             return await self.as_async_query_wrapper(cursor=cursor, query=query)
         raise Exception("Unknown type of query")
 
-    async def aio_execute(self, query):
+    async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
+        __log__.debug(sql, params)
+        with peewee.__exception_wrapper__:
+            cursor = await self.cursor_async()
+            try:
+                await cursor.execute(sql, params or ())
+                if fetch_results is not None:
+                    return await fetch_results(cursor)
+            finally:
+                await cursor.release()
+
+    async def aio_execute(self, query, fetch_results=None):
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
         :param query: peewee query instance created with ``Model.select()``,
                       ``Model.update()`` etc.
+        :param fetch_results: function with cursor param. It let you get data manually and don't need to close cursor
+                It will be closed automatically
         :return: result depends on query type, it's the same as for sync
             ``query.execute()``
         """
-        with peewee.__exception_wrapper__:
-            cursor = await self.cursor_async()
-            try:
-                return await self.fetch_results(cursor, query)
-            finally:
-                await cursor.release()
+        sql, params = query.sql()
+        default_fetch_results = getattr(query, "fetch_results", functools.partial(self.fetch_results, query))
+        return await self.aio_execute_sql(sql, params, fetch_results=fetch_results or default_fetch_results)
 
 
 ##############
@@ -1249,13 +1252,6 @@ async def _run_no_result_sql(database, operation, *args, **kwargs):
     await cursor.release()
 
 
-async def _execute_query_async(query):
-    """Execute query and return cursor object.
-    """
-    database = _query_db(query)
-    return (await _run_sql(database, *query.sql()))
-
-
 class TaskLocals:
     """Simple `dict` wrapper to get and set values on per `asyncio`
     task basis.
@@ -1320,6 +1316,11 @@ class AioQueryMixin:
     async def aio_execute(self, database):
         return await database.aio_execute(self)
 
+    async def as_async_query_wrapper(self, cursor):
+        result = AsyncQueryWrapper(cursor=cursor, query=self)
+        await result.fetchall()
+        return result
+
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
     pass
@@ -1334,6 +1335,25 @@ class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
 
 
 class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
+
+    async def fetch_results(self, cursor):
+        return await self.as_async_query_wrapper(cursor)
+
+    @peewee.database_required
+    async def aio_scalar(self, database, as_tuple=False, as_dict=False):
+        """Get single value from ``select()`` query, i.e. for aggregation.
+
+        :return: result is the same as after sync ``query.scalar()`` call
+        """
+        async def fetch_results(cursor):
+            row = await cursor.fetchone()
+            if row and not as_tuple:
+                return row[0]
+            else:
+                return row
+
+        return await database.aio_execute(self, fetch_results=fetch_results)
+
 
     async def aio_get(self, database=None):
         clone = self.paginate(1, 1)
