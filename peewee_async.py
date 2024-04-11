@@ -411,7 +411,7 @@ class Manager:
 
 async def execute(query):
     warnings.warn(
-        "`execute` is deprecated, `database.aio_execute` method.",
+        "`execute` is deprecated, use `database.aio_execute` method.",
         DeprecationWarning
     )
     database = _query_db(query)
