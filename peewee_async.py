@@ -1081,14 +1081,14 @@ class transaction:
         self.loop = db.loop
 
     async def commit(self, begin=True):
-        await _run_no_result_sql(self.db, 'COMMIT')
+        await self.db.aio_execute_sql("COMMIT")
         if begin:
-            await _run_no_result_sql(self.db, 'BEGIN')
+            await self.db.aio_execute_sql("BEGIN")
 
     async def rollback(self, begin=True):
-        await _run_no_result_sql(self.db, 'ROLLBACK')
+        await self.db.aio_execute_sql("ROLLBACK")
         if begin:
-            await _run_no_result_sql(self.db, 'BEGIN')
+            await self.db.aio_execute_sql("BEGIN")
 
     async def __aenter__(self):
         if not asyncio_current_task(loop=self.loop):
@@ -1096,7 +1096,7 @@ class transaction:
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
             try:
-                await _run_no_result_sql(self.db, 'BEGIN')
+                await self.db.aio_execute_sql("BEGIN")
             except:
                 await self.pop_transaction()
         return self
@@ -1131,16 +1131,13 @@ class savepoint:
         self.quoted_sid = self.sid.join(self.db.quote)
 
     async def commit(self):
-        await _run_no_result_sql(
-            self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
+        await self.db.aio_execute_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
 
     async def rollback(self):
-        await _run_no_result_sql(
-            self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+        await self.db.aio_execute_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
 
     async def __aenter__(self):
-        await _run_no_result_sql(
-            self.db, 'SAVEPOINT %s;' % self.quoted_sid)
+        await self.db.aio_execute_sql('SAVEPOINT %s;' % self.quoted_sid)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -1185,29 +1182,6 @@ def _query_db(query):
     incapsulates internal peewee's access to database.
     """
     return query._database
-
-
-async def _run_sql(database, operation, *args, **kwargs):
-    """Run SQL operation (query or command) against database.
-    """
-    __log__.debug((operation, args, kwargs))
-
-    with peewee.__exception_wrapper__:
-        cursor = await database.cursor_async()
-
-        try:
-            await cursor.execute(operation, *args, **kwargs)
-        except:
-            await cursor.release()
-            raise
-
-        return cursor
-
-
-async def _run_no_result_sql(database, operation, *args, **kwargs):
-    cursor = await _run_sql(database, operation, *args, **kwargs)
-    await cursor.release()
-
 
 class TaskLocals:
     """Simple `dict` wrapper to get and set values on per `asyncio`
