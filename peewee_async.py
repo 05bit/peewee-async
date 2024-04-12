@@ -60,6 +60,7 @@ __all__ = [
     'PooledMySQLDatabase',
 
     # Low level API ###
+    "execute",
     'count',
     'scalar',
     'atomic',
@@ -408,87 +409,13 @@ class Manager:
 #################
 
 
-async def _execute_with_returning(query):
-    cursor = await _execute_query_async(query)
-    result = AsyncQueryWrapper(cursor=cursor, query=query)
-    try:
-        await result.fetchall()
-    finally:
-        await cursor.release()
-    return result
-
-
-async def select(query):
-    """Perform SELECT query asynchronously.
-    """
-    assert isinstance(query, peewee.SelectQuery),\
-        ("Error, trying to run select coroutine"
-         "with wrong query class %s" % str(query))
-
-    return await _execute_with_returning(query)
-
-
-async def insert(query):
-    """Perform INSERT query asynchronously. Returns last insert ID.
-    This function is called by object.create for single objects only.
-    """
-    assert isinstance(query, peewee.Insert),\
-        ("Error, trying to run insert coroutine"
-         "with wrong query class %s" % str(query))
-
-    if query._returning is not None and len(query._returning) > 1:
-        return await _execute_with_returning(query)
-
-    cursor = await _execute_query_async(query)
-
-    try:
-        if query._returning:
-            row = await cursor.fetchone()
-            if row is not None:
-                result = row[0]
-            else:
-                result = None
-        else:
-            database = _query_db(query)
-            last_id = await database.last_insert_id_async(cursor)
-            result = last_id
-    finally:
-        await cursor.release()
-
-    return result
-
-
-async def update(query):
-    """Perform UPDATE query asynchronously. Returns number of rows updated.
-    """
-    assert isinstance(query, peewee.Update),\
-        ("Error, trying to run update coroutine"
-         "with wrong query class %s" % str(query))
-
-    if query._returning:
-        return await _execute_with_returning(query)
-
-    cursor = await _execute_query_async(query)
-    rowcount = cursor.rowcount
-
-    await cursor.release()
-    return rowcount
-
-
-async def delete(query):
-    """Perform DELETE query asynchronously. Returns number of rows deleted.
-    """
-    assert isinstance(query, peewee.Delete),\
-        ("Error, trying to run delete coroutine"
-         "with wrong query class %s" % str(query))
-    if query._returning:
-        return await _execute_with_returning(query)
-
-    cursor = await _execute_query_async(query)
-    rowcount = cursor.rowcount
-
-    await cursor.release()
-    return rowcount
+async def execute(query):
+    warnings.warn(
+        "`execute` is deprecated, use `database.aio_execute` method.",
+        DeprecationWarning
+    )
+    database = _query_db(query)
+    return await database.aio_execute(query)
 
 
 async def count(query, clear_limit=False):
@@ -497,13 +424,20 @@ async def count(query, clear_limit=False):
     :return: number of objects in ``select()`` query
     """
     clone = query.clone()
+    database = _query_db(query)
     if query._distinct or query._group_by or query._limit or query._offset:
         if clear_limit:
             clone._limit = clone._offset = None
         sql, params = clone.sql()
         wrapped = 'SELECT COUNT(1) FROM (%s) AS wrapped_select' % sql
-        raw = query.model.raw(wrapped, *params)
-        return (await scalar(raw)) or 0
+        async def fetch_results(cursor):
+            row = await cursor.fetchone()
+            if row:
+                return row[0]
+            else:
+                return row
+        result = await database.aio_execute_sql(wrapped, params, fetch_results)
+        return result or 0
     else:
         clone._returning = [peewee.fn.Count(peewee.SQL('*'))]
         clone._order_by = None
@@ -511,40 +445,11 @@ async def count(query, clear_limit=False):
 
 
 async def scalar(query, as_tuple=False):
-    """Get single value from ``select()`` query, i.e. for aggregation.
-
-    :return: result is the same as after sync ``query.scalar()`` call
-    """
-    cursor = await _execute_query_async(query)
-
-    try:
-        row = await cursor.fetchone()
-    finally:
-        await cursor.release()
-
-    if row and not as_tuple:
-        return row[0]
-    else:
-        return row
-
-
-async def raw_query(query):
-    assert isinstance(query, peewee.RawQuery),\
-        ("Error, trying to run raw_query coroutine"
-         "with wrong query class %s" % str(query))
-
-    cursor = await _execute_query_async(query)
-
-    result = AsyncQueryWrapper(cursor=cursor, query=query)
-    try:
-        while True:
-            await result.fetchone()
-    except GeneratorExit:
-        pass
-    finally:
-        await cursor.release()
-
-    return result
+    warnings.warn(
+        "`scalar` is deprecated, use `query.aio_scalar` method.",
+        DeprecationWarning
+    )
+    return await query.aio_scalar(as_tuple=as_tuple)
 
 
 async def prefetch(sq, *subqueries, prefetch_type):
@@ -655,6 +560,12 @@ class AsyncQueryWrapper:
                 await self.fetchone()
         except GeneratorExit:
             pass
+
+    @classmethod
+    async def make_for_all_rows(cls, cursor, query):
+        result = AsyncQueryWrapper(cursor=cursor, query=query)
+        await result.fetchall()
+        return result
 
 
 ############
@@ -830,26 +741,37 @@ class AsyncDatabase:
                         (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
-    async def aio_execute(self, query):
+    async def fetch_results(self, query, cursor):
+        if isinstance(query, peewee.ModelCompoundSelectQuery):
+            return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
+        if isinstance(query, peewee.RawQuery):
+            return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
+        raise Exception("Unknown type of query")
+
+    async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
+        __log__.debug(sql, params)
+        with peewee.__exception_wrapper__:
+            cursor = await self.cursor_async()
+            try:
+                await cursor.execute(sql, params or ())
+                if fetch_results is not None:
+                    return await fetch_results(cursor)
+            finally:
+                await cursor.release()
+
+    async def aio_execute(self, query, fetch_results=None):
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
         :param query: peewee query instance created with ``Model.select()``,
                       ``Model.update()`` etc.
+        :param fetch_results: function with cursor param. It let you get data manually and don't need to close cursor
+                It will be closed automatically
         :return: result depends on query type, it's the same as for sync
             ``query.execute()``
         """
-        if isinstance(query, (peewee.Select, peewee.ModelCompoundSelectQuery)):
-            coroutine = select
-        elif isinstance(query, peewee.Update):
-            coroutine = update
-        elif isinstance(query, peewee.Insert):
-            coroutine = insert
-        elif isinstance(query, peewee.Delete):
-            coroutine = delete
-        else:
-            coroutine = raw_query
-
-        return (await coroutine(query))
+        sql, params = query.sql()
+        default_fetch_results = getattr(query, "fetch_results", functools.partial(self.fetch_results, query))
+        return await self.aio_execute_sql(sql, params, fetch_results=fetch_results or default_fetch_results)
 
 
 class AioPool(metaclass=abc.ABCMeta):
@@ -1160,14 +1082,14 @@ class transaction:
         self.loop = db.loop
 
     async def commit(self, begin=True):
-        await _run_no_result_sql(self.db, 'COMMIT')
+        await self.db.aio_execute_sql("COMMIT")
         if begin:
-            await _run_no_result_sql(self.db, 'BEGIN')
+            await self.db.aio_execute_sql("BEGIN")
 
     async def rollback(self, begin=True):
-        await _run_no_result_sql(self.db, 'ROLLBACK')
+        await self.db.aio_execute_sql("ROLLBACK")
         if begin:
-            await _run_no_result_sql(self.db, 'BEGIN')
+            await self.db.aio_execute_sql("BEGIN")
 
     async def __aenter__(self):
         if not asyncio_current_task(loop=self.loop):
@@ -1175,7 +1097,7 @@ class transaction:
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
             try:
-                await _run_no_result_sql(self.db, 'BEGIN')
+                await self.db.aio_execute_sql("BEGIN")
             except:
                 await self.pop_transaction()
         return self
@@ -1210,16 +1132,13 @@ class savepoint:
         self.quoted_sid = self.sid.join(self.db.quote)
 
     async def commit(self):
-        await _run_no_result_sql(
-            self.db, 'RELEASE SAVEPOINT %s;' % self.quoted_sid)
+        await self.db.aio_execute_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
 
     async def rollback(self):
-        await _run_no_result_sql(
-            self.db, 'ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+        await self.db.aio_execute_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
 
     async def __aenter__(self):
-        await _run_no_result_sql(
-            self.db, 'SAVEPOINT %s;' % self.quoted_sid)
+        await self.db.aio_execute_sql('SAVEPOINT %s;' % self.quoted_sid)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -1264,36 +1183,6 @@ def _query_db(query):
     incapsulates internal peewee's access to database.
     """
     return query._database
-
-
-async def _run_sql(database, operation, *args, **kwargs):
-    """Run SQL operation (query or command) against database.
-    """
-    __log__.debug((operation, args, kwargs))
-
-    with peewee.__exception_wrapper__:
-        cursor = await database.cursor_async()
-
-        try:
-            await cursor.execute(operation, *args, **kwargs)
-        except:
-            await cursor.release()
-            raise
-
-        return cursor
-
-
-async def _run_no_result_sql(database, operation, *args, **kwargs):
-    cursor = await _run_sql(database, operation, *args, **kwargs)
-    await cursor.release()
-
-
-async def _execute_query_async(query):
-    """Execute query and return cursor object.
-    """
-    database = _query_db(query)
-    return (await _run_sql(database, *query.sql()))
-
 
 class TaskLocals:
     """Simple `dict` wrapper to get and set values on per `asyncio`
@@ -1359,20 +1248,57 @@ class AioQueryMixin:
     async def aio_execute(self, database):
         return await database.aio_execute(self)
 
+    async def make_async_query_wrapper(self, cursor):
+        return await AsyncQueryWrapper.make_for_all_rows(cursor, self)
+
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
-    pass
+    async def fetch_results(self, cursor):
+        if self._returning:
+            return await self.make_async_query_wrapper(cursor)
+        return cursor.rowcount
 
 
 class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
-    pass
+
+    async def fetch_results(self, cursor):
+        if self._returning:
+            return await self.make_async_query_wrapper(cursor)
+        return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
-    pass
+    async def fetch_results(self, cursor):
+        if self._returning is not None and len(self._returning) > 1:
+            return await self.make_async_query_wrapper(cursor)
+
+        if self._returning:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+        else:
+            return await self._database.last_insert_id_async(cursor)
 
 
 class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
+
+    async def fetch_results(self, cursor):
+        return await self.make_async_query_wrapper(cursor)
+
+    @peewee.database_required
+    async def aio_scalar(self, database, as_tuple=False):
+        """Get single value from ``select()`` query, i.e. for aggregation.
+
+        :return: result is the same as after sync ``query.scalar()`` call
+        """
+        async def fetch_results(cursor):
+            row = await cursor.fetchone()
+            if row and not as_tuple:
+                return row[0]
+            else:
+                return row
+
+        return await database.aio_execute(self, fetch_results=fetch_results)
+
 
     async def aio_get(self, database=None):
         clone = self.paginate(1, 1)

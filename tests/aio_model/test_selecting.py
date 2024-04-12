@@ -1,9 +1,5 @@
-import uuid
-
-import pytest
-
-from tests.conftest import all_dbs, postgres_only
-from tests.models import TestModel, TestModelAlpha, TestModelBeta
+from tests.conftest import all_dbs
+from tests.models import TestModelAlpha, TestModelBeta
 
 
 @all_dbs
