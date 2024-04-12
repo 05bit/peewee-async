@@ -561,6 +561,12 @@ class AsyncQueryWrapper:
         except GeneratorExit:
             pass
 
+    @classmethod
+    async def make_for_all_rows(cls, cursor, query):
+        result = AsyncQueryWrapper(cursor=cursor, query=query)
+        await result.fetchall()
+        return result
+
 
 ############
 # Database #
@@ -735,16 +741,11 @@ class AsyncDatabase:
                         (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
-    async def as_async_query_wrapper(self, cursor, query):
-        result = AsyncQueryWrapper(cursor=cursor, query=query)
-        await result.fetchall()
-        return result
-
     async def fetch_results(self, query, cursor):
         if isinstance(query, peewee.ModelCompoundSelectQuery):
-            return await self.as_async_query_wrapper(cursor=cursor, query=query)
+            return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         if isinstance(query, peewee.RawQuery):
-            return await self.as_async_query_wrapper(cursor=cursor, query=query)
+            return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         raise Exception("Unknown type of query")
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
@@ -1247,16 +1248,14 @@ class AioQueryMixin:
     async def aio_execute(self, database):
         return await database.aio_execute(self)
 
-    async def as_async_query_wrapper(self, cursor):
-        result = AsyncQueryWrapper(cursor=cursor, query=self)
-        await result.fetchall()
-        return result
+    async def make_async_query_wrapper(self, cursor):
+        return await AsyncQueryWrapper.make_for_all_rows(cursor, self)
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
     async def fetch_results(self, cursor):
         if self._returning:
-            return await self.as_async_query_wrapper(cursor=cursor)
+            return await self.make_async_query_wrapper(cursor)
         return cursor.rowcount
 
 
@@ -1264,35 +1263,29 @@ class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
 
     async def fetch_results(self, cursor):
         if self._returning:
-            return await self.as_async_query_wrapper(cursor=cursor)
+            return await self.make_async_query_wrapper(cursor)
         return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
     async def fetch_results(self, cursor):
         if self._returning is not None and len(self._returning) > 1:
-            return await self.as_async_query_wrapper(cursor=cursor)
+            return await self.make_async_query_wrapper(cursor)
 
         if self._returning:
             row = await cursor.fetchone()
-            if row is not None:
-                result = row[0]
-            else:
-                result = None
+            return row[0] if row else None
         else:
-            last_id = await self._database.last_insert_id_async(cursor)
-            result = last_id
-
-        return result
+            return await self._database.last_insert_id_async(cursor)
 
 
 class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
 
     async def fetch_results(self, cursor):
-        return await self.as_async_query_wrapper(cursor)
+        return await self.make_async_query_wrapper(cursor)
 
     @peewee.database_required
-    async def aio_scalar(self, database, as_tuple=False, as_dict=False):
+    async def aio_scalar(self, database, as_tuple=False):
         """Get single value from ``select()`` query, i.e. for aggregation.
 
         :return: result is the same as after sync ``query.scalar()`` call
