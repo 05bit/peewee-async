@@ -589,7 +589,7 @@ class ConnectionContext:
         return self.conn
 
     async def __aexit__(self, *args):
-        if not self.in_transaction:
+        if not self.in_transaction and self.db._async_conn:
             self.db._async_conn.release(self.conn)
 
 
