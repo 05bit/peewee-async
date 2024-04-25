@@ -572,6 +572,27 @@ class AsyncQueryWrapper:
 # Database #
 ############
 
+class ConnectionContext:
+    def __init__(self, db):
+        self.db = db
+        self.in_transaction = False
+        self.conn = None
+
+    async def __aenter__(self):
+        await self.db.connect_async()
+
+        if self.db.transaction_depth_async() > 0:
+            self.conn = self.db.transaction_conn_async()
+            self.in_transaction = True
+        else:
+            self.conn = await self.db._async_conn.acquire()
+        return self.conn
+
+    async def __aexit__(self, *args):
+        if not self.in_transaction:
+            self.db._async_conn.release(self.conn)
+
+
 class AsyncDatabase:
     _loop = None  # asyncio event loop
     _timeout = None  # connection timeout
@@ -626,18 +647,6 @@ class AsyncDatabase:
             )
             await conn.create()
             self._async_conn = conn
-
-    async def cursor_async(self):
-        """Acquire async cursor.
-        """
-        await self.connect_async(loop=self._loop)
-
-        if self.transaction_depth_async() > 0:
-            conn = self.transaction_conn_async()
-        else:
-            conn = None
-
-        return await self._async_conn.cursor(conn=conn)
 
     async def close_async(self):
         """Close async connection.
@@ -748,16 +757,17 @@ class AsyncDatabase:
             return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         raise Exception("Unknown type of query")
 
+    def connection(self) -> ConnectionContext:
+        return ConnectionContext(self)
+
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
-            cursor = await self.cursor_async()
-            try:
-                await cursor.execute(sql, params or ())
-                if fetch_results is not None:
-                    return await fetch_results(cursor)
-            finally:
-                await cursor.release()
+            async with self.connection() as connection:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(sql, params or ())
+                    if fetch_results is not None:
+                        return await fetch_results(cursor)
 
     async def aio_execute(self, query, fetch_results=None):
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
@@ -806,36 +816,6 @@ class AioPool(metaclass=abc.ABCMeta):
         self.pool.terminate()
         await self.pool.wait_closed()
 
-    async def cursor(self, conn=None, *args, **kwargs):
-        """Get cursor for connection from pool.
-        """
-        in_transaction = conn is not None
-        if not conn:
-            conn = await self.acquire()
-        try:
-            cursor = await conn.cursor(*args, **kwargs)
-        except:
-            if not in_transaction:
-                self.release(conn)
-            raise
-        cursor.release = functools.partial(
-            self.release_cursor, cursor,
-            in_transaction=in_transaction)
-        return cursor
-
-    async def release_cursor(self, cursor, in_transaction=False):
-        """Release cursor coroutine. Unless in transaction,
-        the connection is also released back to the pool.
-        """
-        conn = cursor.connection
-        await self.close_cursor(cursor)
-        if not in_transaction:
-            self.release(conn)
-
-    @abc.abstractmethod
-    async def close_cursor(self, cursor):
-        raise NotImplementedError
-
 
 
 ##############
@@ -862,9 +842,6 @@ class AioPostgresqlPool(AioPool):
             timeout=self.timeout,
             database=self.database,
             **self.connect_params)
-
-    async def close_cursor(self, cursor):
-        cursor.close()
 
 
 class AsyncPostgresqlMixin(AsyncDatabase):
@@ -987,9 +964,6 @@ class AioMysqlPool(AioPool):
             db=self.database,
             connect_timeout=self.timeout,
             **self.connect_params)
-
-    async def close_cursor(self, cursor):
-        await cursor.close()
 
 
 class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
