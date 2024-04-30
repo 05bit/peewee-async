@@ -793,11 +793,19 @@ class AioPool(metaclass=abc.ABCMeta):
         self.database = database
         self.timeout = timeout
         self.connect_params = kwargs
+        self._connection_lock = asyncio.Lock()
+
+    async def connect(self):
+        if self.pool is not None:
+            return
+        async with self._connection_lock:
+            await self.create()
 
     async def acquire(self):
         """Acquire connection from pool.
         """
-        return (await self.pool.acquire())
+        await self.connect()
+        return await self.pool.acquire()
 
     def release(self, conn):
         """Release connection to pool.
@@ -813,8 +821,13 @@ class AioPool(metaclass=abc.ABCMeta):
     async def terminate(self):
         """Terminate all pool connections.
         """
-        self.pool.terminate()
-        await self.pool.wait_closed()
+        async with self._connection_lock:
+            if self.pool is not None:
+                pool = self.pool
+                self.pool = None
+                pool.terminate()
+                await pool.wait_closed()
+
 
 
 
