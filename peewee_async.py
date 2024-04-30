@@ -80,7 +80,6 @@ __log__.addHandler(logging.NullHandler())
 class Manager:
     """Async peewee model's manager.
 
-    :param loop: (optional) asyncio event loop
     :param database: (optional) async database driver
 
     Example::
@@ -112,29 +111,13 @@ class Manager:
     #: in constructor or as a class member.
     database = None
 
-    def __init__(self, database=None, *, loop=None):
+    def __init__(self, database=None):
         assert database or self.database, \
                ("Error, database must be provided via "
                 "argument or class member.")
 
         self.database = database or self.database
-        self._loop = loop
         self._timeout = getattr(database, 'timeout', None)
-
-        attach_callback = getattr(self.database, 'attach_callback', None)
-        if attach_callback:
-            attach_callback(lambda db: setattr(db, '_loop', loop))
-        else:
-            self.database._loop = loop
-
-    @property
-    def loop(self):
-        """Get the event loop.
-
-        If no event loop is provided explicitly on creating
-        the instance, just return the current event loop.
-        """
-        return self._loop or asyncio.get_event_loop()
 
     @property
     def is_connected(self):
@@ -298,7 +281,7 @@ class Manager:
     async def connect(self):
         """Open database async connection if not connected.
         """
-        await self.database.connect_async(loop=self.loop, timeout=self._timeout)
+        await self.database.connect_async(timeout=self._timeout)
 
     async def close(self):
         """Close database async connection if connected.
@@ -594,7 +577,6 @@ class ConnectionContext:
 
 
 class AsyncDatabase:
-    _loop = None  # asyncio event loop
     _timeout = None  # connection timeout
     _allow_sync = True  # whether sync queries are allowed
     _async_conn = None  # async connection
@@ -602,6 +584,7 @@ class AsyncDatabase:
 
     def __init__(self, database, **kwargs):
         self._async_lock = asyncio.Lock()
+        self._task_data = TaskLocals()
         super().__init__(database, **kwargs)
 
 
@@ -615,18 +598,8 @@ class AsyncDatabase:
         else:
             super().__setattr__(name, value)
 
-    @property
-    def loop(self):
-        """Get the event loop.
-
-        If no event loop is provided explicitly on creating
-        the instance, just return the current event loop.
-        """
-        return self._loop or asyncio.get_event_loop()
-
-    async def connect_async(self, loop=None, timeout=None):
-        """Set up async connection on specified event loop or
-        on default event loop.
+    async def connect_async(self, timeout=None):
+        """Set up async connection on default event loop.
         """
         if self.deferred:
             raise Exception("Error, database not properly initialized "
@@ -634,14 +607,10 @@ class AsyncDatabase:
         async with self._async_lock:
             if self._async_conn:
                 return
-            if self._task_data is None:
-                self._task_data = TaskLocals(loop=self._loop)
-            self._loop = loop
             if not timeout and self._timeout:
                 timeout = self._timeout
             conn = self._async_conn_cls(
                 database=self.database,
-                loop=self._loop,
                 timeout=timeout,
                 **self.connect_params_async
             )
@@ -660,7 +629,7 @@ class AsyncDatabase:
     async def push_transaction_async(self):
         """Increment async transaction depth.
         """
-        await self.connect_async(loop=self.loop)
+        await self.connect_async()
         depth = self.transaction_depth_async()
         if not depth:
             conn = await self._async_conn.acquire()
@@ -787,9 +756,8 @@ class AsyncDatabase:
 class AioPool(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
+    def __init__(self, *, database=None, timeout=None, **kwargs):
         self.pool = None
-        self.loop = loop
         self.database = database
         self.timeout = timeout
         self.connect_params = kwargs
@@ -839,10 +807,9 @@ class AioPool(metaclass=abc.ABCMeta):
 class AioPostgresqlPool(AioPool):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
+    def __init__(self, *, database=None, timeout=None, **kwargs):
         super().__init__(
             database=database,
-            loop=loop,
             timeout=timeout or aiopg.DEFAULT_TIMEOUT,
             **kwargs,
         )
@@ -851,7 +818,6 @@ class AioPostgresqlPool(AioPool):
         """Create connection pool asynchronously.
         """
         self.pool = await aiopg.create_pool(
-            loop=self.loop,
             timeout=self.timeout,
             database=self.database,
             **self.connect_params)
@@ -973,7 +939,6 @@ class AioMysqlPool(AioPool):
         """Create connection pool asynchronously.
         """
         self.pool = await aiomysql.create_pool(
-            loop=self.loop,
             db=self.database,
             connect_timeout=self.timeout,
             **self.connect_params)
@@ -1066,7 +1031,6 @@ class transaction:
     """
     def __init__(self, db):
         self.db = db
-        self.loop = db.loop
 
     async def commit(self, begin=True):
         await self.db.aio_execute_sql("COMMIT")
@@ -1079,7 +1043,7 @@ class transaction:
             await self.db.aio_execute_sql("BEGIN")
 
     async def __aenter__(self):
-        if not asyncio_current_task(loop=self.loop):
+        if not asyncio_current_task():
             raise RuntimeError("The transaction must run within a task")
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
@@ -1182,8 +1146,7 @@ class TaskLocals:
 
     When task is done, all saved values are removed from stored data.
     """
-    def __init__(self, loop):
-        self.loop = loop
+    def __init__(self):
         self.data = {}
 
     def get(self, key, *val):
@@ -1215,7 +1178,7 @@ class TaskLocals:
         :param create: if argument is `True`, create empty dict
                        for task, default: `False`
         """
-        task = asyncio_current_task(loop=self.loop)
+        task = asyncio_current_task()
         if task:
             task_id = id(task)
             if create and task_id not in self.data:
