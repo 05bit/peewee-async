@@ -556,22 +556,24 @@ class AsyncQueryWrapper:
 ############
 
 class ConnectionContext:
-    def __init__(self, db):
-        self.db = db
+    def __init__(self, aio_pool, task_data):
+        self.aio_pool = aio_pool
+        self.task_data = task_data
         self.in_transaction = False
         self.conn = None
 
     async def __aenter__(self):
-        if self.db.transaction_depth_async() > 0:
-            self.conn = self.db.transaction_conn_async()
+        depth = self.task_data.get('depth', 0)
+        if depth > 0:
+            self.conn = self.task_data.get('conn', None)
             self.in_transaction = True
         else:
-            self.conn = await self.db._async_conn.acquire()
+            self.conn = await self.aio_pool.acquire()
         return self.conn
 
     async def __aexit__(self, *args):
-        if not self.in_transaction and self.db._async_conn:
-            self.db._async_conn.release(self.conn)
+        if not self.in_transaction:
+            self.aio_pool.release(self.conn)
 
 
 class AsyncDatabase:
@@ -637,11 +639,6 @@ class AsyncDatabase:
         """Get async transaction depth.
         """
         return self._task_data.get('depth', 0) if self._task_data else 0
-
-    def transaction_conn_async(self):
-        """Get async transaction connection.
-        """
-        return self._task_data.get('conn', None) if self._task_data else None
 
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
@@ -711,7 +708,7 @@ class AsyncDatabase:
         raise Exception("Unknown type of query")
 
     def connection(self) -> ConnectionContext:
-        return ConnectionContext(self)
+        return ConnectionContext(self._async_conn, self._task_data)
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
