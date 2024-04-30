@@ -123,7 +123,7 @@ class Manager:
     def is_connected(self):
         """Check if database is connected.
         """
-        return self.database._async_conn is not None
+        return self.database._async_conn.pool is not None
 
     async def get(self, source_, *args, **kwargs):
         """Get the model instance.
@@ -562,8 +562,6 @@ class ConnectionContext:
         self.conn = None
 
     async def __aenter__(self):
-        await self.db.connect_async()
-
         if self.db.transaction_depth_async() > 0:
             self.conn = self.db.transaction_conn_async()
             self.in_transaction = True
@@ -579,13 +577,16 @@ class ConnectionContext:
 class AsyncDatabase:
     _timeout = None  # connection timeout
     _allow_sync = True  # whether sync queries are allowed
-    _async_conn = None  # async connection
-    _task_data = None  # asyncio per-task data
 
     def __init__(self, database, **kwargs):
+        super().__init__(database, **kwargs)
         self._async_lock = asyncio.Lock()
         self._task_data = TaskLocals()
-        super().__init__(database, **kwargs)
+        self._async_conn = self._async_conn_cls(
+            database=self.database,
+            timeout=self._timeout,
+            **self.connect_params_async
+        )
 
 
     def __setattr__(self, name, value):
@@ -604,32 +605,16 @@ class AsyncDatabase:
         if self.deferred:
             raise Exception("Error, database not properly initialized "
                             "before opening connection")
-        async with self._async_lock:
-            if self._async_conn:
-                return
-            if not timeout and self._timeout:
-                timeout = self._timeout
-            conn = self._async_conn_cls(
-                database=self.database,
-                timeout=timeout,
-                **self.connect_params_async
-            )
-            await conn.create()
-            self._async_conn = conn
+        await self._async_conn.connect()
 
     async def close_async(self):
         """Close async connection.
         """
-        async with self._async_lock:
-            if self._async_conn:
-                conn = self._async_conn
-                self._async_conn = None
-                await conn.terminate()
+        await self._async_conn.terminate()
 
     async def push_transaction_async(self):
         """Increment async transaction depth.
         """
-        await self.connect_async()
         depth = self.transaction_depth_async()
         if not depth:
             conn = await self._async_conn.acquire()
@@ -764,9 +749,9 @@ class AioPool(metaclass=abc.ABCMeta):
         self._connection_lock = asyncio.Lock()
 
     async def connect(self):
-        if self.pool is not None:
-            return
         async with self._connection_lock:
+            if self.pool is not None:
+                return
             await self.create()
 
     async def acquire(self):
