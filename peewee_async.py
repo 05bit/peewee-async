@@ -123,7 +123,7 @@ class Manager:
     def is_connected(self):
         """Check if database is connected.
         """
-        return self.database._async_conn.pool is not None
+        return self.database.aio_pool.pool is not None
 
     async def get(self, source_, *args, **kwargs):
         """Get the model instance.
@@ -583,7 +583,7 @@ class AsyncDatabase:
     def __init__(self, database, **kwargs):
         super().__init__(database, **kwargs)
         self._task_data = TaskLocals()
-        self._async_conn = self._async_conn_cls(
+        self.aio_pool = self.aio_pool_cls(
             database=self.database,
             timeout=self._timeout,
             **self.connect_params_async
@@ -606,19 +606,19 @@ class AsyncDatabase:
         if self.deferred:
             raise Exception("Error, database not properly initialized "
                             "before opening connection")
-        await self._async_conn.connect()
+        await self.aio_pool.connect()
 
     async def close_async(self):
         """Close async connection.
         """
-        await self._async_conn.terminate()
+        await self.aio_pool.terminate()
 
     async def push_transaction_async(self):
         """Increment async transaction depth.
         """
         depth = self.transaction_depth_async()
         if not depth:
-            conn = await self._async_conn.acquire()
+            conn = await self.aio_pool.acquire()
             self._task_data.set('conn', conn)
         self._task_data.set('depth', depth + 1)
 
@@ -631,7 +631,7 @@ class AsyncDatabase:
             self._task_data.set('depth', depth)
             if depth == 0:
                 conn = self._task_data.get('conn')
-                self._async_conn.release(conn)
+                self.aio_pool.release(conn)
         else:
             raise ValueError("Invalid async transaction depth value")
 
@@ -708,7 +708,7 @@ class AsyncDatabase:
         raise Exception("Unknown type of query")
 
     def connection(self) -> ConnectionContext:
-        return ConnectionContext(self._async_conn, self._task_data)
+        return ConnectionContext(self.aio_pool, self._task_data)
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
@@ -808,14 +808,15 @@ class AsyncPostgresqlMixin(AsyncDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
+
+    aio_pool_cls = AioPostgresqlPool
+
     if psycopg2:
         Error = psycopg2.Error
 
-    def init_async(self, conn_cls=AioPostgresqlPool,
-                   enable_json=False, enable_hstore=False):
+    def init_async(self, enable_json=False, enable_hstore=False):
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
-        self._async_conn_cls = conn_cls
         self._enable_json = enable_json
         self._enable_hstore = enable_hstore
 
@@ -936,6 +937,8 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
+    aio_pool_cls = AioMysqlPool
+
     if pymysql:
         Error = pymysql.Error
 
@@ -944,7 +947,6 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
             raise Exception("Error, aiomysql is not installed!")
         self.min_connections = 1
         self.max_connections = 1
-        self._async_conn_cls = kwargs.pop('async_conn', AioMysqlPool)
         super().init(database, **kwargs)
 
     @property
