@@ -580,7 +580,6 @@ class AsyncDatabase:
 
     def __init__(self, database, **kwargs):
         super().__init__(database, **kwargs)
-        self._async_lock = asyncio.Lock()
         self._task_data = TaskLocals()
         self._async_conn = self._async_conn_cls(
             database=self.database,
