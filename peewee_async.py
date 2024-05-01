@@ -80,7 +80,6 @@ __log__.addHandler(logging.NullHandler())
 class Manager:
     """Async peewee model's manager.
 
-    :param loop: (optional) asyncio event loop
     :param database: (optional) async database driver
 
     Example::
@@ -112,35 +111,18 @@ class Manager:
     #: in constructor or as a class member.
     database = None
 
-    def __init__(self, database=None, *, loop=None):
+    def __init__(self, database=None):
         assert database or self.database, \
                ("Error, database must be provided via "
                 "argument or class member.")
 
         self.database = database or self.database
-        self._loop = loop
-        self._timeout = getattr(database, 'timeout', None)
-
-        attach_callback = getattr(self.database, 'attach_callback', None)
-        if attach_callback:
-            attach_callback(lambda db: setattr(db, '_loop', loop))
-        else:
-            self.database._loop = loop
-
-    @property
-    def loop(self):
-        """Get the event loop.
-
-        If no event loop is provided explicitly on creating
-        the instance, just return the current event loop.
-        """
-        return self._loop or asyncio.get_event_loop()
 
     @property
     def is_connected(self):
         """Check if database is connected.
         """
-        return self.database._async_conn is not None
+        return self.database.aio_pool.pool is not None
 
     async def get(self, source_, *args, **kwargs):
         """Get the model instance.
@@ -298,7 +280,7 @@ class Manager:
     async def connect(self):
         """Open database async connection if not connected.
         """
-        await self.database.connect_async(loop=self.loop, timeout=self._timeout)
+        await self.database.connect_async()
 
     async def close(self):
         """Close database async connection if connected.
@@ -572,16 +554,37 @@ class AsyncQueryWrapper:
 # Database #
 ############
 
+class ConnectionContext:
+    def __init__(self, aio_pool, task_data):
+        self.aio_pool = aio_pool
+        self.task_data = task_data
+        self.in_transaction = False
+        self.conn = None
+
+    async def __aenter__(self):
+        depth = self.task_data.get('depth', 0)
+        if depth > 0:
+            self.conn = self.task_data.get('conn', None)
+            self.in_transaction = True
+        else:
+            self.conn = await self.aio_pool.acquire()
+        return self.conn
+
+    async def __aexit__(self, *args):
+        if not self.in_transaction:
+            self.aio_pool.release(self.conn)
+
+
 class AsyncDatabase:
-    _loop = None  # asyncio event loop
-    _timeout = None  # connection timeout
     _allow_sync = True  # whether sync queries are allowed
-    _async_conn = None  # async connection
-    _task_data = None  # asyncio per-task data
 
     def __init__(self, database, **kwargs):
-        self._async_lock = asyncio.Lock()
         super().__init__(database, **kwargs)
+        self._task_data = TaskLocals()
+        self.aio_pool = self.aio_pool_cls(
+            database=self.database,
+            **self.connect_params_async
+        )
 
 
     def __setattr__(self, name, value):
@@ -594,67 +597,25 @@ class AsyncDatabase:
         else:
             super().__setattr__(name, value)
 
-    @property
-    def loop(self):
-        """Get the event loop.
-
-        If no event loop is provided explicitly on creating
-        the instance, just return the current event loop.
-        """
-        return self._loop or asyncio.get_event_loop()
-
-    async def connect_async(self, loop=None, timeout=None):
-        """Set up async connection on specified event loop or
-        on default event loop.
+    async def connect_async(self):
+        """Set up async connection on default event loop.
         """
         if self.deferred:
             raise Exception("Error, database not properly initialized "
                             "before opening connection")
-        async with self._async_lock:
-            if self._async_conn:
-                return
-            if self._task_data is None:
-                self._task_data = TaskLocals(loop=self._loop)
-            self._loop = loop
-            if not timeout and self._timeout:
-                timeout = self._timeout
-            conn = self._async_conn_cls(
-                database=self.database,
-                loop=self._loop,
-                timeout=timeout,
-                **self.connect_params_async
-            )
-            await conn.create()
-            self._async_conn = conn
-
-    async def cursor_async(self):
-        """Acquire async cursor.
-        """
-        await self.connect_async(loop=self._loop)
-
-        if self.transaction_depth_async() > 0:
-            conn = self.transaction_conn_async()
-        else:
-            conn = None
-
-        return await self._async_conn.cursor(conn=conn)
+        await self.aio_pool.connect()
 
     async def close_async(self):
         """Close async connection.
         """
-        async with self._async_lock:
-            if self._async_conn:
-                conn = self._async_conn
-                self._async_conn = None
-                await conn.terminate()
+        await self.aio_pool.terminate()
 
     async def push_transaction_async(self):
         """Increment async transaction depth.
         """
-        await self.connect_async(loop=self.loop)
         depth = self.transaction_depth_async()
         if not depth:
-            conn = await self._async_conn.acquire()
+            conn = await self.aio_pool.acquire()
             self._task_data.set('conn', conn)
         self._task_data.set('depth', depth + 1)
 
@@ -667,7 +628,7 @@ class AsyncDatabase:
             self._task_data.set('depth', depth)
             if depth == 0:
                 conn = self._task_data.get('conn')
-                self._async_conn.release(conn)
+                self.aio_pool.release(conn)
         else:
             raise ValueError("Invalid async transaction depth value")
 
@@ -675,11 +636,6 @@ class AsyncDatabase:
         """Get async transaction depth.
         """
         return self._task_data.get('depth', 0) if self._task_data else 0
-
-    def transaction_conn_async(self):
-        """Get async transaction connection.
-        """
-        return self._task_data.get('conn', None) if self._task_data else None
 
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
@@ -748,16 +704,17 @@ class AsyncDatabase:
             return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         raise Exception("Unknown type of query")
 
+    def connection(self) -> ConnectionContext:
+        return ConnectionContext(self.aio_pool, self._task_data)
+
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
-            cursor = await self.cursor_async()
-            try:
-                await cursor.execute(sql, params or ())
-                if fetch_results is not None:
-                    return await fetch_results(cursor)
-            finally:
-                await cursor.release()
+            async with self.connection() as connection:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(sql, params or ())
+                    if fetch_results is not None:
+                        return await fetch_results(cursor)
 
     async def aio_execute(self, query, fetch_results=None):
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
@@ -777,17 +734,24 @@ class AsyncDatabase:
 class AioPool(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
+    def __init__(self, *, database=None, **kwargs):
         self.pool = None
-        self.loop = loop
         self.database = database
-        self.timeout = timeout
         self.connect_params = kwargs
+        self._connection_lock = asyncio.Lock()
+
+    async def connect(self):
+        async with self._connection_lock:
+            if self.pool is not None:
+                return
+            await self.create()
 
     async def acquire(self):
         """Acquire connection from pool.
         """
-        return (await self.pool.acquire())
+        if self.pool is None:
+            await self.connect()
+        return await self.pool.acquire()
 
     def release(self, conn):
         """Release connection to pool.
@@ -803,38 +767,13 @@ class AioPool(metaclass=abc.ABCMeta):
     async def terminate(self):
         """Terminate all pool connections.
         """
-        self.pool.terminate()
-        await self.pool.wait_closed()
+        async with self._connection_lock:
+            if self.pool is not None:
+                pool = self.pool
+                self.pool = None
+                pool.terminate()
+                await pool.wait_closed()
 
-    async def cursor(self, conn=None, *args, **kwargs):
-        """Get cursor for connection from pool.
-        """
-        in_transaction = conn is not None
-        if not conn:
-            conn = await self.acquire()
-        try:
-            cursor = await conn.cursor(*args, **kwargs)
-        except:
-            if not in_transaction:
-                self.release(conn)
-            raise
-        cursor.release = functools.partial(
-            self.release_cursor, cursor,
-            in_transaction=in_transaction)
-        return cursor
-
-    async def release_cursor(self, cursor, in_transaction=False):
-        """Release cursor coroutine. Unless in transaction,
-        the connection is also released back to the pool.
-        """
-        conn = cursor.connection
-        await self.close_cursor(cursor)
-        if not in_transaction:
-            self.release(conn)
-
-    @abc.abstractmethod
-    async def close_cursor(self, cursor):
-        raise NotImplementedError
 
 
 
@@ -846,39 +785,31 @@ class AioPool(metaclass=abc.ABCMeta):
 class AioPostgresqlPool(AioPool):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, loop=None, timeout=None, **kwargs):
-        super().__init__(
-            database=database,
-            loop=loop,
-            timeout=timeout or aiopg.DEFAULT_TIMEOUT,
-            **kwargs,
-        )
 
     async def create(self):
         """Create connection pool asynchronously.
         """
+        if "connect_timeout" in self.connect_params:
+            self.connect_params['timeout'] = self.connect_params.pop("connect_timeout")
         self.pool = await aiopg.create_pool(
-            loop=self.loop,
-            timeout=self.timeout,
             database=self.database,
-            **self.connect_params)
-
-    async def close_cursor(self, cursor):
-        cursor.close()
+            **self.connect_params
+        )
 
 
 class AsyncPostgresqlMixin(AsyncDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
+
+    aio_pool_cls = AioPostgresqlPool
+
     if psycopg2:
         Error = psycopg2.Error
 
-    def init_async(self, conn_cls=AioPostgresqlPool,
-                   enable_json=False, enable_hstore=False):
+    def init_async(self, enable_json=False, enable_hstore=False):
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
-        self._async_conn_cls = conn_cls
         self._enable_json = enable_json
         self._enable_hstore = enable_hstore
 
@@ -953,7 +884,13 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin,
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
-        self._timeout = kwargs.pop('connection_timeout', aiopg.DEFAULT_TIMEOUT)
+        connection_timeout = kwargs.pop('connection_timeout', None)
+        if connection_timeout is not None:
+            warnings.warn(
+                "`connection_timeout` is deprecated, use `connect_timeout` instead.",
+                DeprecationWarning
+            )
+            kwargs['connect_timeout'] = connection_timeout
         super().init(database, **kwargs)
         self.init_async()
 
@@ -983,13 +920,8 @@ class AioMysqlPool(AioPool):
         """Create connection pool asynchronously.
         """
         self.pool = await aiomysql.create_pool(
-            loop=self.loop,
-            db=self.database,
-            connect_timeout=self.timeout,
-            **self.connect_params)
-
-    async def close_cursor(self, cursor):
-        await cursor.close()
+            db=self.database, **self.connect_params
+        )
 
 
 class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
@@ -1003,6 +935,8 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
+    aio_pool_cls = AioMysqlPool
+
     if pymysql:
         Error = pymysql.Error
 
@@ -1011,7 +945,6 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
             raise Exception("Error, aiomysql is not installed!")
         self.min_connections = 1
         self.max_connections = 1
-        self._async_conn_cls = kwargs.pop('async_conn', AioMysqlPool)
         super().init(database, **kwargs)
 
     @property
@@ -1079,7 +1012,6 @@ class transaction:
     """
     def __init__(self, db):
         self.db = db
-        self.loop = db.loop
 
     async def commit(self, begin=True):
         await self.db.aio_execute_sql("COMMIT")
@@ -1092,7 +1024,7 @@ class transaction:
             await self.db.aio_execute_sql("BEGIN")
 
     async def __aenter__(self):
-        if not asyncio_current_task(loop=self.loop):
+        if not asyncio_current_task():
             raise RuntimeError("The transaction must run within a task")
         await self.db.push_transaction_async()
         if self.db.transaction_depth_async() == 1:
@@ -1195,8 +1127,7 @@ class TaskLocals:
 
     When task is done, all saved values are removed from stored data.
     """
-    def __init__(self, loop):
-        self.loop = loop
+    def __init__(self):
         self.data = {}
 
     def get(self, key, *val):
@@ -1228,7 +1159,7 @@ class TaskLocals:
         :param create: if argument is `True`, create empty dict
                        for task, default: `False`
         """
-        task = asyncio_current_task(loop=self.loop)
+        task = asyncio_current_task()
         if task:
             task_id = id(task)
             if create and task_id not in self.data:

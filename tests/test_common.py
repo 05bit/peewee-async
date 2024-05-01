@@ -147,7 +147,7 @@ async def test_connect_close(manager):
         await manager.connect()
         # await asyncio.sleep(0.05, loop=self.loop)
         # NOTE: "private" member access
-        return manager.database._async_conn
+        return manager.database.aio_pool
 
 
     c1 = await get_conn(manager)
