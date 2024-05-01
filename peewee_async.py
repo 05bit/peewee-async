@@ -749,7 +749,8 @@ class AioPool(metaclass=abc.ABCMeta):
     async def acquire(self):
         """Acquire connection from pool.
         """
-        await self.connect()
+        if self.pool is None:
+            await self.connect()
         return await self.pool.acquire()
 
     def release(self, conn):
@@ -784,11 +785,6 @@ class AioPool(metaclass=abc.ABCMeta):
 class AioPostgresqlPool(AioPool):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, **kwargs):
-        super().__init__(
-            database=database,
-            **kwargs,
-        )
 
     async def create(self):
         """Create connection pool asynchronously.
