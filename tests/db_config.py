@@ -8,6 +8,7 @@ PG_DEFAULTS = {
     'port': 5432,
     'password': 'postgres',
     'user': 'postgres',
+    "connect_timeout": 30
 }
 
 MYSQL_DEFAULTS = {
@@ -15,7 +16,8 @@ MYSQL_DEFAULTS = {
     'host': '127.0.0.1',
     'port': 3306,
     'user': 'root',
-    'password': 'mysql'
+    'password': 'mysql',
+    "connect_timeout": 30
 }
 
 DB_DEFAULTS = {

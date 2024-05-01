@@ -117,7 +117,6 @@ class Manager:
                 "argument or class member.")
 
         self.database = database or self.database
-        self._timeout = getattr(database, 'timeout', None)
 
     @property
     def is_connected(self):
@@ -281,7 +280,7 @@ class Manager:
     async def connect(self):
         """Open database async connection if not connected.
         """
-        await self.database.connect_async(timeout=self._timeout)
+        await self.database.connect_async()
 
     async def close(self):
         """Close database async connection if connected.
@@ -577,7 +576,6 @@ class ConnectionContext:
 
 
 class AsyncDatabase:
-    _timeout = None  # connection timeout
     _allow_sync = True  # whether sync queries are allowed
 
     def __init__(self, database, **kwargs):
@@ -585,7 +583,6 @@ class AsyncDatabase:
         self._task_data = TaskLocals()
         self.aio_pool = self.aio_pool_cls(
             database=self.database,
-            timeout=self._timeout,
             **self.connect_params_async
         )
 
@@ -600,7 +597,7 @@ class AsyncDatabase:
         else:
             super().__setattr__(name, value)
 
-    async def connect_async(self, timeout=None):
+    async def connect_async(self):
         """Set up async connection on default event loop.
         """
         if self.deferred:
@@ -737,10 +734,9 @@ class AsyncDatabase:
 class AioPool(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, timeout=None, **kwargs):
+    def __init__(self, *, database=None, **kwargs):
         self.pool = None
         self.database = database
-        self.timeout = timeout
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()
 
@@ -788,20 +784,21 @@ class AioPool(metaclass=abc.ABCMeta):
 class AioPostgresqlPool(AioPool):
     """Asynchronous database connection pool.
     """
-    def __init__(self, *, database=None, timeout=None, **kwargs):
+    def __init__(self, *, database=None, **kwargs):
         super().__init__(
             database=database,
-            timeout=timeout or aiopg.DEFAULT_TIMEOUT,
             **kwargs,
         )
 
     async def create(self):
         """Create connection pool asynchronously.
         """
+        if "connect_timeout" in self.connect_params:
+            self.connect_params['timeout'] = self.connect_params.pop("connect_timeout")
         self.pool = await aiopg.create_pool(
-            timeout=self.timeout,
             database=self.database,
-            **self.connect_params)
+            **self.connect_params
+        )
 
 
 class AsyncPostgresqlMixin(AsyncDatabase):
@@ -891,7 +888,13 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin,
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
-        self._timeout = kwargs.pop('connection_timeout', aiopg.DEFAULT_TIMEOUT)
+        connection_timeout = kwargs.pop('connection_timeout', None)
+        if connection_timeout is not None:
+            warnings.warn(
+                "`connection_timeout` is deprecated, use `connect_timeout` instead.",
+                DeprecationWarning
+            )
+            kwargs['connect_timeout'] = connection_timeout
         super().init(database, **kwargs)
         self.init_async()
 
@@ -921,9 +924,8 @@ class AioMysqlPool(AioPool):
         """Create connection pool asynchronously.
         """
         self.pool = await aiomysql.create_pool(
-            db=self.database,
-            connect_timeout=self.timeout,
-            **self.connect_params)
+            db=self.database, **self.connect_params
+        )
 
 
 class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
