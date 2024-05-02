@@ -855,14 +855,6 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
         super().init(database, **kwargs)
         self.init_async()
 
-    @property
-    def use_speedups(self):
-        return False
-
-    @use_speedups.setter
-    def use_speedups(self, value):
-        pass
-
 
 register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
 
@@ -893,14 +885,6 @@ class PooledPostgresqlDatabase(AsyncPostgresqlMixin,
             kwargs['connect_timeout'] = connection_timeout
         super().init(database, **kwargs)
         self.init_async()
-
-    @property
-    def use_speedups(self):
-        return False
-
-    @use_speedups.setter
-    def use_speedups(self, value):
-        pass
 
 
 register_database(PooledPostgresqlDatabase, 'postgres+pool+async',
@@ -963,14 +947,6 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
         """Get ID of last inserted row.
         """
         return cursor.lastrowid
-
-    @property
-    def use_speedups(self):
-        return False
-
-    @use_speedups.setter
-    def use_speedups(self, value):
-        pass
 
 
 register_database(MySQLDatabase, 'mysql+async')
