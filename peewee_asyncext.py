@@ -13,10 +13,12 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
+import warnings
+
 from playhouse import postgres_ext as ext
 from playhouse.db_url import register_database
 
-from peewee_async import AsyncPostgresqlMixin, aiopg
+from peewee_async import AsyncPostgresqlMixin
 
 
 class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
@@ -71,7 +73,13 @@ class PooledPostgresqlExtDatabase(
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
-        self._timeout = kwargs.pop('connection_timeout', aiopg.DEFAULT_TIMEOUT)
+        connection_timeout = kwargs.pop('connection_timeout', None)
+        if connection_timeout is not None:
+            warnings.warn(
+                "`connection_timeout` is deprecated, use `connect_timeout` instead.",
+                DeprecationWarning
+            )
+            kwargs['connect_timeout'] = connection_timeout
         super().init(database, **kwargs)
         self.init_async(
             enable_json=True,
