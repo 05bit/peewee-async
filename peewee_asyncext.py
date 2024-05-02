@@ -33,28 +33,24 @@ class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
+
     def init(self, database, **kwargs):
         self.min_connections = 1
         self.max_connections = 1
         super().init(database, **kwargs)
-        self.init_async(enable_json=True,
-                        enable_hstore=self._register_hstore)
-
-    @property
-    def use_speedups(self):
-        return False
-
-    @use_speedups.setter
-    def use_speedups(self, value):
-        pass
+        self.init_async(
+            enable_json=True,
+            enable_hstore=self._register_hstore
+        )
 
 
-register_database(PostgresqlExtDatabase, 'postgresext+async',
-                  'postgresqlext+async')
+register_database(PostgresqlExtDatabase, 'postgresext+async', 'postgresqlext+async')
 
 
-class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin,
-                                  ext.PostgresqlExtDatabase):
+class PooledPostgresqlExtDatabase(
+    AsyncPostgresqlMixin,
+    ext.PostgresqlExtDatabase
+):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -71,22 +67,16 @@ class PooledPostgresqlExtDatabase(AsyncPostgresqlMixin,
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
+
     def init(self, database, **kwargs):
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
         self._timeout = kwargs.pop('connection_timeout', aiopg.DEFAULT_TIMEOUT)
         super().init(database, **kwargs)
-        self.init_async(enable_json=True,
-                        enable_hstore=self._register_hstore)
-
-    @property
-    def use_speedups(self):
-        return False
-
-    @use_speedups.setter
-    def use_speedups(self, value):
-        pass
+        self.init_async(
+            enable_json=True,
+            enable_hstore=self._register_hstore
+        )
 
 
-register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async',
-                  'postgresqlext+pool+async')
+register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
