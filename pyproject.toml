@@ -6,6 +6,7 @@ authors = ["Alexey Kinev <rudy@05bit.com>", "Gorshkov Nikolay(contributor) <noga
 readme = "README.md"
 packages = [
     { include = "peewee_async.py" },
+    { include = "peewee_async_compat.py" },
     { include = "peewee_asyncext.py" },
 ]
 

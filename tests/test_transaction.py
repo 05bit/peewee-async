@@ -1,7 +1,5 @@
 import asyncio
 
-import pytest
-
 from tests.conftest import all_dbs
 from tests.models import TestModel
 

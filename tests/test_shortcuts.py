@@ -1,7 +1,6 @@
 import uuid
 
 import peewee
-import peewee as pw
 import pytest
 
 from tests.conftest import all_dbs
@@ -94,7 +93,7 @@ async def test_scalar_query(manager):
     text = "Test %s" % uuid.uuid4()
     await manager.create(TestModel, text=text)
 
-    fn = pw.fn.Count(TestModel.id)
+    fn = peewee.fn.Count(TestModel.id)
     count = await manager.scalar(TestModel.select(fn))
 
     assert count == 2
