@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   postgres:
-    image: postgres
+    image: postgres:16.2-alpine3.19
     ports:
       - '5432:5432'
     command: postgres -c log_statement=all
