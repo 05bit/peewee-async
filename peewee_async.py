@@ -698,7 +698,7 @@ class AsyncDatabase:
         return super().execute_sql(*args, **kwargs)
 
     async def fetch_results(self, query, cursor):
-        if isinstance(query, peewee.ModelCompoundSelectQuery):
+        if isinstance(query, peewee.BaseModelSelect):
             return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         if isinstance(query, peewee.RawQuery):
             return await AsyncQueryWrapper.make_for_all_rows(cursor, query)

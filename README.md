@@ -22,6 +22,7 @@ Overview
 The complete documentation:  
 http://peewee-async-lib.readthedocs.io
 
+
 Install
 -------
 
@@ -37,13 +38,13 @@ or for MySQL:
 pip install peewee-async[mysql]
 ```
 
+
 Quickstart
 ----------
 
 Create 'test' PostgreSQL database for running this snippet:
 
     createdb -E utf-8 test
-
 
 ```python
 import asyncio
@@ -99,6 +100,18 @@ with objects.allow_sync():
 # Not bad. Watch this, I'm async!
 ```
 
+
+More examples
+-------------
+
+Build and run with Docker Compose:
+
+```bash
+docker compose -f examples/docker-compose.yaml build
+docker compose -f examples/docker-compose.yaml up
+```
+
+
 Documentation
 -------------
 
@@ -106,27 +119,34 @@ http://peewee-async-lib.readthedocs.io
 
 http://peewee-async.readthedocs.io - **DEPRECATED**
 
+
 Developing
 ----------
+
 Install dependencies using pip:
+
 ```bash
 pip install -e .[develop]
 ```
 
 Or using [poetry](https://python-poetry.org/docs/):
+
 ```bash
 poetry install -E develop
 ```
 
 Run databases:
+
 ```bash
 docker-compose up -d
 ```
 
 Run tests:
+
 ```bash
 pytest tests -v -s
 ```
+
 
 Discuss
 -------

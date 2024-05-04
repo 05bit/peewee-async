@@ -1,5 +1,8 @@
 .DS_Store
 .idea/
+.vscode
+.venv/
+.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -10,6 +13,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.installed.cfg
 env/
 venv/
 build/
@@ -23,7 +27,6 @@ parts/
 sdist/
 var/
 *.egg-info/
-.installed.cfg
 *.egg*
 *.ini
 
