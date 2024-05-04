@@ -298,15 +298,6 @@ class AsyncDatabase:
                         (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
-    async def fetch_results(self, query, cursor):
-        # TODO: Probably we don't need this method at all?
-        # We might get here if we use older `Manager` interface. 
-        if isinstance(query, peewee.BaseModelSelect):
-            return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
-        if isinstance(query, peewee.RawQuery):
-            return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
-        assert False, "Unsupported type of query '%s', use AioModel instead" % type(query)
-
     def connection(self) -> ConnectionContext:
         return ConnectionContext(self.aio_pool, self._task_data)
 
@@ -324,16 +315,12 @@ class AsyncDatabase:
 
         :param query: peewee query instance created with ``Model.select()``,
                       ``Model.update()`` etc.
-        :param fetch_results: function with cursor param. It let you get data manually and don't need to close cursor
-                It will be closed automatically
-        :return: result depends on query type, it's the same as for sync
-            ``query.execute()``
+        :param fetch_results: function with cursor param. It let you get data manually and
+                              don't need to close cursor It will be closed automatically.
+        :return: result depends on query type, it's the same as for sync `query.execute()`
         """
         sql, params = query.sql()
-        if fetch_results is None:
-            query_fetch_results = getattr(query, 'fetch_results', None)
-            database_fetch_results = functools.partial(self.fetch_results, query)
-            fetch_results = query_fetch_results or database_fetch_results
+        fetch_results = fetch_results or getattr(query, 'fetch_results', None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 

@@ -49,7 +49,23 @@ def _patch_query_with_compat_methods(query, async_query_cls):
     - aio_get (for SELECT)
     - aio_scalar (for SELECT)
     """
-    from peewee_async import AioModelSelect
+    from peewee_async import AioModelSelect, AioModelUpdate, AioModelDelete, AioModelInsert
+
+    if getattr(query, 'aio_execute', None):
+        # No need to patch
+        return
+
+    if async_query_cls is None:
+        if isinstance(query, peewee.RawQuery):
+            async_query_cls = AioModelSelect
+        if isinstance(query, peewee.SelectBase):
+            async_query_cls = AioModelSelect
+        elif isinstance(query, peewee.Update):
+            async_query_cls = AioModelUpdate
+        elif isinstance(query, peewee.Delete):
+            async_query_cls = AioModelDelete
+        elif isinstance(query, peewee.Insert):
+            async_query_cls = AioModelInsert
 
     query.aio_execute = partial(async_query_cls.aio_execute, query)
     query.fetch_results = partial(async_query_cls.fetch_results, query)
@@ -345,6 +361,7 @@ class Manager:
 
     async def execute(self, query):
         """Execute query asyncronously."""
+        _patch_query_with_compat_methods(query, None)
         return await self.database.aio_execute(query)
 
     async def prefetch(self, query, *subqueries, prefetch_type=peewee.PREFETCH_TYPE.JOIN):
