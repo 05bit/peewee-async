@@ -2,9 +2,9 @@ version: '3.3'
 
 services:
   postgres:
-    image: postgres:16.2-alpine3.19
+    image: postgres
     ports:
-      - '5432:5432'
+      - ${POSTGRES_PORT:-5432}:5432
     command: postgres -c log_statement=all
     environment:
       - POSTGRES_PASSWORD=postgres
@@ -14,7 +14,7 @@ services:
   mysql:
     image: mysql
     ports:
-      - '3306:3306'
+      - ${MYSQL_PORT:-3306}:3306
     environment:
       - MYSQL_ROOT_PASSWORD=mysql
       - MYSQL_DATABASE=mysql

@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-# from asyncio import sleep as async_sleep
 from secrets import token_hex
 from datetime import datetime
 from aiohttp import web
@@ -11,9 +10,13 @@ from peewee_async import PooledPostgresqlDatabase, Manager
 logger = logging.getLogger(__name__)
 
 database = PooledPostgresqlDatabase(
-    'examples', user='postgres', password='postgres',
-    host='db-postgres', port=5432,
-    min_connections=10, max_connections=100,
+    os.environ.get('POSTGRES_DB', 'postgres'),
+    user=os.environ.get('POSTGRES_USER', 'postgres'),
+    password=os.environ.get('POSTGRES_PASSWORD', 'postgres'),
+    host=os.environ.get('POSTGRES_HOST', '127.0.0.1'),
+    port=int(os.environ.get('POSTGRES_PORT', 5432)),
+    min_connections=2,
+    max_connections=10,
 )
 
 objects = Manager(database)
@@ -34,11 +37,6 @@ class Post(Model):
 
     def __str__(self):
         return self.title
-
-
-def create_tables():
-    with database:
-        database.create_tables([Post], safe=True)
 
 
 def add_post(title, text):
@@ -87,18 +85,20 @@ app.add_routes(routes)
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    # Initialize database
-    create_tables()
+    print("Initialize tables and add some random posts...")
 
-    # Add some random posts
+    try:
+        with database:
+            database.create_tables([Post], safe=True)
+            print("Tables are created.")
+    except Exception as exc:
+        print("Error creating tables: {}".format(exc))
+
     try:
         add_post("Hello, world", "This is a first post")
         add_post("Hello, world 2", "This is a second post")
         add_post("42", "What is this all about?")
         add_post("Let it be!", "Let it be, let it be, let it be, let it be")
-    except Exception as e:
-        print("Error adding posts: {}".format(e))
-
-    # Run application server
-    port = os.environ.get('HTTP_PORT', 10080)
-    app.run(port=port, host='0.0.0.0')
+        print("Done.")
+    except Exception as exc:
+        print("Error adding posts: {}".format(exc))
