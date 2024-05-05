@@ -16,7 +16,6 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 import abc
 import asyncio
 import contextlib
-import functools
 import logging
 import uuid
 import warnings
