@@ -1,5 +1,6 @@
 import uuid
 
+import peewee
 from tests.conftest import all_dbs
 from tests.models import CompatTestModel
 
@@ -9,6 +10,34 @@ async def test_create_select_compat_mode(manager):
     obj1 = await manager.create(CompatTestModel, text="Test 1")
     obj2 = await manager.create(CompatTestModel, text="Test 2")
     query = CompatTestModel.select().order_by(CompatTestModel.text)
+    assert isinstance(query, peewee.ModelSelect)
+    result = await manager.execute(query)
+    assert list(result) == [obj1, obj2]
+
+
+@all_dbs
+async def test_compound_select_compat_mode(manager):
+    obj1 = await manager.create(CompatTestModel, text="Test 1")
+    obj2 = await manager.create(CompatTestModel, text="Test 2")
+    query = (
+        CompatTestModel.select().where(CompatTestModel.id == obj1.id) |
+        CompatTestModel.select().where(CompatTestModel.id == obj2.id)
+    )
+    assert isinstance(query, peewee.ModelCompoundSelectQuery)
+    result = await manager.execute(query)
+    assert len(list(result)) == 2
+    assert obj1 in list(result)
+    assert obj2 in list(result)
+
+
+@all_dbs
+async def test_raw_select_compat_mode(manager):
+    obj1 = await manager.create(CompatTestModel, text="Test 1")
+    obj2 = await manager.create(CompatTestModel, text="Test 2")
+    query = CompatTestModel.raw(
+        'SELECT id, text, data FROM compattestmodel m ORDER BY m.text'
+    )
+    assert isinstance(query, peewee.ModelRaw)
     result = await manager.execute(query)
     assert list(result) == [obj1, obj2]
 
