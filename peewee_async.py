@@ -20,9 +20,11 @@ import functools
 import logging
 import uuid
 import warnings
+from contextvars import ContextVar
+from importlib.metadata import version
+from typing import Optional
 
 import peewee
-from importlib.metadata import version
 from playhouse.db_url import register_database
 
 IntegrityErrors = (peewee.IntegrityError,)
@@ -70,6 +72,18 @@ __all__ = [
 
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
+
+
+class ConnectionContext:
+    def __init__(self, connection):
+        self.connection = connection
+        self.transactions = []
+
+    def has_transactions(self):
+        return len(self.transactions) > 0
+
+connection_context: ContextVar[Optional[ConnectionContext]] = ContextVar("connection_context", default=None)
+
 
 
 #################
@@ -554,25 +568,65 @@ class AsyncQueryWrapper:
 # Database #
 ############
 
-class ConnectionContext:
-    def __init__(self, aio_pool, task_data):
-        self.aio_pool = aio_pool
-        self.task_data = task_data
-        self.in_transaction = False
-        self.conn = None
+class Transaction:
+
+    def __init__(self, _connection_context: ConnectionContext):
+        self.connection_context = _connection_context
+        self.savepoint = None
+
+    async def begin(self):
+        sql = "BEGIN"
+        if self.connection_context.has_transactions():
+            self.savepoint = f"AIODB__{uuid.uuid4().hex}"
+            sql = f"SAVEPOINT {self.savepoint}"
+        return await self.connection_context.connection.execute(sql)
 
     async def __aenter__(self):
-        depth = self.task_data.get('depth', 0)
-        if depth > 0:
-            self.conn = self.task_data.get('conn', None)
-            self.in_transaction = True
+        await self.begin()
+        self.connection_context.transactions.append(self)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if exc_type is not None:
+            await self.rollback()
         else:
-            self.conn = await self.aio_pool.acquire()
-        return self.conn
+            await self.commit()
+        self.connection_context.transactions.pop()
+
+    async def commit(self):
+
+        sql = "COMMIT"
+        if self.savepoint:
+            sql = f"RELEASE SAVEPOINT {self.savepoint}"
+        return await self.connection_context.connection.execute(sql)
+
+    async def rollback(self):
+        sql = "ROLLBACK"
+        if self.savepoint:
+            sql = f"ROLLBACK TO SAVEPOINT {self.savepoint}"
+        return await self.connection_context.connection.execute(sql)
+
+
+class ConnectionContextManager:
+    def __init__(self, aio_pool):
+        self.aio_pool = aio_pool
+
+    async def __aenter__(self):
+        _connection_context = connection_context.get()
+        if _connection_context is not None:
+            if _connection_context.has_transactions() is False:
+                raise Exception("Connection already open")
+            connection = _connection_context.connection
+        else:
+            connection = await self.aio_pool.acquire()
+            connection_context.set(ConnectionContext(connection))
+        return connection
 
     async def __aexit__(self, *args):
-        if not self.in_transaction:
-            self.aio_pool.release(self.conn)
+        _connection_context = connection_context.get()
+        if _connection_context.has_transactions() is False:
+            self.aio_pool.release(_connection_context.connection)
+            connection_context.set(None)
 
 
 class AsyncDatabase:
@@ -643,6 +697,13 @@ class AsyncDatabase:
         """
         return transaction(self)
 
+    def aio_atomic(self):
+        """Similar to peewee `Database.transaction()` method, but returns
+        asynchronous context manager.
+        """
+        async with self.connection() as connection:
+            return Transaction(connection)
+
     def atomic_async(self):
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
@@ -704,8 +765,8 @@ class AsyncDatabase:
             return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         raise Exception("Unknown type of query")
 
-    def connection(self) -> ConnectionContext:
-        return ConnectionContext(self.aio_pool, self._task_data)
+    def connection(self) -> ConnectionContextManager:
+        return ConnectionContextManager(self.aio_pool)
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
