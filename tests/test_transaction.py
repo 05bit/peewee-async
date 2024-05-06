@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from tests.conftest import all_dbs
+from tests.conftest import all_dbs, postgres_only
 from tests.models import TestModel
 
 
@@ -12,12 +12,12 @@ class FakeUpdateError(Exception):
     pass
 
 
-@all_dbs
+@postgres_only
 async def test_atomic_success(manager):
     obj = await manager.create(TestModel, text='FOO')
     obj_id = obj.id
 
-    async with manager.atomic():
+    async with manager.database.aio_atomic():
         obj.text = 'BAR'
         await manager.update(obj)
 

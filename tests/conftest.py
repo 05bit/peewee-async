@@ -53,9 +53,9 @@ async def manager(request):
 
 PG_DBS = [
     "postgres",
-    "postgres-ext",
-    "postgres-pool",
-    "postgres-pool-ext"
+    # "postgres-ext",
+    # "postgres-pool",
+    # "postgres-pool-ext"
 ]
 
 MYSQL_DBS = ["mysql", "mysql-pool"]

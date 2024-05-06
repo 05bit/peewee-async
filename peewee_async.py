@@ -583,7 +583,6 @@ class Transaction:
 
     async def __aenter__(self):
         await self.begin()
-        self.connection_context.transactions.append(self)
         return self
 
     async def __aexit__(self, exc_type, exc_value, exc_tb):
@@ -610,23 +609,35 @@ class Transaction:
 class ConnectionContextManager:
     def __init__(self, aio_pool):
         self.aio_pool = aio_pool
+        self.connection_context = connection_context.get()
 
     async def __aenter__(self):
-        _connection_context = connection_context.get()
-        if _connection_context is not None:
-            if _connection_context.has_transactions() is False:
+        if self.connection_context is not None:
+            if self.connection_context.has_transactions() is False:
                 raise Exception("Connection already open")
-            connection = _connection_context.connection
         else:
             connection = await self.aio_pool.acquire()
-            connection_context.set(ConnectionContext(connection))
+            self.connection_context = ConnectionContext(connection)
+            connection_context.set(self.connection_context)
         return connection
 
     async def __aexit__(self, *args):
-        _connection_context = connection_context.get()
-        if _connection_context.has_transactions() is False:
-            self.aio_pool.release(_connection_context.connection)
+        if self.connection_context.has_transactions() is False:
+            self.aio_pool.release(self.connection_context.connection)
             connection_context.set(None)
+
+class TransactionContextManager(ConnectionContextManager):
+    async def __aenter__(self):
+        connection = await super().__aenter__()
+        self.transaction = Transaction(connection)
+        await self.transaction.__aenter__()
+        self.connection_context.transactions.append(self)
+        return connection
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        await self.transaction.__aexit__(exc_type, exc_value, exc_tb)
+        await super().__aexit__()
+
 
 
 class AsyncDatabase:
@@ -701,8 +712,7 @@ class AsyncDatabase:
         """Similar to peewee `Database.transaction()` method, but returns
         asynchronous context manager.
         """
-        async with self.connection() as connection:
-            return Transaction(connection)
+        return TransactionContextManager(self.aio_pool)
 
     def atomic_async(self):
         """Similar to peewee `Database.atomic()` method, but returns
@@ -771,7 +781,8 @@ class AsyncDatabase:
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
-            async with self.connection() as connection:
+            async with self.connection() as _connection_context:
+                connection = connection_context.connection
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
                     if fetch_results is not None:
