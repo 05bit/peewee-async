@@ -590,7 +590,6 @@ class Transaction:
             await self.rollback()
         else:
             await self.commit()
-        self.connection_context.transactions.pop()
 
     async def commit(self):
 
@@ -636,8 +635,8 @@ class TransactionContextManager(ConnectionContextManager):
 
     async def __aexit__(self, exc_type, exc_value, exc_tb):
         await self.transaction.__aexit__(exc_type, exc_value, exc_tb)
+        self.connection_context.transactions.pop()
         await super().__aexit__()
-
 
 
 class AsyncDatabase:
@@ -781,8 +780,7 @@ class AsyncDatabase:
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
-            async with self.connection() as _connection_context:
-                connection = connection_context.connection
+            async with self.connection() as connection:
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
                     if fetch_results is not None:
