@@ -20,6 +20,9 @@ async def test_atomic_success(manager):
     async with manager.database.aio_atomic():
         obj.text = 'BAR'
         await manager.update(obj)
+        async with manager.database.aio_atomic():
+            obj.text = 'BAR'
+            await manager.update(obj)
 
     res = await manager.get(TestModel, id=obj_id)
     assert res.text == 'BAR'
