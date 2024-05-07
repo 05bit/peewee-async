@@ -315,13 +315,13 @@ class Manager:
                 await objects.create(
                     PageBlock, key='signature', text="William Shakespeare")
         """
-        return atomic(self.database)
+        return self.database.aio_atomic()
 
     def transaction(self):
         """Similar to `peewee.Database.transaction()` method, but returns
         **asynchronous** context manager.
         """
-        return transaction(self.database)
+        return self.database.aio_atomic()
 
     def savepoint(self, sid=None):
         """Similar to `peewee.Database.savepoint()` method, but returns
