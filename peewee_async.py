@@ -327,6 +327,7 @@ class Manager:
         """Similar to `peewee.Database.savepoint()` method, but returns
         **asynchronous** context manager.
         """
+        # TODO disable the future
         return savepoint(self.database, sid=sid)
 
     def allow_sync(self):
@@ -621,11 +622,10 @@ class ConnectionContextManager:
     def __init__(self, aio_pool):
         self.aio_pool = aio_pool
         self.connection_context = connection_context.get()
+        self.resuing_connection = self.connection_context is not None
 
     async def __aenter__(self):
         if self.connection_context is not None:
-            if self.connection_context.has_transactions() is False:
-                raise Exception("Connection already open")
             connection = self.connection_context.connection
         else:
             connection = await self.aio_pool.acquire()
@@ -634,7 +634,7 @@ class ConnectionContextManager:
         return connection
 
     async def __aexit__(self, *args):
-        if self.connection_context.has_transactions() is False:
+        if self.resuing_connection is False:
             self.aio_pool.release(self.connection_context.connection)
             connection_context.set(None)
 
@@ -721,6 +721,7 @@ class AsyncDatabase:
         """Similar to peewee `Database.transaction()` method, but returns
         asynchronous context manager.
         """
+        # TODO add using Transaction cls
         return transaction(self)
 
     def aio_atomic(self):
@@ -733,12 +734,14 @@ class AsyncDatabase:
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
         """
+        # TODO add using Transaction cls
         return atomic(self)
 
     def savepoint_async(self, sid=None):
         """Similar to peewee `Database.savepoint()` method, but returns
         asynchronous context manager.
         """
+        # TODO disable the future
         return savepoint(self, sid=sid)
 
     def set_allow_sync(self, value):
@@ -790,13 +793,13 @@ class AsyncDatabase:
             return await AsyncQueryWrapper.make_for_all_rows(cursor, query)
         raise Exception("Unknown type of query")
 
-    def connection(self) -> ConnectionContextManager:
+    def aio_connection(self) -> ConnectionContextManager:
         return ConnectionContextManager(self.aio_pool)
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
-            async with self.connection() as connection:
+            async with self.aio_connection() as connection:
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
                     if fetch_results is not None:
@@ -825,6 +828,9 @@ class AioPool(metaclass=abc.ABCMeta):
         self.database = database
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()
+
+    def has_acquired_connections(self):
+        return self.pool is not None and len(self.pool._used) > 0
 
     async def connect(self):
         async with self._connection_lock:

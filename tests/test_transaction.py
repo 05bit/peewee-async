@@ -1,139 +1,131 @@
+from tests.conftest import dbs_all
+from tests.models import TestModel
+from peewee_async import Transaction
 import asyncio
 
-import pytest
 
-from tests.conftest import all_dbs
-from tests.models import TestModel
+@dbs_all
+async def test_savepoint_success(db):
 
+    async with db.aio_atomic():
+        await TestModel.aio_create(text='FOO')
 
-class FakeUpdateError(Exception):
-    """Fake error while updating database.
-    """
-    pass
+        async with db.aio_atomic():
+            await TestModel.update(text="BAR").aio_execute()
 
-
-@all_dbs
-async def test_atomic_success(manager):
-    obj = await manager.create(TestModel, text='FOO')
-    obj_id = obj.id
-
-    async with manager.database.aio_atomic():
-        obj.text = 'BAR'
-        await manager.update(obj)
-        async with manager.database.aio_atomic():
-            obj.text = 'BAR'
-            await manager.update(obj)
-
-    res = await manager.get(TestModel, id=obj_id)
-    assert res.text == 'BAR'
+    assert await TestModel.aio_get_or_none(text="BAR") is not None
+    assert db.aio_pool.has_acquired_connections() is False
 
 
-@all_dbs
-async def test_atomic_failed(manager):
-    """Failed update in transaction.
-    """
+@dbs_all
+async def test_transaction_success(db):
+    async with db.aio_atomic():
+        await TestModel.aio_create(text='FOO')
 
-    obj = await manager.create(TestModel, text='FOO')
-    obj_id = obj.id
+    assert TestModel.aio_get_or_none(text="FOO") is not None
+    assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_savepoint_rollback(db):
+    await TestModel.aio_create(text='FOO', data="")
+
+    async with db.aio_atomic():
+        await TestModel.update(data="BAR").aio_execute()
+
+        try:
+            async with db.aio_atomic():
+                await TestModel.aio_create(text='FOO')
+        except:
+            pass
+
+    assert TestModel.aio_get_or_none(data="BAR") is not None
+    assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_transaction_rollback(db):
+    await TestModel.aio_create(text='FOO', data="")
 
     try:
-        async with manager.atomic():
-            obj.text = 'BAR'
-            await manager.update(obj)
-            raise FakeUpdateError()
-    except FakeUpdateError as e:
-        error = True
-        res = await manager.get(TestModel, id=obj_id)
+        async with db.aio_atomic():
+            await TestModel.update(data="BAR").aio_execute()
+            assert await TestModel.aio_get_or_none(data="BAR") is not None
+            await TestModel.aio_create(text='FOO')
+    except:
+        pass
 
-    assert error is True
-    assert res.text == 'FOO'
-
-
-# @all_dbs
-# async def test_several_transactions(manager):
-#     """Run several transactions in parallel tasks.
-#     """
-#
-#     async def t1():
-#         async with manager.atomic():
-#             assert manager.database.transaction_depth_async() == 1
-#             await asyncio.sleep(0.25)
-#
-#     async def t2():
-#         async with manager.atomic():
-#             assert manager.database.transaction_depth_async() == 1
-#             await asyncio.sleep(0.0625)
-#
-#     async def t3():
-#         async with manager.atomic():
-#             assert manager.database.transaction_depth_async() == 1
-#             await asyncio.sleep(0.125)
-#
-#     await asyncio.gather(t1(), t2(), t3())
+    assert await TestModel.aio_get_or_none(data="BAR") is None
+    assert db.aio_pool.has_acquired_connections() is False
 
 
-@all_dbs
-async def test_acid_when_connetion_has_been_brooken(manager):
-    async def restart_connections(event_for_lock: asyncio.Event) -> None:
-        event_for_lock.set()
-        # С этого момента БД доступна, пулл в порядке, всё хорошо. Таски могут работать работу
-        await asyncio.sleep(0.05)
+@dbs_all
+async def test_several_transactions(db):
+    """Run several transactions in parallel tasks.
+    """
 
-        # Ниже происходит падение метеорита
-        # (приложением обнаруживается разрыв коннекта с БД и оно сливает пулл + заполняет заново)
-        # (может выглядеть нереалистично, но такое бывает и на проде, мы просто симулируем это редкое событие)
-        #
-        # Мы через event запрещаем таскам трогать БД на время переподнятия пулла.
-        # Это нужно, чтобы воспроизвести очень редкие условия, при которых peewee-async косячит.
-        event_for_lock.clear()
+    async def t1():
+        async with db.aio_atomic():
+            await TestModel.aio_create(text='FOO1', data="")
 
-        await manager.database.close_async()
-        await manager.database.connect_async()
+    async def t2():
+        async with db.aio_atomic():
+            await TestModel.aio_create(text='FOO2', data="")
+            try:
+                async with db.aio_atomic():
+                    await TestModel.aio_create(text='FOO2', data="not_created")
+            except:
+                pass
 
-        event_for_lock.set()
+    async def t3():
+        async with db.aio_atomic():
+            await TestModel.aio_create(text='FOO3', data="")
+            async with db.aio_atomic():
+                await TestModel.update(data="BAR").where(TestModel.text == 'FOO3').aio_execute()
 
-        # БД самопочинилась (пулл заполнен и готов к работе).
-        # С этого момента таски опять могут работать работу
-        return None
+    await asyncio.gather(t1(), t2(), t3())
 
-    async def insert_records(event_for_wait: asyncio.Event):
-        await event_for_wait.wait()
-        async with manager.transaction():
-            # BEGIN
-            # INSERT 1
-            await manager.create(TestModel, text="1")
-
-            # Это место для падения метеорита.
-            # Тут произойдёт разрыв соединения и подключение заново.
-            # event здесь нужен чтобы таска не упала с исключением, а воспроизвела редкое поведение peewee-async
-            await asyncio.sleep(0.05)
-            await event_for_wait.wait()
-            # # Метеорит позади. event-loop вернул управление в таску
-            #
-            # # INSERT 2
-            await manager.create(TestModel, text="2")
-            # END ?
-
-        return None
+    assert await TestModel.aio_get_or_none(text="FOO1") is not None
+    assert await TestModel.aio_get_or_none(text="FOO2", data="") is not None
+    assert await TestModel.aio_get_or_none(text="FOO3", data="BAR") is not None
+    assert db.aio_pool.has_acquired_connections() is False
 
 
-    # Этот event-семафор нужно чтобы удобно воссоздать редкую ситуацию,
-    # когда разрыв + восстановление происходит до того, как в asyncio.Task вернётся управление.
-    # В дикой природе такое происходит редко и при определённых стечениях обстоятельств,
-    # но приносит ощутимый ущерб
-    event = asyncio.Event()
+@dbs_all
+async def test_transaction_manual_work(db):
+    async with db.aio_connection() as connection:
+        tr = Transaction(connection)
+        await tr.begin()
+        await TestModel.aio_create(text='FOO')
+        assert TestModel.aio_get_or_none(text="FOO") is not None
+        try:
+            await TestModel.aio_create(text='FOO')
+        except:
+            await tr.rollback()
+        else:
+            await tr.commit()
 
-    results = await asyncio.gather(
-        restart_connections(event),
-        insert_records(event),
-        return_exceptions=True,
-    )
-    # Проверяем, что ни одна из тасок не упала с исключением
-    # assert results == [None, None]
+    assert await TestModel.aio_get_or_none(text="FOO") is None
+    assert db.aio_pool.has_acquired_connections() is False
 
-    # (!) Убеждаемся, что атомарность работает (!)
-    # Т.е. у нас должны либо закоммититься 2 записи, либо ни одной
-    a = list(await manager.execute(TestModel.select()))
-    assert len(a) == 0, f'WTF, peewee-async ?! Saved rows: {a}'
-    # Если assert выше упал, то в БД оказалась 1 запись, а не 0 или 2.
-    # Хотя мы на уровне кода пытались гарантировать, что такого не будет
+
+@dbs_all
+async def test_savepoint_manual_work(db):
+    async with db.aio_connection() as connection:
+        tr = Transaction(connection)
+        await tr.begin()
+        await TestModel.aio_create(text='FOO')
+        assert TestModel.aio_get_or_none(text="FOO") is not None
+
+        savepoint = Transaction(connection, is_savepoint=True)
+        await savepoint.begin()
+        try:
+            await TestModel.aio_create(text='FOO')
+        except:
+            await savepoint.rollback()
+        else:
+            await savepoint.commit()
+        await tr.commit()
+
+    assert await TestModel.aio_get_or_none(text="FOO") is not None
+    assert db.aio_pool.has_acquired_connections() is False
