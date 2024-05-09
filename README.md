@@ -104,12 +104,7 @@ with objects.allow_sync():
 More examples
 -------------
 
-Build and run with Docker Compose:
-
-```bash
-docker compose -f examples/docker-compose.yaml build
-docker compose -f examples/docker-compose.yaml up
-```
+Check the .`/examples` directory for more.
 
 
 Documentation
