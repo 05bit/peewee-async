@@ -113,11 +113,8 @@ async def count(query, clear_limit=False):
 
 async def prefetch(sq, *subqueries, prefetch_type):
     """Asynchronous version of the `prefetch()` from peewee."""
-    from peewee_async import AioModelSelect
-
     database = _query_db(sq)
     if not subqueries:
-        _patch_query_with_compat_methods(sq, AioModelSelect)
         result = await database.aio_execute(sq)
         return result
 
@@ -136,7 +133,6 @@ async def prefetch(sq, *subqueries, prefetch_type):
         id_map = deps[query_model]
         has_relations = bool(rel_map.get(query_model))
         database = _query_db(pq.query)
-        _patch_query_with_compat_methods(pq.query, AioModelSelect)
         result = await database.aio_execute(pq.query)
 
         for instance in result:
@@ -230,8 +226,6 @@ class Manager:
 
         All will return `MyModel` instance with `id = 1`
         """
-        from peewee_async import AioModelSelect  # noqa
-
         await self.connect()
 
         if isinstance(source_, peewee.Query):
@@ -246,8 +240,6 @@ class Manager:
         if conditions:
             query = query.where(*conditions)
 
-        _patch_query_with_compat_methods(query, AioModelSelect)
-
         try:
             result = await self.execute(query)
             return list(result)[0]
@@ -256,12 +248,8 @@ class Manager:
 
     async def create(self, model_, **data):
         """Create a new object saved to database."""
-        from peewee_async import AioModelInsert
-
         obj = model_(**data)
         query = model_.insert(**dict(obj.__data__))
-
-        _patch_query_with_compat_methods(query, AioModelInsert)
 
         pk = await self.execute(query)
         if obj._pk is None:
@@ -298,8 +286,6 @@ class Manager:
         :param only: (optional) the list/tuple of fields or
                      field names to update
         """
-        from peewee_async import AioModelUpdate  # noqa
-
         field_dict = dict(obj.__data__)
         pk_field = obj._meta.primary_key
 
@@ -317,7 +303,6 @@ class Manager:
 
         query = obj.update(**field_dict).where(obj._pk_expr())
 
-        _patch_query_with_compat_methods(query, AioModelUpdate)
 
         result = await self.execute(query)
         obj._dirty.clear()
@@ -326,22 +311,17 @@ class Manager:
 
     async def delete(self, obj, recursive=False, delete_nullable=False):
         """Delete object from database."""
-        from peewee_async import AioModelDelete, AioModelUpdate
         if recursive:
             dependencies = obj.dependencies(delete_nullable)
             for cond, fk in reversed(list(dependencies)):
                 model = fk.model
                 if fk.null and not delete_nullable:
                     sq = model.update(**{fk.name: None}).where(cond)
-                    _patch_query_with_compat_methods(sq, AioModelUpdate)
                 else:
                     sq = model.delete().where(cond)
-                    _patch_query_with_compat_methods(sq, AioModelDelete)
                 await self.execute(sq)
 
         query = obj.delete().where(obj._pk_expr())
-        _patch_query_with_compat_methods(query, AioModelDelete)
-
         return (await self.execute(query))
 
     async def create_or_get(self, model_, **kwargs):
@@ -361,7 +341,6 @@ class Manager:
 
     async def execute(self, query):
         """Execute query asyncronously."""
-        _patch_query_with_compat_methods(query, None)
         return await self.database.aio_execute(query)
 
     async def prefetch(self, query, *subqueries, prefetch_type=peewee.PREFETCH_TYPE.JOIN):
