@@ -1,5 +1,4 @@
 import peewee
-import pytest
 from tests.conftest import all_dbs
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
@@ -18,7 +17,6 @@ async def test_select_w_join(manager):
     assert result.joined_alpha.id == alpha.id
 
 
-@pytest.mark.skip
 @all_dbs
 async def test_select_compound(manager):
     obj1 = await manager.create(TestModel, text="Test 1")
@@ -29,8 +27,8 @@ async def test_select_compound(manager):
     )
     assert isinstance(query, peewee.ModelCompoundSelectQuery)
     # NOTE: Two `AioModelSelect` when joining via `|` produce `ModelCompoundSelectQuery`
-    # without `aio_execute()` method, so only compat mode is available for now.
-    result = await query.aio_execute()
+    # without `aio_execute()` method, so using `database.aio_execute()` here.
+    result = await manager.database.aio_execute(query)
     assert len(list(result)) == 2
     assert obj1 in list(result)
     assert obj2 in list(result)

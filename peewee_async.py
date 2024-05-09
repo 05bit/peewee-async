@@ -24,6 +24,7 @@ import peewee
 from importlib.metadata import version
 from playhouse.db_url import register_database
 from peewee_async_compat import Manager, count, execute, prefetch, scalar
+from peewee_async_compat import _patch_query_with_compat_methods
 
 try:
     import aiopg
@@ -318,6 +319,9 @@ class AsyncDatabase:
                               don't need to close cursor It will be closed automatically.
         :return: result depends on query type, it's the same as for sync `query.execute()`
         """
+        # To make `Database.aio_execute` compatible with peewee's sync queries we
+        # apply optional patching, it will do nothing for Aio-counterparts:
+        _patch_query_with_compat_methods(query, None)
         sql, params = query.sql()
         fetch_results = fetch_results or getattr(query, 'fetch_results', None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
