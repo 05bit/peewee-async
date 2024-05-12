@@ -25,7 +25,7 @@ from typing import Optional
 
 import peewee
 from playhouse.db_url import register_database
-from peewee_async_compat import Manager, count, execute, prefetch, scalar
+from peewee_async_compat import Manager, count, execute, prefetch, scalar, savepoint, atomic, transaction
 from peewee_async_compat import _patch_query_with_compat_methods
 
 try:
@@ -65,8 +65,8 @@ __all__ = [
     'execute',
     'count',
     'scalar',
-    'atomic',
     'prefetch',
+    'atomic',
     'transaction',
     'savepoint',
 ]
@@ -82,11 +82,6 @@ class ConnectionContext:
         self.transaction_is_opened = False
 
 connection_context: ContextVar[Optional[ConnectionContext]] = ContextVar("connection_context", default=None)
-
-
-
-
-
 
 ###################
 # Result wrappers #
@@ -652,71 +647,6 @@ class PooledMySQLDatabase(MySQLDatabase):
 
 
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
-
-
-################
-# Transactions #
-################
-
-
-def transaction(db):
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.transaction()`. Will start new `asyncio` task for
-    transaction if not started already.
-    """
-    warnings.warn(
-        "`transaction` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
-        DeprecationWarning
-    )
-    return TransactionContextManager(db.aio_pool)
-
-
-class savepoint:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.savepoint()`.
-    """
-    def __init__(self, db, sid=None):
-        warnings.warn(
-            "`savepoint` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
-            DeprecationWarning
-        )
-        self.db = db
-        self.sid = sid or 's' + uuid.uuid4().hex
-        self.quoted_sid = self.sid.join(self.db.quote)
-
-    async def commit(self):
-        await self.db.aio_execute_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
-
-    async def rollback(self):
-        await self.db.aio_execute_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
-
-    async def __aenter__(self):
-        await self.db.aio_execute_sql('SAVEPOINT %s;' % self.quoted_sid)
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type:
-                await self.rollback()
-            else:
-                try:
-                    await self.commit()
-                except:
-                    await self.rollback()
-                    raise
-        finally:
-            pass
-
-
-def atomic(db):
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.atomic()`.
-    """
-    warnings.warn(
-        "`atomic` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
-        DeprecationWarning
-    )
-    return TransactionContextManager(db.aio_pool)
 
 
 class AioQueryMixin:

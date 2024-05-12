@@ -10,6 +10,7 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2024, Alexey Kinëv <rudy@05bit.com>
 
 """
+import uuid
 from functools import partial
 
 import warnings
@@ -31,6 +32,9 @@ __all__ = [
     'prefetch',
     'execute',
     'scalar',
+    'atomic',
+    'transaction',
+    'savepoint',
 ]
 
 
@@ -412,11 +416,6 @@ class Manager:
         Similar to `peewee.Database.savepoint()` method, but returns
         **asynchronous** context manager.
         """
-        warnings.warn(
-            "`savepoint` is deprecated, use `database.aio_atomic` method.",
-            DeprecationWarning
-        )
-        from peewee_async import savepoint  # noqa
         return savepoint(self.database, sid=sid)
 
     def allow_sync(self):
@@ -446,3 +445,69 @@ class Manager:
             if f not in fields:
                 field_dict.pop(f)
         return field_dict
+
+
+def transaction(db):
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.transaction()`. Will start new `asyncio` task for
+    transaction if not started already.
+    """
+    warnings.warn(
+        "`transaction` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
+        DeprecationWarning
+    )
+    from peewee_async import TransactionContextManager
+    return TransactionContextManager(db.aio_pool)
+
+
+def atomic(db):
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.atomic()`.
+    """
+    warnings.warn(
+        "`atomic` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
+        DeprecationWarning
+    )
+    from peewee_async import TransactionContextManager
+    return TransactionContextManager(db.aio_pool)
+
+class _savepoint:
+    """Asynchronous context manager (`async with`), similar to
+    `peewee.savepoint()`.
+    """
+    def __init__(self, db, sid=None):
+
+        self.db = db
+        self.sid = sid or 's' + uuid.uuid4().hex
+        self.quoted_sid = self.sid.join(self.db.quote)
+
+    async def commit(self):
+        await self.db.aio_execute_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
+
+    async def rollback(self):
+        await self.db.aio_execute_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
+
+    async def __aenter__(self):
+        await self.db.aio_execute_sql('SAVEPOINT %s;' % self.quoted_sid)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type:
+                await self.rollback()
+            else:
+                try:
+                    await self.commit()
+                except:
+                    await self.rollback()
+                    raise
+        finally:
+            pass
+
+
+def savepoint(db, sid=None):
+    warnings.warn(
+        "`savepoint` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
+        DeprecationWarning
+    )
+    return _savepoint(db.db, sid)
