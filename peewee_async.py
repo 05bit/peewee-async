@@ -57,6 +57,8 @@ __all__ = [
     'PooledPostgresqlDatabase',
     'MySQLDatabase',
     'PooledMySQLDatabase',
+    'Transaction',
+    'AioModel',
 
     # Compatibility API (deprecated in v1.0 release)
     'Manager',
