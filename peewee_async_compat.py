@@ -412,7 +412,12 @@ class Manager:
         Similar to `peewee.Database.savepoint()` method, but returns
         **asynchronous** context manager.
         """
-        raise Exception("`savepoint` feature is disabled use `database.aio_atomic` or Transaction class instead.")
+        warnings.warn(
+            "`savepoint` is deprecated, use `database.aio_atomic` method.",
+            DeprecationWarning
+        )
+        from peewee_async import savepoint  # noqa
+        return savepoint(self.database, sid=sid)
 
     def allow_sync(self):
         """

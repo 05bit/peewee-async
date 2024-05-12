@@ -169,9 +169,9 @@ class AsyncQueryWrapper:
         return result
 
 
-############
-# Database #
-############
+###############
+# Transaction #
+###############
 
 class Transaction:
 
@@ -263,12 +263,16 @@ class TransactionContextManager(ConnectionContextManager):
         await super().__aexit__()
 
 
+############
+# Database #
+############
+
+
 class AsyncDatabase:
     _allow_sync = True  # whether sync queries are allowed
 
     def __init__(self, database, **kwargs):
         super().__init__(database, **kwargs)
-        self._task_data = TaskLocals()
         self.aio_pool = self.aio_pool_cls(
             database=self.database,
             **self.connect_params_async
@@ -297,39 +301,15 @@ class AsyncDatabase:
         """
         await self.aio_pool.terminate()
 
-    async def push_transaction_async(self):
-        """Increment async transaction depth.
-        """
-        depth = self.transaction_depth_async()
-        if not depth:
-            conn = await self.aio_pool.acquire()
-            self._task_data.set('conn', conn)
-        self._task_data.set('depth', depth + 1)
-
-    async def pop_transaction_async(self):
-        """Decrement async transaction depth.
-        """
-        depth = self.transaction_depth_async()
-        if depth > 0:
-            depth -= 1
-            self._task_data.set('depth', depth)
-            if depth == 0:
-                conn = self._task_data.get('conn')
-                self.aio_pool.release(conn)
-        else:
-            raise ValueError("Invalid async transaction depth value")
-
-    def transaction_depth_async(self):
-        """Get async transaction depth.
-        """
-        return self._task_data.get('depth', 0) if self._task_data else 0
-
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
         asynchronous context manager.
         """
-        # TODO add using Transaction cls
-        return transaction(self)
+        warnings.warn(
+            "`atomic_async` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return self.aio_atomic()
 
     def aio_atomic(self):
         """Similar to peewee `Database.transaction()` method, but returns
@@ -341,14 +321,20 @@ class AsyncDatabase:
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
         """
-        # TODO add using Transaction cls
-        return atomic(self)
+        warnings.warn(
+            "`atomic_async` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return self.aio_atomic()
 
     def savepoint_async(self, sid=None):
         """Similar to peewee `Database.savepoint()` method, but returns
         asynchronous context manager.
         """
-        # TODO disable the future
+        warnings.warn(
+            "`savepoint` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
         return savepoint(self, sid=sid)
 
     def set_allow_sync(self, value):
@@ -673,53 +659,16 @@ register_database(PooledMySQLDatabase, 'mysql+pool+async')
 ################
 
 
-class transaction:
+def transaction(db):
     """Asynchronous context manager (`async with`), similar to
     `peewee.transaction()`. Will start new `asyncio` task for
     transaction if not started already.
     """
-    def __init__(self, db):
-        self.db = db
-
-    async def commit(self, begin=True):
-        await self.db.aio_execute_sql("COMMIT")
-        if begin:
-            await self.db.aio_execute_sql("BEGIN")
-
-    async def rollback(self, begin=True):
-        await self.db.aio_execute_sql("ROLLBACK")
-        if begin:
-            await self.db.aio_execute_sql("BEGIN")
-
-    async def __aenter__(self):
-        if not asyncio_current_task():
-            raise RuntimeError("The transaction must run within a task")
-        await self.db.push_transaction_async()
-        if self.db.transaction_depth_async() == 1:
-            try:
-                await self.db.aio_execute_sql("BEGIN")
-            except:
-                await self.pop_transaction()
-        return self
-
-    async def pop_transaction(self):
-        # transaction depth may be zero if database gone
-        depth = self.db.transaction_depth_async()
-        if depth > 0:
-            await self.db.pop_transaction_async()
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type:
-                await self.rollback(False)
-            elif self.db.transaction_depth_async() == 1:
-                try:
-                    await self.commit(False)
-                except:
-                    await self.rollback(False)
-                    raise
-        finally:
-            await self.pop_transaction()
+    warnings.warn(
+        "`transaction` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
+        DeprecationWarning
+    )
+    return TransactionContextManager(db.aio_pool)
 
 
 class savepoint:
@@ -727,6 +676,10 @@ class savepoint:
     `peewee.savepoint()`.
     """
     def __init__(self, db, sid=None):
+        warnings.warn(
+            "`savepoint` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
+            DeprecationWarning
+        )
         self.db = db
         self.sid = sid or 's' + uuid.uuid4().hex
         self.quoted_sid = self.sid.join(self.db.quote)
@@ -755,84 +708,15 @@ class savepoint:
             pass
 
 
-class atomic:
+def atomic(db):
     """Asynchronous context manager (`async with`), similar to
     `peewee.atomic()`.
     """
-    def __init__(self, db):
-        self.db = db
-
-    async def __aenter__(self):
-        if self.db.transaction_depth_async() > 0:
-            self._ctx = self.db.savepoint_async()
-        else:
-            self._ctx = self.db.transaction_async()
-        return (await self._ctx.__aenter__())
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._ctx.__aexit__(exc_type, exc_val, exc_tb)
-
-
-####################
-# Internal helpers #
-####################
-
-class TaskLocals:
-    """Simple `dict` wrapper to get and set values on per `asyncio`
-    task basis.
-
-    The idea is similar to thread-local data, but actually *much* simpler.
-    It's no more than a "sugar" class. Use `get()` and `set()` method like
-    you would to for `dict` but values will be get and set in the context
-    of currently running `asyncio` task.
-
-    When task is done, all saved values are removed from stored data.
-    """
-    def __init__(self):
-        self.data = {}
-
-    def get(self, key, *val):
-        """Get value stored for current running task. Optionally
-        you may provide the default value. Raises `KeyError` when
-        can't get the value and no default one is provided.
-        """
-        data = self.get_data()
-        if data is not None:
-            return data.get(key, *val)
-        if val:
-            return val[0]
-        raise KeyError(key)
-
-    def set(self, key, val):
-        """Set value stored for current running task.
-        """
-        data = self.get_data(True)
-        if data is not None:
-            data[key] = val
-        else:
-            raise RuntimeError("No task is currently running")
-
-    def get_data(self, create=False):
-        """Get dict stored for current running task. Return `None`
-        or an empty dict if no data was found depending on the
-        `create` argument value.
-
-        :param create: if argument is `True`, create empty dict
-                       for task, default: `False`
-        """
-        task = asyncio_current_task()
-        if task:
-            task_id = id(task)
-            if create and task_id not in self.data:
-                self.data[task_id] = {}
-                task.add_done_callback(self.del_data)
-            return self.data.get(task_id)
-        return None
-
-    def del_data(self, task):
-        """Delete data for task from stored data dict.
-        """
-        del self.data[id(task)]
+    warnings.warn(
+        "`atomic` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
+        DeprecationWarning
+    )
+    return TransactionContextManager(db.aio_pool)
 
 
 class AioQueryMixin:
