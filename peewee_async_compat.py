@@ -390,6 +390,10 @@ class Manager:
                 await objects.create(
                     PageBlock, key='signature', text="William Shakespeare")
         """
+        warnings.warn(
+            "`atomic` is deprecated, use `database.aio_atomic` method.",
+            DeprecationWarning
+        )
         return self.database.aio_atomic()
 
     def transaction(self):
@@ -397,7 +401,10 @@ class Manager:
         Similar to `peewee.Database.transaction()` method, but returns
         **asynchronous** context manager.
         """
-
+        warnings.warn(
+            "`transaction` is deprecated, use `database.aio_atomic` method.",
+            DeprecationWarning
+        )
         return self.database.aio_atomic()
 
     def savepoint(self, sid=None):
@@ -405,7 +412,7 @@ class Manager:
         Similar to `peewee.Database.savepoint()` method, but returns
         **asynchronous** context manager.
         """
-        raise Exception("The feature didn't work")
+        raise Exception("`savepoint` feature is disabled use `database.aio_atomic` or Transaction class instead.")
 
     def allow_sync(self):
         """
