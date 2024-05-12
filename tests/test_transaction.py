@@ -1,7 +1,8 @@
+import asyncio
+
+from peewee_async import Transaction
 from tests.conftest import dbs_all
 from tests.models import TestModel
-from peewee_async import Transaction
-import asyncio
 
 
 @dbs_all
@@ -22,7 +23,7 @@ async def test_transaction_success(db):
     async with db.aio_atomic():
         await TestModel.aio_create(text='FOO')
 
-    assert TestModel.aio_get_or_none(text="FOO") is not None
+    assert await TestModel.aio_get_or_none(text="FOO") is not None
     assert db.aio_pool.has_acquired_connections() is False
 
 
@@ -39,7 +40,7 @@ async def test_savepoint_rollback(db):
         except:
             pass
 
-    assert TestModel.aio_get_or_none(data="BAR") is not None
+    assert await TestModel.aio_get_or_none(data="BAR") is not None
     assert db.aio_pool.has_acquired_connections() is False
 
 
@@ -97,7 +98,7 @@ async def test_transaction_manual_work(db):
         tr = Transaction(connection)
         await tr.begin()
         await TestModel.aio_create(text='FOO')
-        assert TestModel.aio_get_or_none(text="FOO") is not None
+        assert await TestModel.aio_get_or_none(text="FOO") is not None
         try:
             await TestModel.aio_create(text='FOO')
         except:
@@ -115,7 +116,7 @@ async def test_savepoint_manual_work(db):
         tr = Transaction(connection)
         await tr.begin()
         await TestModel.aio_create(text='FOO')
-        assert TestModel.aio_get_or_none(text="FOO") is not None
+        assert await TestModel.aio_get_or_none(text="FOO") is not None
 
         savepoint = Transaction(connection, is_savepoint=True)
         await savepoint.begin()

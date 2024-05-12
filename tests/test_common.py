@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 
-import peewee as pw
+import peewee
 import pytest
 
 import peewee_async
@@ -27,7 +27,6 @@ async def test_multiple_iterate_over_result(manager):
     result = await manager.execute(
         TestModel.select().order_by(TestModel.text))
 
-    assert list(result) == [obj1, obj2]
     assert list(result) == [obj1, obj2]
 
 
@@ -122,7 +121,7 @@ async def test_allow_sync_is_reverted_for_exc(manager):
             ununique_text = "ununique_text"
             await manager.create(TestModel, text=ununique_text)
             await manager.create(TestModel, text=ununique_text)
-    except pw.IntegrityError:
+    except peewee.IntegrityError:
         pass
     assert manager.database._allow_sync is False
 
@@ -196,11 +195,9 @@ async def test_deferred_init(params, db_cls):
     [
         (DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()
     ]
-
 )
 async def test_proxy_database(params, db_cls):
-
-    database = pw.Proxy()
+    database = peewee.Proxy()
     TestModel._meta.database = database
     manager = peewee_async.Manager(database)
 

@@ -1,3 +1,4 @@
+import os
 import peewee_async
 import peewee_asyncext
 
@@ -5,19 +6,19 @@ import peewee_asyncext
 PG_DEFAULTS = {
     'database': 'postgres',
     'host': '127.0.0.1',
-    'port': 5432,
+    'port': int(os.environ.get('POSTGRES_PORT', 5432)),
     'password': 'postgres',
     'user': 'postgres',
-    "connect_timeout": 30
+    'connect_timeout': 30
 }
 
 MYSQL_DEFAULTS = {
     'database': 'mysql',
     'host': '127.0.0.1',
-    'port': 3306,
+    'port': int(os.environ.get('MYSQL_PORT', 3306)),
     'user': 'root',
     'password': 'mysql',
-    "connect_timeout": 30
+    'connect_timeout': 30
 }
 
 DB_DEFAULTS = {
@@ -28,6 +29,7 @@ DB_DEFAULTS = {
     'mysql': MYSQL_DEFAULTS,
     'mysql-pool': MYSQL_DEFAULTS
 }
+
 DB_CLASSES = {
     'postgres': peewee_async.PostgresqlDatabase,
     'postgres-ext': peewee_asyncext.PostgresqlExtDatabase,
