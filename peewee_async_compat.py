@@ -230,6 +230,10 @@ class Manager:
 
         All will return `MyModel` instance with `id = 1`
         """
+        warnings.warn(
+            "`get` method is deprecated, use `AioModel.aio_get` instead.",
+            DeprecationWarning
+        )
         await self.connect()
 
         if isinstance(source_, peewee.Query):
@@ -252,6 +256,10 @@ class Manager:
 
     async def create(self, model_, **data):
         """Create a new object saved to database."""
+        warnings.warn(
+            "`create` method is deprecated, use `AioModel.aio_create` instead.",
+            DeprecationWarning
+        )
         obj = model_(**data)
         query = model_.insert(**dict(obj.__data__))
 
@@ -277,6 +285,10 @@ class Manager:
 
     async def get_or_none(self, model_, *args, **kwargs):
         """Try to get an object and return None if it doesn't exist."""
+        warnings.warn(
+            "`get_or_none` method is deprecated, use `AioModel.aio_get_or_none` instead.",
+            DeprecationWarning
+        )
         try:
             return (await self.get(model_, *args, **kwargs))
         except model_.DoesNotExist:
@@ -345,6 +357,10 @@ class Manager:
 
     async def execute(self, query):
         """Execute query asyncronously."""
+        warnings.warn(
+            "`execute` method is deprecated, use `AioModel.aio_execute` or database.aio_execute instead.",
+            DeprecationWarning
+        )
         return await self.database.aio_execute(query)
 
     async def prefetch(self, query, *subqueries, prefetch_type=peewee.PREFETCH_TYPE.JOIN):
