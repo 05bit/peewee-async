@@ -26,6 +26,60 @@ def event_loop():
 
 
 @pytest.fixture
+async def db(request):
+    db = request.param
+    if db.startswith('postgres') and aiopg is None:
+        pytest.skip("aiopg is not installed")
+    if db.startswith('mysql') and aiomysql is None:
+        pytest.skip("aiomysql is not installed")
+
+    params = DB_DEFAULTS[db]
+    database = DB_CLASSES[db](**params)
+    database._allow_sync = False
+    with database.allow_sync():
+        for model in ALL_MODELS:
+            model._meta.database = database
+            model.create_table(True)
+
+    yield database
+
+    with database.allow_sync():
+        for model in reversed(sort_models(ALL_MODELS)):
+            model.delete().execute()
+            model._meta.database = None
+    await database.close_async()
+
+
+PG_DBS = [
+    "postgres",
+    "postgres-ext",
+    "postgres-pool",
+    "postgres-pool-ext"
+]
+
+MYSQL_DBS = ["mysql", "mysql-pool"]
+
+
+dbs_all = pytest.mark.parametrize(
+    "db", PG_DBS + MYSQL_DBS, indirect=["db"]
+)
+
+# MANAGERS fixtures will be removed in v1.0.0
+# TODO add manager prefix to fixtures
+postgres_only = pytest.mark.parametrize(
+    "manager", PG_DBS, indirect=["manager"]
+)
+
+mysql_only = pytest.mark.parametrize(
+    "manager", MYSQL_DBS, indirect=["manager"]
+)
+
+all_dbs = pytest.mark.parametrize(
+    "manager", PG_DBS + MYSQL_DBS, indirect=["manager"]
+)
+
+
+@pytest.fixture
 async def manager(request):
     db = request.param
     if db.startswith('postgres') and aiopg is None:
@@ -49,26 +103,3 @@ async def manager(request):
             model.delete().execute()
             model._meta.database = None
     await database.close_async()
-
-
-PG_DBS = [
-    "postgres",
-    "postgres-ext",
-    "postgres-pool",
-    "postgres-pool-ext"
-]
-
-MYSQL_DBS = ["mysql", "mysql-pool"]
-
-
-postgres_only = pytest.mark.parametrize(
-    "manager", PG_DBS, indirect=["manager"]
-)
-
-mysql_only = pytest.mark.parametrize(
-    "manager", MYSQL_DBS, indirect=["manager"]
-)
-
-all_dbs = pytest.mark.parametrize(
-    "manager", PG_DBS + MYSQL_DBS, indirect=["manager"]
-)

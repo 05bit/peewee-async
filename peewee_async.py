@@ -19,11 +19,13 @@ import contextlib
 import logging
 import uuid
 import warnings
+from contextvars import ContextVar
+from importlib.metadata import version
+from typing import Optional
 
 import peewee
-from importlib.metadata import version
 from playhouse.db_url import register_database
-from peewee_async_compat import Manager, count, execute, prefetch, scalar
+from peewee_async_compat import Manager, count, execute, prefetch, scalar, savepoint, atomic, transaction
 from peewee_async_compat import _patch_query_with_compat_methods
 
 try:
@@ -55,14 +57,16 @@ __all__ = [
     'PooledPostgresqlDatabase',
     'MySQLDatabase',
     'PooledMySQLDatabase',
+    'Transaction',
+    'AioModel',
 
     # Compatibility API (deprecated in v1.0 release)
     'Manager',
     'execute',
     'count',
     'scalar',
-    'atomic',
     'prefetch',
+    'atomic',
     'transaction',
     'savepoint',
 ]
@@ -70,6 +74,14 @@ __all__ = [
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
 
+
+class ConnectionContext:
+    def __init__(self, connection):
+        self.connection = connection
+        # needs for to know whether begin a transaction  or create a savepoint
+        self.transaction_is_opened = False
+
+connection_context: ContextVar[Optional[ConnectionContext]] = ContextVar("connection_context", default=None)
 
 ###################
 # Result wrappers #
@@ -152,29 +164,103 @@ class AsyncQueryWrapper:
         return result
 
 
+###############
+# Transaction #
+###############
+
+class Transaction:
+
+    def __init__(self, connection, is_savepoint=False):
+        self.connection = connection
+        if is_savepoint:
+            self.savepoint = f"PWASYNC__{uuid.uuid4().hex}"
+        else:
+            self.savepoint = None
+
+    @property
+    def is_savepoint(self):
+        return self.savepoint is not None
+
+    async def execute(self, sql):
+        async with self.connection.cursor() as cursor:
+            await cursor.execute(sql)
+
+    async def begin(self):
+        sql = "BEGIN"
+        if self.savepoint:
+            sql = f"SAVEPOINT {self.savepoint}"
+        return await self.execute(sql)
+
+    async def __aenter__(self):
+        await self.begin()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if exc_type is not None:
+            await self.rollback()
+        else:
+            await self.commit()
+
+    async def commit(self):
+
+        sql = "COMMIT"
+        if self.savepoint:
+            sql = f"RELEASE SAVEPOINT {self.savepoint}"
+        return await self.execute(sql)
+
+    async def rollback(self):
+        sql = "ROLLBACK"
+        if self.savepoint:
+            sql = f"ROLLBACK TO SAVEPOINT {self.savepoint}"
+        return await self.execute(sql)
+
+
+class ConnectionContextManager:
+    def __init__(self, aio_pool):
+        self.aio_pool = aio_pool
+        self.connection_context = connection_context.get()
+        self.resuing_connection = self.connection_context is not None
+
+    async def __aenter__(self):
+        if self.connection_context is not None:
+            connection = self.connection_context.connection
+        else:
+            connection = await self.aio_pool.acquire()
+            self.connection_context = ConnectionContext(connection)
+            connection_context.set(self.connection_context)
+        return connection
+
+    async def __aexit__(self, *args):
+        if self.resuing_connection is False:
+            self.aio_pool.release(self.connection_context.connection)
+            connection_context.set(None)
+
+
+class TransactionContextManager(ConnectionContextManager):
+    async def __aenter__(self):
+        connection = await super().__aenter__()
+        begin_transaction = self.connection_context.transaction_is_opened is False
+
+        self.transaction = Transaction(connection, is_savepoint=begin_transaction is False)
+        await self.transaction.__aenter__()
+
+        if begin_transaction is True:
+            self.connection_context.transaction_is_opened = True
+        return connection
+
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        await self.transaction.__aexit__(exc_type, exc_value, exc_tb)
+
+        end_transaction = self.transaction.is_savepoint is False
+        if end_transaction is True:
+            self.connection_context.transaction_is_opened = False
+
+        await super().__aexit__()
+
+
 ############
 # Database #
 ############
-
-class ConnectionContext:
-    def __init__(self, aio_pool, task_data):
-        self.aio_pool = aio_pool
-        self.task_data = task_data
-        self.in_transaction = False
-        self.conn = None
-
-    async def __aenter__(self):
-        depth = self.task_data.get('depth', 0)
-        if depth > 0:
-            self.conn = self.task_data.get('conn', None)
-            self.in_transaction = True
-        else:
-            self.conn = await self.aio_pool.acquire()
-        return self.conn
-
-    async def __aexit__(self, *args):
-        if not self.in_transaction:
-            self.aio_pool.release(self.conn)
 
 
 class AsyncDatabase:
@@ -182,7 +268,6 @@ class AsyncDatabase:
 
     def __init__(self, database, **kwargs):
         super().__init__(database, **kwargs)
-        self._task_data = TaskLocals()
         self.aio_pool = self.aio_pool_cls(
             database=self.database,
             **self.connect_params_async
@@ -211,49 +296,40 @@ class AsyncDatabase:
         """
         await self.aio_pool.terminate()
 
-    async def push_transaction_async(self):
-        """Increment async transaction depth.
-        """
-        depth = self.transaction_depth_async()
-        if not depth:
-            conn = await self.aio_pool.acquire()
-            self._task_data.set('conn', conn)
-        self._task_data.set('depth', depth + 1)
-
-    async def pop_transaction_async(self):
-        """Decrement async transaction depth.
-        """
-        depth = self.transaction_depth_async()
-        if depth > 0:
-            depth -= 1
-            self._task_data.set('depth', depth)
-            if depth == 0:
-                conn = self._task_data.get('conn')
-                self.aio_pool.release(conn)
-        else:
-            raise ValueError("Invalid async transaction depth value")
-
-    def transaction_depth_async(self):
-        """Get async transaction depth.
-        """
-        return self._task_data.get('depth', 0) if self._task_data else 0
-
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
         asynchronous context manager.
         """
-        return transaction(self)
+        warnings.warn(
+            "`atomic_async` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return self.aio_atomic()
+
+    def aio_atomic(self):
+        """Similar to peewee `Database.transaction()` method, but returns
+        asynchronous context manager.
+        """
+        return TransactionContextManager(self.aio_pool)
 
     def atomic_async(self):
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
         """
-        return atomic(self)
+        warnings.warn(
+            "`atomic_async` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return self.aio_atomic()
 
     def savepoint_async(self, sid=None):
         """Similar to peewee `Database.savepoint()` method, but returns
         asynchronous context manager.
         """
+        warnings.warn(
+            "`savepoint` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
         return savepoint(self, sid=sid)
 
     def set_allow_sync(self, value):
@@ -298,13 +374,13 @@ class AsyncDatabase:
                         (str(args), str(kwargs)))
         return super().execute_sql(*args, **kwargs)
 
-    def connection(self) -> ConnectionContext:
-        return ConnectionContext(self.aio_pool, self._task_data)
+    def aio_connection(self) -> ConnectionContextManager:
+        return ConnectionContextManager(self.aio_pool)
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
-            async with self.connection() as connection:
+            async with self.aio_connection() as connection:
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
                     if fetch_results is not None:
@@ -335,6 +411,9 @@ class AioPool(metaclass=abc.ABCMeta):
         self.database = database
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()
+
+    def has_acquired_connections(self):
+        return self.pool is not None and len(self.pool._used) > 0
 
     async def connect(self):
         async with self._connection_lock:
@@ -568,173 +647,6 @@ class PooledMySQLDatabase(MySQLDatabase):
 
 
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
-
-
-################
-# Transactions #
-################
-
-
-class transaction:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.transaction()`. Will start new `asyncio` task for
-    transaction if not started already.
-    """
-    def __init__(self, db):
-        self.db = db
-
-    async def commit(self, begin=True):
-        await self.db.aio_execute_sql("COMMIT")
-        if begin:
-            await self.db.aio_execute_sql("BEGIN")
-
-    async def rollback(self, begin=True):
-        await self.db.aio_execute_sql("ROLLBACK")
-        if begin:
-            await self.db.aio_execute_sql("BEGIN")
-
-    async def __aenter__(self):
-        if not asyncio_current_task():
-            raise RuntimeError("The transaction must run within a task")
-        await self.db.push_transaction_async()
-        if self.db.transaction_depth_async() == 1:
-            try:
-                await self.db.aio_execute_sql("BEGIN")
-            except:
-                await self.pop_transaction()
-        return self
-
-    async def pop_transaction(self):
-        # transaction depth may be zero if database gone
-        depth = self.db.transaction_depth_async()
-        if depth > 0:
-            await self.db.pop_transaction_async()
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type:
-                await self.rollback(False)
-            elif self.db.transaction_depth_async() == 1:
-                try:
-                    await self.commit(False)
-                except:
-                    await self.rollback(False)
-                    raise
-        finally:
-            await self.pop_transaction()
-
-
-class savepoint:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.savepoint()`.
-    """
-    def __init__(self, db, sid=None):
-        self.db = db
-        self.sid = sid or 's' + uuid.uuid4().hex
-        self.quoted_sid = self.sid.join(self.db.quote)
-
-    async def commit(self):
-        await self.db.aio_execute_sql('RELEASE SAVEPOINT %s;' % self.quoted_sid)
-
-    async def rollback(self):
-        await self.db.aio_execute_sql('ROLLBACK TO SAVEPOINT %s;' % self.quoted_sid)
-
-    async def __aenter__(self):
-        await self.db.aio_execute_sql('SAVEPOINT %s;' % self.quoted_sid)
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        try:
-            if exc_type:
-                await self.rollback()
-            else:
-                try:
-                    await self.commit()
-                except:
-                    await self.rollback()
-                    raise
-        finally:
-            pass
-
-
-class atomic:
-    """Asynchronous context manager (`async with`), similar to
-    `peewee.atomic()`.
-    """
-    def __init__(self, db):
-        self.db = db
-
-    async def __aenter__(self):
-        if self.db.transaction_depth_async() > 0:
-            self._ctx = self.db.savepoint_async()
-        else:
-            self._ctx = self.db.transaction_async()
-        return (await self._ctx.__aenter__())
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self._ctx.__aexit__(exc_type, exc_val, exc_tb)
-
-
-####################
-# Internal helpers #
-####################
-
-class TaskLocals:
-    """Simple `dict` wrapper to get and set values on per `asyncio`
-    task basis.
-
-    The idea is similar to thread-local data, but actually *much* simpler.
-    It's no more than a "sugar" class. Use `get()` and `set()` method like
-    you would to for `dict` but values will be get and set in the context
-    of currently running `asyncio` task.
-
-    When task is done, all saved values are removed from stored data.
-    """
-    def __init__(self):
-        self.data = {}
-
-    def get(self, key, *val):
-        """Get value stored for current running task. Optionally
-        you may provide the default value. Raises `KeyError` when
-        can't get the value and no default one is provided.
-        """
-        data = self.get_data()
-        if data is not None:
-            return data.get(key, *val)
-        if val:
-            return val[0]
-        raise KeyError(key)
-
-    def set(self, key, val):
-        """Set value stored for current running task.
-        """
-        data = self.get_data(True)
-        if data is not None:
-            data[key] = val
-        else:
-            raise RuntimeError("No task is currently running")
-
-    def get_data(self, create=False):
-        """Get dict stored for current running task. Return `None`
-        or an empty dict if no data was found depending on the
-        `create` argument value.
-
-        :param create: if argument is `True`, create empty dict
-                       for task, default: `False`
-        """
-        task = asyncio_current_task()
-        if task:
-            task_id = id(task)
-            if create and task_id not in self.data:
-                self.data[task_id] = {}
-                task.add_done_callback(self.del_data)
-            return self.data.get(task_id)
-        return None
-
-    def del_data(self, task):
-        """Delete data for task from stored data dict.
-        """
-        del self.data[id(task)]
 
 
 class AioQueryMixin:
