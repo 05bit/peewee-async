@@ -144,8 +144,8 @@ async def test_acid_when_connetion_has_been_broken(db):
         # Somebody decides to close all connections and open again
         event_for_lock.clear()
 
-        await db.close_async()
-        await db.connect_async()
+        await db.aio_close()
+        await db.aio_connect()
 
         event_for_lock.set()
         return None

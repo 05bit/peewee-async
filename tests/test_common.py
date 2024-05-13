@@ -5,12 +5,12 @@ import peewee
 import pytest
 
 import peewee_async
-from tests.conftest import all_dbs
+from tests.conftest import manager_for_all_dbs
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import UUIDTestModel, TestModelAlpha, CompositeTestModel, TestModel
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_composite_key(manager):
     obj_uuid = await manager.create(UUIDTestModel, text='UUID')
     obj_alpha = await manager.create(TestModelAlpha, text='Alpha')
@@ -18,7 +18,7 @@ async def test_composite_key(manager):
     assert (obj_uuid, obj_alpha) == (comp.uuid, comp.alpha)
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_multiple_iterate_over_result(manager):
 
     obj1 = await manager.create(TestModel, text="Test 1")
@@ -30,7 +30,7 @@ async def test_multiple_iterate_over_result(manager):
     assert list(result) == [obj1, obj2]
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_indexing_result(manager):
 
     await manager.create(TestModel, text="Test 1")
@@ -42,7 +42,7 @@ async def test_indexing_result(manager):
     assert obj == result[1]
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_select_many_objects(manager):
     text = "Test 1"
     obj1 = await manager.create(TestModel, text=text)
@@ -61,7 +61,7 @@ async def test_select_many_objects(manager):
         assert o1 == o2
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_raw_query(manager):
 
     text = "Test %s" % uuid.uuid4()
@@ -86,7 +86,7 @@ async def test_raw_query(manager):
     assert isinstance(result3[0], dict) is True
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_get_obj_by_id(manager):
     text = "Test %s" % uuid.uuid4()
     obj1 = await manager.create(TestModel, text=text)
@@ -96,7 +96,7 @@ async def test_get_obj_by_id(manager):
     assert obj1.id == obj2.id
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_get_obj_by_uuid(manager):
 
     text = "Test %s" % uuid.uuid4()
@@ -106,7 +106,7 @@ async def test_get_obj_by_uuid(manager):
     assert len(str(obj1.id)) == 36
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_create_uuid_obj(manager):
 
     text = "Test %s" % uuid.uuid4()
@@ -114,7 +114,7 @@ async def test_create_uuid_obj(manager):
     assert len(str(obj.id)) == 36
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_allow_sync_is_reverted_for_exc(manager):
     try:
         with manager.allow_sync():
@@ -126,7 +126,7 @@ async def test_allow_sync_is_reverted_for_exc(manager):
     assert manager.database._allow_sync is False
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_many_requests(manager):
 
     max_connections = getattr(manager.database, 'max_connections', 1)
@@ -139,7 +139,7 @@ async def test_many_requests(manager):
     assert len(done) == n
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_connect_close(manager):
 
     async def get_conn(manager):

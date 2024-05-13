@@ -3,11 +3,11 @@ import uuid
 import peewee
 import pytest
 
-from tests.conftest import all_dbs
+from tests.conftest import manager_for_all_dbs
 from tests.models import TestModel, TestModelAlpha, TestModelBeta, TestModelGamma
 
 
-@all_dbs
+@manager_for_all_dbs
 @pytest.mark.parametrize(
     "prefetch_type",
     peewee.PREFETCH_TYPE.values()
@@ -43,7 +43,7 @@ async def test_prefetch(manager, prefetch_type):
     assert tuple(result[0].betas[0].gammas) == (gamma_111, gamma_112)
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_get_or_none(manager):
     """Test get_or_none manager function."""
     text1 = "Test %s" % uuid.uuid4()
@@ -59,7 +59,7 @@ async def test_get_or_none(manager):
     assert obj3 is None
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_count_query_with_limit(manager):
     text = "Test %s" % uuid.uuid4()
     await manager.create(TestModel, text=text)
@@ -72,7 +72,7 @@ async def test_count_query_with_limit(manager):
     assert count == 1
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_count_query(manager):
     text = "Test %s" % uuid.uuid4()
     await manager.create(TestModel, text=text)
@@ -85,7 +85,7 @@ async def test_count_query(manager):
     assert count == 3
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_scalar_query(manager):
 
     text = "Test %s" % uuid.uuid4()
@@ -99,7 +99,7 @@ async def test_scalar_query(manager):
     assert count == 2
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_delete_obj(manager):
     text = "Test %s" % uuid.uuid4()
     obj1 = await manager.create(TestModel, text=text)
@@ -111,7 +111,7 @@ async def test_delete_obj(manager):
     assert obj3 is None
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_update_obj(manager):
 
     text = "Test %s" % uuid.uuid4()
@@ -124,7 +124,7 @@ async def test_update_obj(manager):
     assert obj2.text == "Test update object"
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_create_obj(manager):
 
     text = "Test %s" % uuid.uuid4()
@@ -133,7 +133,7 @@ async def test_create_obj(manager):
     assert obj.text == text
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_create_or_get(manager):
     text = "Test %s" % uuid.uuid4()
     obj1, created1 = await manager.create_or_get(
@@ -148,7 +148,7 @@ async def test_create_or_get(manager):
     assert obj2.data == "Data 1"
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_get_or_create(manager):
 
     text = "Test %s" % uuid.uuid4()

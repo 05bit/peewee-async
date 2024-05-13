@@ -1,11 +1,11 @@
 import uuid
 
-from tests.conftest import postgres_only, all_dbs
+from tests.conftest import postgres_only, manager_for_all_dbs
 from tests.models import TestModel
 from tests.utils import model_has_fields
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_delete__count(manager):
     query = TestModel.insert_many([
         {'text': "Test %s" % uuid.uuid4()},
@@ -18,7 +18,7 @@ async def test_delete__count(manager):
     assert count == 2
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_delete__by_condition(manager):
     expected_text = "text1"
     deleted_text = "text2"

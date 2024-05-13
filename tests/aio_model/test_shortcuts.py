@@ -2,12 +2,12 @@ import uuid
 
 import pytest
 
-from tests.conftest import all_dbs, postgres_only
+from tests.conftest import manager_for_all_dbs, postgres_only
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_aio_get(manager):
     obj1 = await TestModel.aio_create(text="Test 1")
     obj2 = await TestModel.aio_create(text="Test 2")
@@ -22,7 +22,7 @@ async def test_aio_get(manager):
         await TestModel.aio_get(TestModel.text == "unknown")
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_aio_get_or_none(manager):
     obj1 = await TestModel.aio_create(text="Test 1")
 

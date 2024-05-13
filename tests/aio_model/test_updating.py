@@ -1,10 +1,10 @@
 import uuid
 
-from tests.conftest import postgres_only, all_dbs
+from tests.conftest import postgres_only, manager_for_all_dbs
 from tests.models import TestModel
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_update__count(manager):
     for n in range(3):
         await TestModel.aio_create(text=f"{n}")
@@ -13,7 +13,7 @@ async def test_update__count(manager):
     assert count == 3
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_update__field_updated(manager):
     text = "Test %s" % uuid.uuid4()
     obj1 = await TestModel.aio_create(text=text)
