@@ -263,7 +263,7 @@ class TransactionContextManager(ConnectionContextManager):
 ############
 
 
-class AsyncDatabase:
+class AioDatabase:
     _allow_sync = True  # whether sync queries are allowed
 
     def __init__(self, database, **kwargs):
@@ -283,7 +283,7 @@ class AsyncDatabase:
         else:
             super().__setattr__(name, value)
 
-    async def connect_async(self):
+    async def aio_connect(self):
         """Set up async connection on default event loop.
         """
         if self.deferred:
@@ -291,10 +291,24 @@ class AsyncDatabase:
                             "before opening connection")
         await self.aio_pool.connect()
 
-    async def close_async(self):
+    async def aio_close(self):
         """Close async connection.
         """
         await self.aio_pool.terminate()
+
+    async def connect_async(self):
+        warnings.warn(
+            "`connect_async` is deprecated, use `aio_connect` instead.",
+            DeprecationWarning
+        )
+        await self.aio_connect()
+
+    async def close_async(self):
+        warnings.warn(
+            "`close_async` is deprecated, use `aio_close` instead.",
+            DeprecationWarning
+        )
+        await self.aio_close()
 
     def transaction_async(self):
         """Similar to peewee `Database.transaction()` method, but returns
@@ -472,7 +486,7 @@ class AioPostgresqlPool(AioPool):
         )
 
 
-class AsyncPostgresqlMixin(AsyncDatabase):
+class AioPostgresqlMixin(AioDatabase):
     """Mixin for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
@@ -513,7 +527,7 @@ class AsyncPostgresqlMixin(AsyncDatabase):
         return cursor.lastrowid
 
 
-class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
 
@@ -534,7 +548,7 @@ class PostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
 register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
 
 
-class PooledPostgresqlDatabase(AsyncPostgresqlMixin, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
@@ -581,7 +595,7 @@ class AioMysqlPool(AioPool):
         )
 
 
-class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
+class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     """MySQL database driver providing **single drop-in sync** connection
     and **single async connection** interface.
 

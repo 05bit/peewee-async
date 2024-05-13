@@ -1,9 +1,9 @@
 import peewee
-from tests.conftest import all_dbs
+from tests.conftest import manager_for_all_dbs
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_select_w_join(manager):
     alpha = await TestModelAlpha.aio_create(text="Test 1")
     beta = await TestModelBeta.aio_create(alpha_id=alpha.id, text="text")
@@ -17,7 +17,7 @@ async def test_select_w_join(manager):
     assert result.joined_alpha.id == alpha.id
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_select_compound(manager):
     obj1 = await manager.create(TestModel, text="Test 1")
     obj2 = await manager.create(TestModel, text="Test 2")

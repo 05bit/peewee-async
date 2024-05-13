@@ -18,10 +18,10 @@ import warnings
 from playhouse import postgres_ext as ext
 from playhouse.db_url import register_database
 
-from peewee_async import AsyncPostgresqlMixin
+from peewee_async import AioPostgresqlMixin
 
 
-class PostgresqlExtDatabase(AsyncPostgresqlMixin, ext.PostgresqlExtDatabase):
+class PostgresqlExtDatabase(AioPostgresqlMixin, ext.PostgresqlExtDatabase):
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **single async connection** interface.
 
@@ -50,7 +50,7 @@ register_database(PostgresqlExtDatabase, 'postgresext+async', 'postgresqlext+asy
 
 
 class PooledPostgresqlExtDatabase(
-    AsyncPostgresqlMixin,
+    AioPostgresqlMixin,
     ext.PostgresqlExtDatabase
 ):
     """PosgreSQL database extended driver providing **single drop-in sync**

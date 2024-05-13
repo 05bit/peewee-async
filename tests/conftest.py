@@ -47,7 +47,7 @@ async def db(request):
         for model in reversed(sort_models(ALL_MODELS)):
             model.delete().execute()
             model._meta.database = None
-    await database.close_async()
+    await database.aio_close()
 
 
 PG_DBS = [
@@ -74,7 +74,7 @@ mysql_only = pytest.mark.parametrize(
     "manager", MYSQL_DBS, indirect=["manager"]
 )
 
-all_dbs = pytest.mark.parametrize(
+manager_for_all_dbs = pytest.mark.parametrize(
     "manager", PG_DBS + MYSQL_DBS, indirect=["manager"]
 )
 

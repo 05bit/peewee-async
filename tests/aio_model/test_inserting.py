@@ -1,11 +1,11 @@
 import uuid
 
-from tests.conftest import postgres_only, all_dbs
+from tests.conftest import postgres_only, manager_for_all_dbs
 from tests.models import TestModel, UUIDTestModel
 from tests.utils import model_has_fields
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_insert_many(manager):
     last_id = await TestModel.insert_many([
         {'text': "Test %s" % uuid.uuid4()},
@@ -18,7 +18,7 @@ async def test_insert_many(manager):
     assert last_id in [m.id for m in res]
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_insert__return_id(manager):
     last_id = await TestModel.insert(text="Test %s" % uuid.uuid4()).aio_execute()
 

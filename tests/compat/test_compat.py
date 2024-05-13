@@ -1,11 +1,11 @@
 import uuid
 
 import peewee
-from tests.conftest import all_dbs
+from tests.conftest import manager_for_all_dbs
 from tests.models import CompatTestModel
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_create_select_compat_mode(manager):
     obj1 = await manager.create(CompatTestModel, text="Test 1")
     obj2 = await manager.create(CompatTestModel, text="Test 2")
@@ -15,7 +15,7 @@ async def test_create_select_compat_mode(manager):
     assert list(result) == [obj1, obj2]
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_compound_select_compat_mode(manager):
     obj1 = await manager.create(CompatTestModel, text="Test 1")
     obj2 = await manager.create(CompatTestModel, text="Test 2")
@@ -30,7 +30,7 @@ async def test_compound_select_compat_mode(manager):
     assert obj2 in list(result)
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_raw_select_compat_mode(manager):
     obj1 = await manager.create(CompatTestModel, text="Test 1")
     obj2 = await manager.create(CompatTestModel, text="Test 2")
@@ -42,7 +42,7 @@ async def test_raw_select_compat_mode(manager):
     assert list(result) == [obj1, obj2]
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_update_compat_mode(manager):
     obj_draft = await manager.create(CompatTestModel, text="Draft 1")
     obj_draft.text = "Final result"
@@ -51,7 +51,7 @@ async def test_update_compat_mode(manager):
     assert obj.text == "Final result"
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_count_compat_mode(manager):
     obj = await manager.create(CompatTestModel, text="Unique title %s" % uuid.uuid4())
     search = CompatTestModel.select().where(CompatTestModel.text == obj.text)
@@ -59,7 +59,7 @@ async def test_count_compat_mode(manager):
     assert count == 1
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_delete_compat_mode(manager):
     obj = await manager.create(CompatTestModel, text="Expired item %s" % uuid.uuid4())
     search = CompatTestModel.select().where(CompatTestModel.id == obj.id)

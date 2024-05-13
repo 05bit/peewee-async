@@ -1,6 +1,6 @@
 import asyncio
 
-from tests.conftest import all_dbs
+from tests.conftest import manager_for_all_dbs
 from tests.models import TestModel
 
 
@@ -10,7 +10,7 @@ class FakeUpdateError(Exception):
     pass
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_atomic_success(manager):
     obj = await manager.create(TestModel, text='FOO')
     obj_id = obj.id
@@ -23,7 +23,7 @@ async def test_atomic_success(manager):
     assert res.text == 'BAR'
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_atomic_failed(manager):
     """Failed update in transaction.
     """
@@ -44,7 +44,7 @@ async def test_atomic_failed(manager):
     assert res.text == 'FOO'
 
 
-@all_dbs
+@manager_for_all_dbs
 async def test_acid_when_connetion_has_been_brooken(manager):
     # TODO REWRITE FOR NEW STYLE TRANSACTIONS
     async def restart_connections(event_for_lock: asyncio.Event) -> None:
