@@ -130,3 +130,51 @@ async def test_savepoint_manual_work(db):
 
     assert await TestModel.aio_get_or_none(text="FOO") is not None
     assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_acid_when_connetion_has_been_broken(db):
+    async def restart_connections(event_for_lock: asyncio.Event) -> None:
+        event_for_lock.set()
+        await asyncio.sleep(0.05)
+
+        # Using an event, we force tasks to wait until a certain coroutine
+        # This is necessary to reproduce a case when connections reopened during transaction
+
+        # Somebody decides to close all connections and open again
+        event_for_lock.clear()
+
+        await db.close_async()
+        await db.connect_async()
+
+        event_for_lock.set()
+        return None
+
+    async def insert_records(event_for_wait: asyncio.Event):
+        await event_for_wait.wait()
+        async with db.aio_atomic():
+            # BEGIN
+            # INSERT 1
+            await TestModel.aio_create(text="1")
+
+            await asyncio.sleep(0.05)
+            # wait for db close all connections and open again
+            await event_for_wait.wait()
+
+            # This row should not be inserted because the connection of the current transaction has been closed
+            # # INSERT 2
+            await TestModel.aio_create(text="2")
+
+        return None
+
+    event = asyncio.Event()
+
+    await asyncio.gather(
+        restart_connections(event),
+        insert_records(event),
+        return_exceptions=True,
+    )
+
+    # The transaction has not been committed
+    assert len(list(await TestModel.select().aio_execute())) == 0
+    assert db.aio_pool.has_acquired_connections() is False
