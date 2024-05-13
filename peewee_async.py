@@ -273,16 +273,6 @@ class AioDatabase:
             **self.connect_params_async
         )
 
-    def __setattr__(self, name, value):
-        if name == 'allow_sync':
-            warnings.warn(
-                "`.allow_sync` setter is deprecated, use either the "
-                "`.allow_sync()` context manager or `.set_allow_sync()` "
-                "method.", DeprecationWarning)
-            self._allow_sync = value
-        else:
-            super().__setattr__(name, value)
-
     async def aio_connect(self):
         """Set up async connection on default event loop.
         """
@@ -296,55 +286,11 @@ class AioDatabase:
         """
         await self.aio_pool.terminate()
 
-    async def connect_async(self):
-        warnings.warn(
-            "`connect_async` is deprecated, use `aio_connect` instead.",
-            DeprecationWarning
-        )
-        await self.aio_connect()
-
-    async def close_async(self):
-        warnings.warn(
-            "`close_async` is deprecated, use `aio_close` instead.",
-            DeprecationWarning
-        )
-        await self.aio_close()
-
-    def transaction_async(self):
-        """Similar to peewee `Database.transaction()` method, but returns
-        asynchronous context manager.
-        """
-        warnings.warn(
-            "`atomic_async` is deprecated, use `aio_atomic` instead.",
-            DeprecationWarning
-        )
-        return self.aio_atomic()
-
     def aio_atomic(self):
-        """Similar to peewee `Database.transaction()` method, but returns
-        asynchronous context manager.
-        """
-        return TransactionContextManager(self.aio_pool)
-
-    def atomic_async(self):
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
         """
-        warnings.warn(
-            "`atomic_async` is deprecated, use `aio_atomic` instead.",
-            DeprecationWarning
-        )
-        return self.aio_atomic()
-
-    def savepoint_async(self, sid=None):
-        """Similar to peewee `Database.savepoint()` method, but returns
-        asynchronous context manager.
-        """
-        warnings.warn(
-            "`savepoint` is deprecated, use `aio_atomic` instead.",
-            DeprecationWarning
-        )
-        return savepoint(self, sid=sid)
+        return TransactionContextManager(self.aio_pool)
 
     def set_allow_sync(self, value):
         """Allow or forbid sync queries for the database. See also
@@ -415,6 +361,61 @@ class AioDatabase:
         sql, params = query.sql()
         fetch_results = fetch_results or getattr(query, 'fetch_results', None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
+
+    #### Deprecated methods ####
+    def __setattr__(self, name, value):
+        if name == 'allow_sync':
+            warnings.warn(
+                "`.allow_sync` setter is deprecated, use either the "
+                "`.allow_sync()` context manager or `.set_allow_sync()` "
+                "method.", DeprecationWarning)
+            self._allow_sync = value
+        else:
+            super().__setattr__(name, value)
+
+    def atomic_async(self):
+        """Similar to peewee `Database.atomic()` method, but returns
+        asynchronous context manager.
+        """
+        warnings.warn(
+            "`atomic_async` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return self.aio_atomic()
+
+    def savepoint_async(self, sid=None):
+        """Similar to peewee `Database.savepoint()` method, but returns
+        asynchronous context manager.
+        """
+        warnings.warn(
+            "`savepoint` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return savepoint(self, sid=sid)
+
+    async def connect_async(self):
+        warnings.warn(
+            "`connect_async` is deprecated, use `aio_connect` instead.",
+            DeprecationWarning
+        )
+        await self.aio_connect()
+
+    async def close_async(self):
+        warnings.warn(
+            "`close_async` is deprecated, use `aio_close` instead.",
+            DeprecationWarning
+        )
+        await self.aio_close()
+
+    def transaction_async(self):
+        """Similar to peewee `Database.transaction()` method, but returns
+        asynchronous context manager.
+        """
+        warnings.warn(
+            "`atomic_async` is deprecated, use `aio_atomic` instead.",
+            DeprecationWarning
+        )
+        return self.aio_atomic()
 
 
 class AioPool(metaclass=abc.ABCMeta):
