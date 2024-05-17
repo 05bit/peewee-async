@@ -446,7 +446,8 @@ class AioPool(metaclass=abc.ABCMeta):
     def release(self, conn):
         """Release connection to pool.
         """
-        self.pool.release(conn)
+        if self.pool is not None:
+            self.pool.release(conn)
 
     @abc.abstractmethod
     async def create(self):

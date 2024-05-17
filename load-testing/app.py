@@ -66,19 +66,12 @@ class MySimplestModel(peewee.Model):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await peewee_async._run_no_result_sql(  # noqa
-        database=manager.database,
-        operation='CREATE TABLE IF NOT EXISTS MySimplestModel (id SERIAL PRIMARY KEY);',
-    )
-    await peewee_async._run_no_result_sql(  # noqa
-        database=manager.database,
-        operation='TRUNCATE TABLE MySimplestModel;',
-    )
+    await manager.database.aio_execute_sql('CREATE TABLE IF NOT EXISTS MySimplestModel (id SERIAL PRIMARY KEY);')
+    await manager.database.aio_execute_sql('TRUNCATE TABLE MySimplestModel;')
     setup_logging()
     yield
     # Clean up the ML models and release the resources
     await manager.close()
-
 
 app = FastAPI(lifespan=lifespan)
 errors = set()
@@ -100,8 +93,8 @@ async def nested_transaction():
 
 
 async def nested_atomic():
-    async with manager.atomic():
-        await manager.execute(MySimplestModel.update(id=1))
+    async with manager.database.aio_atomic():
+        await manager.database.aio_execute(MySimplestModel.update(id=1))
 
 
 @app.get("/transaction")
@@ -119,8 +112,8 @@ async def transaction():
 @app.get("/atomic")
 async def atomic():
     try:
-        async with manager.atomic():
-            await manager.execute(MySimplestModel.update(id=1))
+        async with manager.database.aio_atomic():
+            await manager.database.aio_execute(MySimplestModel.update(id=1))
             await nested_atomic()
     except Exception as e:
         errors.add(str(e))
