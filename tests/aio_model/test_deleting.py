@@ -1,12 +1,12 @@
 import uuid
 
-from tests.conftest import postgres_only, manager_for_all_dbs
+from tests.conftest import dbs_all, dbs_postgres
 from tests.models import TestModel
 from tests.utils import model_has_fields
 
 
-@manager_for_all_dbs
-async def test_delete__count(manager):
+@dbs_all
+async def test_delete__count(db):
     query = TestModel.insert_many([
         {'text': "Test %s" % uuid.uuid4()},
         {'text': "Test %s" % uuid.uuid4()},
@@ -18,8 +18,8 @@ async def test_delete__count(manager):
     assert count == 2
 
 
-@manager_for_all_dbs
-async def test_delete__by_condition(manager):
+@dbs_all
+async def test_delete__by_condition(db):
     expected_text = "text1"
     deleted_text = "text2"
     query = TestModel.insert_many([
@@ -35,8 +35,8 @@ async def test_delete__by_condition(manager):
     assert res[0].text == expected_text
 
 
-@postgres_only
-async def test_delete__return_model(manager):
+@dbs_postgres
+async def test_delete__return_model(db):
     m = await TestModel.aio_create(text="text", data="data")
 
     res = await TestModel.delete().returning(TestModel).aio_execute()

@@ -1,11 +1,11 @@
 import uuid
 
-from tests.conftest import postgres_only, manager_for_all_dbs
+from tests.conftest import dbs_all, dbs_postgres
 from tests.models import TestModel
 
 
-@manager_for_all_dbs
-async def test_update__count(manager):
+@dbs_all
+async def test_update__count(db):
     for n in range(3):
         await TestModel.aio_create(text=f"{n}")
     count = await TestModel.update(data="new_data").aio_execute()
@@ -13,8 +13,8 @@ async def test_update__count(manager):
     assert count == 3
 
 
-@manager_for_all_dbs
-async def test_update__field_updated(manager):
+@dbs_all
+async def test_update__field_updated(db):
     text = "Test %s" % uuid.uuid4()
     obj1 = await TestModel.aio_create(text=text)
     await TestModel.update(text="Test update query").where(TestModel.id == obj1.id).aio_execute()
@@ -23,8 +23,8 @@ async def test_update__field_updated(manager):
     assert obj2.text == "Test update query"
 
 
-@postgres_only
-async def test_update__returning_model(manager):
+@dbs_postgres
+async def test_update__returning_model(db):
     await TestModel.aio_create(text="text1", data="data")
     await TestModel.aio_create(text="text2", data="data")
     new_data = "New_data"

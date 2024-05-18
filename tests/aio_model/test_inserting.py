@@ -1,12 +1,12 @@
 import uuid
 
-from tests.conftest import postgres_only, manager_for_all_dbs
+from tests.conftest import dbs_all, dbs_postgres
 from tests.models import TestModel, UUIDTestModel
 from tests.utils import model_has_fields
 
 
-@manager_for_all_dbs
-async def test_insert_many(manager):
+@dbs_all
+async def test_insert_many(db):
     last_id = await TestModel.insert_many([
         {'text': "Test %s" % uuid.uuid4()},
         {'text': "Test %s" % uuid.uuid4()},
@@ -18,8 +18,8 @@ async def test_insert_many(manager):
     assert last_id in [m.id for m in res]
 
 
-@manager_for_all_dbs
-async def test_insert__return_id(manager):
+@dbs_all
+async def test_insert__return_id(db):
     last_id = await TestModel.insert(text="Test %s" % uuid.uuid4()).aio_execute()
 
     res = await TestModel.select().aio_execute()
@@ -27,8 +27,8 @@ async def test_insert__return_id(manager):
     assert last_id == obj.id
 
 
-@postgres_only
-async def test_insert_on_conflict_ignore__last_id_is_none(manager):
+@dbs_postgres
+async def test_insert_on_conflict_ignore__last_id_is_none(db):
     query = TestModel.insert(text="text").on_conflict_ignore()
     await query.aio_execute()
 
@@ -37,8 +37,8 @@ async def test_insert_on_conflict_ignore__last_id_is_none(manager):
     assert last_id is None
 
 
-@postgres_only
-async def test_insert_on_conflict_ignore__return_model(manager):
+@dbs_postgres
+async def test_insert_on_conflict_ignore__return_model(db):
     query = TestModel.insert(text="text", data="data").on_conflict_ignore().returning(TestModel)
 
     res = await query.aio_execute()
@@ -54,8 +54,8 @@ async def test_insert_on_conflict_ignore__return_model(manager):
     }) is True
 
 
-@postgres_only
-async def test_insert_on_conflict_ignore__inserted_once(manager):
+@dbs_postgres
+async def test_insert_on_conflict_ignore__inserted_once(db):
     query = TestModel.insert(text="text").on_conflict_ignore()
     last_id = await query.aio_execute()
 
@@ -66,15 +66,15 @@ async def test_insert_on_conflict_ignore__inserted_once(manager):
     assert res[0].id == last_id
 
 
-@postgres_only
-async def test_insert__uuid_pk(manager):
+@dbs_postgres
+async def test_insert__uuid_pk(db):
     query = UUIDTestModel.insert(text="Test %s" % uuid.uuid4())
     last_id = await query.aio_execute()
     assert len(str(last_id)) == 36
 
 
-@postgres_only
-async def test_insert__return_model(manager):
+@dbs_postgres
+async def test_insert__return_model(db):
     text = "Test %s" % uuid.uuid4()
     data = "data"
     query = TestModel.insert(text=text, data=data).returning(TestModel)
@@ -87,8 +87,8 @@ async def test_insert__return_model(manager):
     ) is True
 
 
-@postgres_only
-async def test_insert_many__return_model(manager):
+@dbs_postgres
+async def test_insert_many__return_model(db):
     texts = [f"text{n}" for n in range(2)]
     query = TestModel.insert_many([
         {"text": text} for text in texts

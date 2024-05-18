@@ -1,10 +1,10 @@
 import peewee
-from tests.conftest import manager_for_all_dbs
+from tests.conftest import manager_for_all_dbs, dbs_all
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
 
-@manager_for_all_dbs
-async def test_select_w_join(manager):
+@dbs_all
+async def test_select_w_join(db):
     alpha = await TestModelAlpha.aio_create(text="Test 1")
     beta = await TestModelBeta.aio_create(alpha_id=alpha.id, text="text")
 

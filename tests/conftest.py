@@ -60,6 +60,11 @@ PG_DBS = [
 MYSQL_DBS = ["mysql", "mysql-pool"]
 
 
+dbs_postgres = pytest.mark.parametrize(
+    "db", PG_DBS, indirect=["db"]
+)
+
+
 dbs_all = pytest.mark.parametrize(
     "db", PG_DBS + MYSQL_DBS, indirect=["db"]
 )
