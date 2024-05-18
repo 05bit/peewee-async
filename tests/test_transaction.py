@@ -1,20 +1,44 @@
 import asyncio
 
+import pytest
+from peewee import IntegrityError
+
 from peewee_async import Transaction
 from tests.conftest import dbs_all
 from tests.models import TestModel
 
 
+class FakeConnectionError(Exception):
+    pass
+
+
 @dbs_all
-async def test_savepoint_success(db):
-
-    async with db.aio_atomic():
-        await TestModel.aio_create(text='FOO')
-
+async def test_transaction_error_on_begin(db, mocker):
+    mocker.patch.object(Transaction, "begin", side_effect=FakeConnectionError)
+    with pytest.raises(FakeConnectionError):
         async with db.aio_atomic():
-            await TestModel.update(text="BAR").aio_execute()
+            await TestModel.aio_create(text='FOO')
+    assert db.aio_pool.has_acquired_connections() is False
 
-    assert await TestModel.aio_get_or_none(text="BAR") is not None
+@dbs_all
+async def test_transaction_error_on_commit(db, mocker):
+    mocker.patch.object(Transaction, "commit", side_effect=FakeConnectionError)
+    with pytest.raises(FakeConnectionError):
+        async with db.aio_atomic():
+            await TestModel.aio_create(text='FOO')
+    assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_transaction_error_on_rollback(db, mocker):
+    await TestModel.aio_create(text='FOO', data="")
+    mocker.patch.object(Transaction, "rollback", side_effect=FakeConnectionError)
+    with pytest.raises(FakeConnectionError):
+        async with db.aio_atomic():
+            await TestModel.update(data="BAR").aio_execute()
+            assert await TestModel.aio_get_or_none(data="BAR") is not None
+            await TestModel.aio_create(text='FOO')
+
     assert db.aio_pool.has_acquired_connections() is False
 
 
@@ -28,33 +52,14 @@ async def test_transaction_success(db):
 
 
 @dbs_all
-async def test_savepoint_rollback(db):
-    await TestModel.aio_create(text='FOO', data="")
-
-    async with db.aio_atomic():
-        await TestModel.update(data="BAR").aio_execute()
-
-        try:
-            async with db.aio_atomic():
-                await TestModel.aio_create(text='FOO')
-        except:
-            pass
-
-    assert await TestModel.aio_get_or_none(data="BAR") is not None
-    assert db.aio_pool.has_acquired_connections() is False
-
-
-@dbs_all
 async def test_transaction_rollback(db):
     await TestModel.aio_create(text='FOO', data="")
 
-    try:
+    with pytest.raises(IntegrityError):
         async with db.aio_atomic():
             await TestModel.update(data="BAR").aio_execute()
             assert await TestModel.aio_get_or_none(data="BAR") is not None
             await TestModel.aio_create(text='FOO')
-    except:
-        pass
 
     assert await TestModel.aio_get_or_none(data="BAR") is None
     assert db.aio_pool.has_acquired_connections() is False
@@ -72,11 +77,9 @@ async def test_several_transactions(db):
     async def t2():
         async with db.aio_atomic():
             await TestModel.aio_create(text='FOO2', data="")
-            try:
+            with pytest.raises(IntegrityError):
                 async with db.aio_atomic():
                     await TestModel.aio_create(text='FOO2', data="not_created")
-            except:
-                pass
 
     async def t3():
         async with db.aio_atomic():
@@ -107,6 +110,33 @@ async def test_transaction_manual_work(db):
             await tr.commit()
 
     assert await TestModel.aio_get_or_none(text="FOO") is None
+    assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_savepoint_success(db):
+    async with db.aio_atomic():
+        await TestModel.aio_create(text='FOO')
+
+        async with db.aio_atomic():
+            await TestModel.update(text="BAR").aio_execute()
+
+    assert await TestModel.aio_get_or_none(text="BAR") is not None
+    assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_savepoint_rollback(db):
+    await TestModel.aio_create(text='FOO', data="")
+
+    async with db.aio_atomic():
+        await TestModel.update(data="BAR").aio_execute()
+
+        with pytest.raises(IntegrityError):
+            async with db.aio_atomic():
+                await TestModel.aio_create(text='FOO')
+
+    assert await TestModel.aio_get_or_none(data="BAR") is not None
     assert db.aio_pool.has_acquired_connections() is False
 
 
@@ -178,3 +208,4 @@ async def test_acid_when_connetion_has_been_broken(db):
     # The transaction has not been committed
     assert len(list(await TestModel.select().aio_execute())) == 0
     assert db.aio_pool.has_acquired_connections() is False
+

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "peewee-async"
-version = "0.9.1"
+version = "0.10.1-beta"
 description = "Asynchronous interface for peewee ORM powered by asyncio."
 authors = ["Alexey Kinev <rudy@05bit.com>", "Gorshkov Nikolay(contributor) <nogamemorebrain@gmail.com>"]
 readme = "README.md"
@@ -19,13 +19,14 @@ aiomysql = { version = "^0.2.0", optional = true }
 cryptography = { version = "^41.0.3", optional = true }
 pytest = { version = "^7.4.1", optional = true }
 pytest-asyncio = { version = "^0.21.1", optional = true }
+pytest-mock = { version = "^3.14.0", optional = true }
 sphinx = { version = "^7.1.2", optional = true }
 sphinx-rtd-theme = { version = "^1.3.0rc1", optional = true }
 
 [tool.poetry.extras]
 postgresql = ["aiopg"]
 mysql = ["aiomysql", "cryptography"]
-develop = ["aiopg", "aiomysql", "cryptography", "pytest", "pytest-asyncio"]
+develop = ["aiopg", "aiomysql", "cryptography", "pytest", "pytest-asyncio", "pytest-mock"]
 docs = ["aiopg", "aiomysql", "cryptography", "sphinx", "sphinx-rtd-theme"]
 
 [build-system]

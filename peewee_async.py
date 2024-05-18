@@ -236,28 +236,6 @@ class ConnectionContextManager:
             connection_context.set(None)
 
 
-class TransactionContextManager(ConnectionContextManager):
-    async def __aenter__(self):
-        connection = await super().__aenter__()
-        begin_transaction = self.connection_context.transaction_is_opened is False
-
-        self.transaction = Transaction(connection, is_savepoint=begin_transaction is False)
-        await self.transaction.__aenter__()
-
-        if begin_transaction is True:
-            self.connection_context.transaction_is_opened = True
-        return connection
-
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
-        await self.transaction.__aexit__(exc_type, exc_value, exc_tb)
-
-        end_transaction = self.transaction.is_savepoint is False
-        if end_transaction is True:
-            self.connection_context.transaction_is_opened = False
-
-        await super().__aexit__()
-
-
 ############
 # Database #
 ############
@@ -286,11 +264,21 @@ class AioDatabase:
         """
         await self.aio_pool.terminate()
 
-    def aio_atomic(self):
+    @contextlib.asynccontextmanager
+    async def aio_atomic(self):
         """Similar to peewee `Database.atomic()` method, but returns
         asynchronous context manager.
         """
-        return TransactionContextManager(self.aio_pool)
+        async with self.aio_connection() as connection:
+            _connection_context = connection_context.get()
+            begin_transaction = _connection_context.transaction_is_opened is False
+            try:
+                async with Transaction(connection, is_savepoint=begin_transaction is False):
+                    _connection_context.transaction_is_opened = True
+                    yield
+            finally:
+                if begin_transaction is True:
+                    _connection_context.transaction_is_opened = False
 
     def set_allow_sync(self, value):
         """Allow or forbid sync queries for the database. See also
