@@ -1,3 +1,5 @@
+import pytest
+
 from peewee_async import connection_context
 from tests.conftest import dbs_all
 from tests.models import TestModel
@@ -17,3 +19,15 @@ async def test_nested_connection(db):
                 await cursor.execute("SELECT 1")
     assert connection_context.get() is None
     assert db.aio_pool.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_db_should_connect_manually_after_close(db):
+    await TestModel.aio_create(text='test')
+
+    await db.aio_close()
+    with pytest.raises(RuntimeError):
+        await TestModel.aio_get_or_none(text='test')
+    await db.aio_connect()
+
+    assert await TestModel.aio_get_or_none(text='test') is not None

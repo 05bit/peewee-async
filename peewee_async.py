@@ -420,9 +420,8 @@ class AioPool(metaclass=abc.ABCMeta):
 
     async def connect(self):
         async with self._connection_lock:
-            if self.pool is not None:
-                return
-            await self.create()
+            if self.pool is None or self.pool.closed:
+                await self.create()
 
     async def acquire(self):
         """Acquire connection from pool.
@@ -434,8 +433,7 @@ class AioPool(metaclass=abc.ABCMeta):
     def release(self, conn):
         """Release connection to pool.
         """
-        if self.pool is not None:
-            self.pool.release(conn)
+        self.pool.release(conn)
 
     @abc.abstractmethod
     async def create(self):
@@ -446,14 +444,8 @@ class AioPool(metaclass=abc.ABCMeta):
     async def terminate(self):
         """Terminate all pool connections.
         """
-        async with self._connection_lock:
-            if self.pool is not None:
-                pool = self.pool
-                self.pool = None
-                pool.terminate()
-                await pool.wait_closed()
-
-
+        self.pool.terminate()
+        await self.pool.wait_closed()
 
 
 ##############

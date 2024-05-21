@@ -123,8 +123,8 @@ async def atomic():
 
 @app.get("/recreate_pool")
 async def atomic():
-    await manager.database.close_async()
-    await manager.database.connect_async()
+    await manager.database.aio_close()
+    await manager.database.aio_connect()
 
 
 if __name__ == "__main__":
