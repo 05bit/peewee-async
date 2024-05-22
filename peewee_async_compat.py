@@ -214,7 +214,7 @@ class Manager:
     def is_connected(self):
         """Check if database is connected.
         """
-        return self.database.aio_pool.pool is not None
+        return self.database.is_connected
 
     async def get(self, source_, *args, **kwargs):
         """Get the model instance.
@@ -472,8 +472,7 @@ def transaction(db):
         "`transaction` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
         DeprecationWarning
     )
-    from peewee_async import TransactionContextManager
-    return TransactionContextManager(db.aio_pool)
+    return db.aio_atomic()
 
 
 def atomic(db):
@@ -484,8 +483,8 @@ def atomic(db):
         "`atomic` is deprecated, use `database.aio_atomic` or `Transaction` class instead.",
         DeprecationWarning
     )
-    from peewee_async import TransactionContextManager
-    return TransactionContextManager(db.aio_pool)
+    return db.aio_atomic()
+
 
 class _savepoint:
     """Asynchronous context manager (`async with`), similar to
