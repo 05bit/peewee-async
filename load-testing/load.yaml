@@ -2,6 +2,9 @@ phantom:
   address: 127.0.0.1:8000 # [Target's address]:[target's port]
   uris:
     - /select
+    - /atomic
+    - /transaction
+    - /recreate_pool
   load_profile:
     load_type: rps # schedule load by defining requests per second
     schedule: const(100, 10m) # starting from 1rps growing linearly to 10rps during 10 minutes

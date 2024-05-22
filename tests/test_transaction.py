@@ -18,7 +18,8 @@ async def test_transaction_error_on_begin(db, mocker):
     with pytest.raises(FakeConnectionError):
         async with db.aio_atomic():
             await TestModel.aio_create(text='FOO')
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
+
 
 @dbs_all
 async def test_transaction_error_on_commit(db, mocker):
@@ -26,7 +27,7 @@ async def test_transaction_error_on_commit(db, mocker):
     with pytest.raises(FakeConnectionError):
         async with db.aio_atomic():
             await TestModel.aio_create(text='FOO')
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -39,7 +40,7 @@ async def test_transaction_error_on_rollback(db, mocker):
             assert await TestModel.aio_get_or_none(data="BAR") is not None
             await TestModel.aio_create(text='FOO')
 
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -48,7 +49,7 @@ async def test_transaction_success(db):
         await TestModel.aio_create(text='FOO')
 
     assert await TestModel.aio_get_or_none(text="FOO") is not None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -62,7 +63,7 @@ async def test_transaction_rollback(db):
             await TestModel.aio_create(text='FOO')
 
     assert await TestModel.aio_get_or_none(data="BAR") is None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -92,7 +93,7 @@ async def test_several_transactions(db):
     assert await TestModel.aio_get_or_none(text="FOO1") is not None
     assert await TestModel.aio_get_or_none(text="FOO2", data="") is not None
     assert await TestModel.aio_get_or_none(text="FOO3", data="BAR") is not None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -110,7 +111,7 @@ async def test_transaction_manual_work(db):
             await tr.commit()
 
     assert await TestModel.aio_get_or_none(text="FOO") is None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -122,7 +123,7 @@ async def test_savepoint_success(db):
             await TestModel.update(text="BAR").aio_execute()
 
     assert await TestModel.aio_get_or_none(text="BAR") is not None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -137,7 +138,7 @@ async def test_savepoint_rollback(db):
                 await TestModel.aio_create(text='FOO')
 
     assert await TestModel.aio_get_or_none(data="BAR") is not None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -159,7 +160,7 @@ async def test_savepoint_manual_work(db):
         await tr.commit()
 
     assert await TestModel.aio_get_or_none(text="FOO") is not None
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
@@ -207,5 +208,5 @@ async def test_acid_when_connetion_has_been_broken(db):
 
     # The transaction has not been committed
     assert len(list(await TestModel.select().aio_execute())) == 0
-    assert db.aio_pool.has_acquired_connections() is False
+    assert db.pool_backend.has_acquired_connections() is False
 

@@ -21,7 +21,7 @@ import uuid
 import warnings
 from contextvars import ContextVar
 from importlib.metadata import version
-from typing import Optional
+from typing import Optional, Type
 
 import peewee
 from playhouse.db_url import register_database
@@ -216,8 +216,8 @@ class Transaction:
 
 
 class ConnectionContextManager:
-    def __init__(self, aio_pool):
-        self.aio_pool = aio_pool
+    def __init__(self, pool_backend):
+        self.pool_backend = pool_backend
         self.connection_context = connection_context.get()
         self.resuing_connection = self.connection_context is not None
 
@@ -225,28 +225,75 @@ class ConnectionContextManager:
         if self.connection_context is not None:
             connection = self.connection_context.connection
         else:
-            connection = await self.aio_pool.acquire()
+            connection = await self.pool_backend.acquire()
             self.connection_context = ConnectionContext(connection)
             connection_context.set(self.connection_context)
         return connection
 
     async def __aexit__(self, *args):
         if self.resuing_connection is False:
-            self.aio_pool.release(self.connection_context.connection)
+            self.pool_backend.release(self.connection_context.connection)
             connection_context.set(None)
+
+
+class PoolBackend(metaclass=abc.ABCMeta):
+    """Asynchronous database connection pool.
+    """
+    def __init__(self, *, database=None, **kwargs):
+        self.pool = None
+        self.database = database
+        self.connect_params = kwargs
+        self._connection_lock = asyncio.Lock()
+
+    @property
+    def is_connected(self):
+        return self.pool is not None and self.pool.closed is False
+
+    def has_acquired_connections(self):
+        return self.pool is not None and len(self.pool._used) > 0
+
+    async def connect(self):
+        async with self._connection_lock:
+            if self.is_connected is False:
+                await self.create()
+
+    async def acquire(self):
+        """Acquire connection from pool.
+        """
+        if self.pool is None:
+            await self.connect()
+        return await self.pool.acquire()
+
+    def release(self, conn):
+        """Release connection to pool.
+        """
+        self.pool.release(conn)
+
+    @abc.abstractmethod
+    async def create(self):
+        """Create connection pool asynchronously.
+        """
+        raise NotImplementedError
+
+    async def terminate(self):
+        """Terminate all pool connections.
+        """
+        self.pool.terminate()
+        await self.pool.wait_closed()
 
 
 ############
 # Database #
 ############
 
-
 class AioDatabase:
     _allow_sync = True  # whether sync queries are allowed
 
+    pool_backend_cls: Type[PoolBackend]
+
     def __init__(self, database, **kwargs):
         super().__init__(database, **kwargs)
-        self.aio_pool = self.aio_pool_cls(
+        self.pool_backend = self.pool_backend_cls(
             database=self.database,
             **self.connect_params_async
         )
@@ -257,12 +304,16 @@ class AioDatabase:
         if self.deferred:
             raise Exception("Error, database not properly initialized "
                             "before opening connection")
-        await self.aio_pool.connect()
+        await self.pool_backend.connect()
+
+    @property
+    def is_connected(self):
+        return self.pool_backend.is_connected
 
     async def aio_close(self):
         """Close async connection.
         """
-        await self.aio_pool.terminate()
+        await self.pool_backend.terminate()
 
     @contextlib.asynccontextmanager
     async def aio_atomic(self):
@@ -323,7 +374,7 @@ class AioDatabase:
         return super().execute_sql(*args, **kwargs)
 
     def aio_connection(self) -> ConnectionContextManager:
-        return ConnectionContextManager(self.aio_pool)
+        return ConnectionContextManager(self.pool_backend)
 
     async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
         __log__.debug(sql, params)
@@ -405,63 +456,12 @@ class AioDatabase:
         )
         return self.aio_atomic()
 
-
-class AioPool(metaclass=abc.ABCMeta):
-    """Asynchronous database connection pool.
-    """
-    def __init__(self, *, database=None, **kwargs):
-        self.pool = None
-        self.database = database
-        self.connect_params = kwargs
-        self._connection_lock = asyncio.Lock()
-
-    def has_acquired_connections(self):
-        return self.pool is not None and len(self.pool._used) > 0
-
-    async def connect(self):
-        async with self._connection_lock:
-            if self.pool is not None:
-                return
-            await self.create()
-
-    async def acquire(self):
-        """Acquire connection from pool.
-        """
-        if self.pool is None:
-            await self.connect()
-        return await self.pool.acquire()
-
-    def release(self, conn):
-        """Release connection to pool.
-        """
-        if self.pool is not None:
-            self.pool.release(conn)
-
-    @abc.abstractmethod
-    async def create(self):
-        """Create connection pool asynchronously.
-        """
-        raise NotImplementedError
-
-    async def terminate(self):
-        """Terminate all pool connections.
-        """
-        async with self._connection_lock:
-            if self.pool is not None:
-                pool = self.pool
-                self.pool = None
-                pool.terminate()
-                await pool.wait_closed()
-
-
-
-
 ##############
 # PostgreSQL #
 ##############
 
 
-class AioPostgresqlPool(AioPool):
+class PostgresqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool.
     """
 
@@ -481,7 +481,7 @@ class AioPostgresqlMixin(AioDatabase):
     for managing async connection.
     """
 
-    aio_pool_cls = AioPostgresqlPool
+    pool_backend_cls = PostgresqlPoolBackend
 
     if psycopg2:
         Error = psycopg2.Error
@@ -573,7 +573,7 @@ register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+p
 #########
 
 
-class AioMysqlPool(AioPool):
+class MysqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool.
     """
 
@@ -596,7 +596,7 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
-    aio_pool_cls = AioMysqlPool
+    pool_backend_cls = MysqlPoolBackend
 
     if pymysql:
         Error = pymysql.Error

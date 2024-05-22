@@ -1,5 +1,6 @@
 import asyncio
 
+from peewee_async import transaction, atomic
 from tests.conftest import manager_for_all_dbs
 from tests.models import TestModel
 
@@ -11,11 +12,37 @@ class FakeUpdateError(Exception):
 
 
 @manager_for_all_dbs
-async def test_atomic_success(manager):
+async def test_manager_atomic_success(manager):
     obj = await manager.create(TestModel, text='FOO')
     obj_id = obj.id
 
     async with manager.atomic():
+        obj.text = 'BAR'
+        await manager.update(obj)
+
+    res = await manager.get(TestModel, id=obj_id)
+    assert res.text == 'BAR'
+
+
+@manager_for_all_dbs
+async def test_transaction_success(manager):
+    obj = await manager.create(TestModel, text='FOO')
+    obj_id = obj.id
+
+    async with transaction(manager.database):
+        obj.text = 'BAR'
+        await manager.update(obj)
+
+    res = await manager.get(TestModel, id=obj_id)
+    assert res.text == 'BAR'
+
+
+@manager_for_all_dbs
+async def test_atomic_success(manager):
+    obj = await manager.create(TestModel, text='FOO')
+    obj_id = obj.id
+
+    async with atomic(manager.database):
         obj.text = 'BAR'
         await manager.update(obj)
 
