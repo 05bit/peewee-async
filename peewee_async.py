@@ -689,6 +689,11 @@ class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
             return await self._database.last_insert_id_async(cursor)
 
 
+class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
+    async def fetch_results(self, cursor):
+        return await self.make_async_query_wrapper(cursor)
+
+
 class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
 
     async def fetch_results(self, cursor):
@@ -763,6 +768,10 @@ class AioModel(peewee.Model):
         columns = [getattr(cls, field) if isinstance(field, str)
                    else field for field in fields]
         return AioModelInsert(cls, insert=query, columns=columns)
+
+    @classmethod
+    def raw(cls, sql, *params):
+        return AioModelRaw(cls, sql, params)
 
     @classmethod
     def delete(cls):
