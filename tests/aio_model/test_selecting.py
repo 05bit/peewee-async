@@ -1,4 +1,6 @@
 import peewee
+
+from peewee_async import AioModelRaw
 from tests.conftest import manager_for_all_dbs, dbs_all
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
@@ -15,6 +17,18 @@ async def test_select_w_join(db):
 
     assert result.id == beta.id
     assert result.joined_alpha.id == alpha.id
+
+
+@dbs_all
+async def test_raw_select(db):
+    obj1 = await TestModel.aio_create(text="Test 1")
+    obj2 = await TestModel.aio_create(text="Test 2")
+    query = TestModel.raw(
+        'SELECT id, text, data FROM testmodel m ORDER BY m.text'
+    )
+    assert isinstance(query, AioModelRaw)
+    result = await query.aio_execute()
+    assert list(result) == [obj1, obj2]
 
 
 @manager_for_all_dbs
