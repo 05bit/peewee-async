@@ -707,13 +707,11 @@ class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
         :return: result is the same as after sync ``query.scalar()`` call
         """
         async def fetch_results(cursor):
-            row = await cursor.fetchone()
-            if row and not as_tuple:
-                return row[0]
-            else:
-                return row
+            return await cursor.fetchone()
 
-        return await database.aio_execute(self, fetch_results=fetch_results)
+        rows = await database.aio_execute(self, fetch_results=fetch_results)
+
+        return rows[0] if rows and not as_tuple else rows
 
     async def aio_get(self, database=None):
         clone = self.paginate(1, 1)

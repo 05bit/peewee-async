@@ -65,7 +65,12 @@ class CompositeTestModel(peewee_async.AioModel):
         primary_key = peewee.CompositeKey('uuid', 'alpha')
 
 
+class IntegerTestModel(peewee_async.AioModel):
+    __test__ = False  # disable pytest warnings
+    num = peewee.IntegerField()
+
+
 ALL_MODELS = (
     TestModel, UUIDTestModel, TestModelAlpha, TestModelBeta, TestModelGamma,
-    CompatTestModel, CompositeTestModel
+    CompatTestModel, CompositeTestModel, IntegerTestModel
 )
