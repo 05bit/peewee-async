@@ -397,7 +397,8 @@ class AioDatabase:
         # To make `Database.aio_execute` compatible with peewee's sync queries we
         # apply optional patching, it will do nothing for Aio-counterparts:
         _patch_query_with_compat_methods(query, None)
-        sql, params = query.sql()
+        ctx = self.get_sql_context()
+        sql, params = ctx.sql(query).query()
         fetch_results = fetch_results or getattr(query, 'fetch_results', None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
@@ -694,7 +695,7 @@ class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
         return await self.make_async_query_wrapper(cursor)
 
 
-class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
+class AioSelectMixin(AioQueryMixin):
 
     async def fetch_results(self, cursor):
         return await self.make_async_query_wrapper(cursor)
@@ -722,6 +723,28 @@ class AioModelSelect(peewee.ModelSelect, AioQueryMixin):
             raise self.model.DoesNotExist('%s instance matching query does '
                                           'not exist:\nSQL: %s\nParams: %s' %
                                           (clone.model, sql, params))
+
+    @peewee.database_required
+    async def aio_count(self, database, clear_limit=False):
+        clone = self.order_by().alias('_wrapped')
+        if clear_limit:
+            clone._limit = clone._offset = None
+        try:
+            if clone._having is None and clone._group_by is None and \
+               clone._windows is None and clone._distinct is None and \
+               clone._simple_distinct is not True:
+                clone = clone.select(peewee.SQL('1'))
+        except AttributeError:
+            pass
+        return await AioSelect([clone], [peewee.fn.COUNT(peewee.SQL('1'))]).aio_scalar(database)
+
+
+class AioSelect(peewee.Select, AioSelectMixin):
+    pass
+
+
+class AioModelSelect(peewee.ModelSelect, AioSelectMixin):
+    pass
 
 
 class AioModel(peewee.Model):

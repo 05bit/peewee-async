@@ -43,3 +43,21 @@ async def test_aio_scalar(db):
     ).aio_scalar(as_tuple=True) == (2, 1)
 
     assert await TestModel.select().aio_scalar() is None
+
+
+@dbs_all
+async def test_count_query(db):
+
+    for num in range(5):
+        await IntegerTestModel.aio_create(num=num)
+    count = await IntegerTestModel.select().limit(3).aio_count()
+    assert count == 3
+
+
+@dbs_all
+async def test_count_query_clear_limit(db):
+
+    for num in range(5):
+        await IntegerTestModel.aio_create(num=num)
+    count = await IntegerTestModel.select().limit(3).aio_count(clear_limit=True)
+    assert count == 5

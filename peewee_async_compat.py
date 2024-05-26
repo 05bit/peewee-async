@@ -78,6 +78,7 @@ def _patch_query_with_compat_methods(query, async_query_cls):
     if async_query_cls is AioModelSelect:
         query.aio_get = partial(async_query_cls.aio_get, query)
         query.aio_scalar = partial(async_query_cls.aio_scalar, query)
+        query.aio_count = partial(async_query_cls.aio_count, query)
 
 
 def _query_db(query):
@@ -94,25 +95,13 @@ async def count(query, clear_limit=False):
 
     :return: number of objects in `select()` query
     """
-    database = _query_db(query)
-    clone = query.clone()
-    if query._distinct or query._group_by or query._limit or query._offset:
-        if clear_limit:
-            clone._limit = clone._offset = None
-        sql, params = clone.sql()
-        wrapped = 'SELECT COUNT(1) FROM (%s) AS wrapped_select' % sql
-        async def fetch_results(cursor):
-            row = await cursor.fetchone()
-            if row:
-                return row[0]
-            else:
-                return row
-        result = await database.aio_execute_sql(wrapped, params, fetch_results)
-        return result or 0
-    else:
-        clone._returning = [peewee.fn.Count(peewee.SQL('*'))]
-        clone._order_by = None
-        return (await scalar(clone)) or 0
+    from peewee_async import AioModelSelect  # noqa
+    warnings.warn(
+        "`count` is deprecated, use `query.aio_count` method.",
+        DeprecationWarning
+    )
+    _patch_query_with_compat_methods(query, AioModelSelect)
+    return await query.aio_count(clear_limit=clear_limit)
 
 
 async def prefetch(sq, *subqueries, prefetch_type):
