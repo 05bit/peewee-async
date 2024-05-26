@@ -1,7 +1,8 @@
 import pytest
+from peewee import fn
 
 from tests.conftest import dbs_all
-from tests.models import TestModel
+from tests.models import TestModel, IntegerTestModel
 
 
 @dbs_all
@@ -28,3 +29,17 @@ async def test_aio_get_or_none(db):
 
     result = await TestModel.aio_get_or_none(TestModel.text == "unknown")
     assert result is None
+
+
+@dbs_all
+async def test_aio_scalar(db):
+    await IntegerTestModel.aio_create(num=1)
+    await IntegerTestModel.aio_create(num=2)
+
+    assert await IntegerTestModel.select(fn.MAX(IntegerTestModel.num)).aio_scalar() == 2
+
+    assert await IntegerTestModel.select(
+        fn.MAX(IntegerTestModel.num),fn.Min(IntegerTestModel.num)
+    ).aio_scalar(as_tuple=True) == (2, 1)
+
+    assert await TestModel.select().aio_scalar() is None
