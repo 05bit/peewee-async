@@ -798,6 +798,18 @@ class AioModel(peewee.Model):
     def delete(cls):
         return AioModelDelete(cls)
 
+    async def aio_delete_instance(self, recursive=False, delete_nullable=False):
+        if recursive:
+            dependencies = self.dependencies(delete_nullable)
+            for query, fk in reversed(list(dependencies)):
+                print(query, fk)
+                model = fk.model
+                if fk.null and not delete_nullable:
+                    await model.update(**{fk.name: None}).where(query).aio_execute()
+                else:
+                    await model.delete().where(query).aio_execute()
+        return await type(self).delete().where(self._pk_expr()).aio_execute()
+
     @classmethod
     async def aio_get(cls, *query, **filters):
         """Async version of **peewee.Model.get**"""

@@ -1,8 +1,10 @@
+import uuid
+
 import pytest
 from peewee import fn
 
 from tests.conftest import dbs_all
-from tests.models import TestModel, IntegerTestModel
+from tests.models import TestModel, IntegerTestModel, TestModelAlpha, TestModelBeta
 
 
 @dbs_all
@@ -61,3 +63,26 @@ async def test_count_query_clear_limit(db):
         await IntegerTestModel.aio_create(num=num)
     count = await IntegerTestModel.select().limit(3).aio_count(clear_limit=True)
     assert count == 5
+
+
+@dbs_all
+async def test_aio_delete_instance(db):
+    text = "Test %s" % uuid.uuid4()
+    obj1 = await TestModel.aio_create(text=text)
+    obj2 = await TestModel.aio_get(id=obj1.id)
+
+    await obj2.aio_delete_instance()
+
+    obj3 = await TestModel.aio_get_or_none(id=obj1.id)
+    assert obj3 is None
+
+
+@dbs_all
+async def test_aio_delete_instance_with_fk(db):
+    alpha = await TestModelAlpha.aio_create(text="test")
+    beta = await TestModelBeta.aio_create(alpha=alpha, text="test")
+
+    await alpha.aio_delete_instance(recursive=True)
+
+    assert await TestModelAlpha.aio_get_or_none(id=alpha.id) is None
+    assert await TestModelBeta.aio_get_or_none(id=beta.id) is None

@@ -44,18 +44,6 @@ async def test_prefetch(manager, prefetch_type):
 
 
 @manager_for_all_dbs
-async def test_delete_obj(manager):
-    text = "Test %s" % uuid.uuid4()
-    obj1 = await manager.create(TestModel, text=text)
-    obj2 = await manager.get(TestModel, id=obj1.id)
-
-    await manager.delete(obj2)
-
-    obj3 = await manager.get_or_none(TestModel, id=obj1.id)
-    assert obj3 is None
-
-
-@manager_for_all_dbs
 async def test_update_obj(manager):
 
     text = "Test %s" % uuid.uuid4()
