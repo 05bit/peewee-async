@@ -316,6 +316,10 @@ class Manager:
 
     async def delete(self, obj, recursive=False, delete_nullable=False):
         """Delete object from database."""
+        warnings.warn(
+            "`delete` method is deprecated, use `AioModel.aio_delete_instance` instead.",
+            DeprecationWarning
+        )
         if recursive:
             dependencies = obj.dependencies(delete_nullable)
             for cond, fk in reversed(list(dependencies)):

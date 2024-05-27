@@ -69,3 +69,15 @@ async def test_create_obj(manager):
     obj = await manager.create(CompatTestModel, text=text)
     assert obj is not None
     assert obj.text == text
+
+
+@manager_for_all_dbs
+async def test_delete_obj(manager):
+    text = "Test %s" % uuid.uuid4()
+    obj1 = await manager.create(CompatTestModel, text=text)
+    obj2 = await manager.get(CompatTestModel, id=obj1.id)
+
+    await manager.delete(obj2)
+
+    obj3 = await manager.get_or_none(CompatTestModel, id=obj1.id)
+    assert obj3 is None
