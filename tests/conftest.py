@@ -70,7 +70,6 @@ dbs_all = pytest.mark.parametrize(
 )
 
 # MANAGERS fixtures will be removed in v1.0.0
-# TODO add manager prefix to fixtures
 postgres_only = pytest.mark.parametrize(
     "manager", PG_DBS, indirect=["manager"]
 )

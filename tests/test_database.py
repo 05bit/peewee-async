@@ -42,3 +42,14 @@ async def test_is_connected(db):
 
     await db.aio_close()
     assert db.is_connected is False
+
+
+@dbs_all
+async def test_aio_close_idempotent(db):
+    assert db.is_connected is False
+
+    await db.aio_close()
+    assert db.is_connected is False
+
+    await db.aio_close()
+    assert db.is_connected is False
