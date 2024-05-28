@@ -278,8 +278,9 @@ class PoolBackend(metaclass=abc.ABCMeta):
     async def terminate(self):
         """Terminate all pool connections.
         """
-        self.pool.terminate()
-        await self.pool.wait_closed()
+        if self.pool is not None:
+            self.pool.terminate()
+            await self.pool.wait_closed()
 
 
 ############
