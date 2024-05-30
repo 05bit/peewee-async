@@ -811,6 +811,49 @@ class AioModel(peewee.Model):
                     await model.delete().where(query).aio_execute()
         return await type(self).delete().where(self._pk_expr()).aio_execute()
 
+    async def aio_save(self, force_insert=False, only=None):
+        field_dict = self.__data__.copy()
+        if self._meta.primary_key is not False:
+            pk_field = self._meta.primary_key
+            pk_value = self._pk
+        else:
+            pk_field = pk_value = None
+        if only is not None:
+            field_dict = self._prune_fields(field_dict, only)
+        elif self._meta.only_save_dirty and not force_insert:
+            field_dict = self._prune_fields(field_dict, self.dirty_fields)
+            if not field_dict:
+                self._dirty.clear()
+                return False
+
+        self._populate_unsaved_relations(field_dict)
+        rows = 1
+
+        if self._meta.auto_increment and pk_value is None:
+            field_dict.pop(pk_field.name, None)
+
+        if pk_value is not None and not force_insert:
+            if self._meta.composite_key:
+                for pk_part_name in pk_field.field_names:
+                    field_dict.pop(pk_part_name, None)
+            else:
+                field_dict.pop(pk_field.name, None)
+            if not field_dict:
+                raise ValueError('no data to save!')
+            rows = await self.update(**field_dict).where(self._pk_expr()).aio_execute()
+        elif pk_field is not None:
+            pk = await self.insert(**field_dict).aio_execute()
+            if pk is not None and (self._meta.auto_increment or
+                                   pk_value is None):
+                self._pk = pk
+                # Although we set the primary-key, do not mark it as dirty.
+                self._dirty.discard(pk_field.name)
+        else:
+            await self.insert(**field_dict).aio_execute()
+
+        self._dirty -= set(field_dict)  # Remove any fields we saved.
+        return rows
+
     @classmethod
     async def aio_get(cls, *query, **filters):
         """Async version of **peewee.Model.get**"""
@@ -835,10 +878,7 @@ class AioModel(peewee.Model):
             return None
 
     @classmethod
-    async def aio_create(cls, **data):
-        """INSERT new row into table and return corresponding model instance."""
-        obj = cls(**data)
-        pk = await cls.insert(**dict(obj.__data__)).aio_execute()
-        if obj._pk is None:
-            obj._pk = pk
-        return obj
+    async def aio_create(cls, **query):
+        inst = cls(**query)
+        await inst.aio_save(force_insert=True)
+        return inst
