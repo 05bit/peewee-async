@@ -882,3 +882,24 @@ class AioModel(peewee.Model):
         inst = cls(**query)
         await inst.aio_save(force_insert=True)
         return inst
+
+    @classmethod
+    async def aio_get_or_create(cls, **kwargs):
+        defaults = kwargs.pop('defaults', {})
+        query = cls.select()
+        for field, value in kwargs.items():
+            query = query.where(getattr(cls, field) == value)
+
+        try:
+            return await query.aio_get(), False
+        except cls.DoesNotExist:
+            try:
+                if defaults:
+                    kwargs.update(defaults)
+                async with cls._meta.database.aio_atomic():
+                    return await cls.aio_create(**kwargs), True
+            except peewee.IntegrityError as exc:
+                try:
+                    return await query.aio_get(), False
+                except cls.DoesNotExist:
+                    raise exc
