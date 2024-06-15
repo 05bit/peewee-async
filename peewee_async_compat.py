@@ -265,6 +265,10 @@ class Manager:
         Return 2-tuple containing the model instance and a boolean
         indicating whether the instance was created.
         """
+        warnings.warn(
+            "`get_or_create` method is deprecated, use `AioModel.aio_get_or_create` instead.",
+            DeprecationWarning
+        )
         try:
             return (await self.get(model_, **kwargs)), False
         except model_.DoesNotExist:
@@ -342,6 +346,10 @@ class Manager:
         Try to create new object with specified data. If object already
         exists, then try to get it by unique fields.
         """
+        warnings.warn(
+            "`create_or_get` method is deprecated, use `AioModel.aio_get_or_create` instead.",
+            DeprecationWarning
+        )
         try:
             return (await self.create(model_, **kwargs)), True
         except IntegrityErrors:

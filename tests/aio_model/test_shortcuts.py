@@ -109,3 +109,18 @@ async def test_aio_save__force_insert(db):
 
     with pytest.raises(peewee.IntegrityError):
         await t.aio_save(force_insert=True)
+
+
+@dbs_all
+async def test_aio_get_or_create__get(db):
+    t1 = await TestModel.aio_create(text="text", data="data")
+    t2, created = await TestModel.aio_get_or_create(text="text")
+    assert t1.id == t2.id
+    assert created is False
+
+
+@dbs_all
+async def test_aio_get_or_create__created(db):
+    t2, created = await TestModel.aio_get_or_create(text="text")
+    assert t2.text == "text"
+    assert created is True
