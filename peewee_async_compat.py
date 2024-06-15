@@ -291,6 +291,10 @@ class Manager:
         :param only: (optional) the list/tuple of fields or
                      field names to update
         """
+        warnings.warn(
+            "`update` method is deprecated, use `AioModel.aio_save` method instead.",
+            DeprecationWarning
+        )
         field_dict = dict(obj.__data__)
         pk_field = obj._meta.primary_key
 

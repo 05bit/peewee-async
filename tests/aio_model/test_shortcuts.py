@@ -1,5 +1,6 @@
 import uuid
 
+import peewee
 import pytest
 from peewee import fn
 
@@ -86,3 +87,25 @@ async def test_aio_delete_instance_with_fk(db):
 
     assert await TestModelAlpha.aio_get_or_none(id=alpha.id) is None
     assert await TestModelBeta.aio_get_or_none(id=beta.id) is None
+
+
+@dbs_all
+async def test_aio_save(db):
+    t = TestModel(text="text", data="data")
+    rows = await t.aio_save()
+    assert rows == 1
+    assert t.id is not None
+
+    assert await TestModel.aio_get_or_none(text="text", data="data") is not None
+
+
+@dbs_all
+async def test_aio_save__force_insert(db):
+    t = await TestModel.aio_create(text="text", data="data")
+    t.data = "data2"
+    await t.aio_save()
+
+    assert await TestModel.aio_get_or_none(text="text", data="data2") is not None
+
+    with pytest.raises(peewee.IntegrityError):
+        await t.aio_save(force_insert=True)
