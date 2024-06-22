@@ -42,11 +42,6 @@ except ImportError:
     aiomysql = None
     pymysql = None
 
-try:
-    asyncio_current_task = asyncio.current_task
-except AttributeError:
-    asyncio_current_task = asyncio.Task.current_task
-
 __version__ = version('peewee-async')
 
 
