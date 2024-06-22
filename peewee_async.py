@@ -739,6 +739,13 @@ class AioSelectMixin(AioQueryMixin):
             pass
         return await AioSelect([clone], [peewee.fn.COUNT(peewee.SQL('1'))]).aio_scalar(database)
 
+    @peewee.database_required
+    async def aio_exists(self, database):
+        clone = self.columns(peewee.SQL('1'))
+        clone._limit = 1
+        clone._offset = None
+        return bool(await clone.aio_scalar())
+
 
 class AioSelect(peewee.Select, AioSelectMixin):
     pass

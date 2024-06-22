@@ -124,3 +124,12 @@ async def test_aio_get_or_create__created(db):
     t2, created = await TestModel.aio_get_or_create(text="text")
     assert t2.text == "text"
     assert created is True
+
+
+@dbs_all
+async def test_aio_exists(db):
+    await TestModel.aio_create(text="text1", data="data")
+    await TestModel.aio_create(text="text2", data="data")
+
+    assert await TestModel.select().where(TestModel.data=="data").aio_exists() is True
+    assert await TestModel.select().where(TestModel.data == "not_existed").aio_exists() is False
