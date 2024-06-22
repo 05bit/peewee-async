@@ -5,7 +5,7 @@ import pytest
 from peewee import fn
 
 from tests.conftest import dbs_all
-from tests.models import TestModel, IntegerTestModel, TestModelAlpha, TestModelBeta
+from tests.models import TestModel, IntegerTestModel, TestModelAlpha, TestModelBeta, TestModelGamma
 
 
 @dbs_all
@@ -133,3 +133,38 @@ async def test_aio_exists(db):
 
     assert await TestModel.select().where(TestModel.data=="data").aio_exists() is True
     assert await TestModel.select().where(TestModel.data == "not_existed").aio_exists() is False
+
+
+@dbs_all
+@pytest.mark.parametrize(
+    "prefetch_type",
+    peewee.PREFETCH_TYPE.values()
+)
+async def test_aio_prefetch(db, prefetch_type):
+    alpha_1 = await TestModelAlpha.aio_create(text='Alpha 1')
+    alpha_2 = await TestModelAlpha.aio_create(text='Alpha 2')
+
+    beta_11 = await TestModelBeta.aio_create(alpha=alpha_1, text='Beta 11')
+    beta_12 = await TestModelBeta.aio_create(alpha=alpha_1, text='Beta 12')
+    _ = await TestModelBeta.aio_create(
+        alpha=alpha_2, text='Beta 21'
+    )
+    _ = await TestModelBeta.aio_create(
+        alpha=alpha_2, text='Beta 22'
+    )
+
+    gamma_111 = await TestModelGamma.aio_create(
+        beta=beta_11, text='Gamma 111'
+    )
+    gamma_112 = await TestModelGamma.aio_create(
+        beta=beta_11, text='Gamma 112'
+    )
+
+    result = await TestModelAlpha.select().order_by(TestModelAlpha.id).aio_prefetch(
+        TestModelBeta.select().order_by(TestModelBeta.id),
+        TestModelGamma.select().order_by(TestModelGamma.id),
+        prefetch_type=prefetch_type,
+    )
+    assert tuple(result) == (alpha_1, alpha_2)
+    assert tuple(result[0].betas) == (beta_11, beta_12)
+    assert tuple(result[0].betas[0].gammas) == (gamma_111, gamma_112)

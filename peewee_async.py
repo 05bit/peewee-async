@@ -59,6 +59,7 @@ __all__ = [
     'PooledMySQLDatabase',
     'Transaction',
     'AioModel',
+    'aio_prefetch'
 
     # Compatibility API (deprecated in v1.0 release)
     'Manager',
@@ -655,6 +656,38 @@ class PooledMySQLDatabase(MySQLDatabase):
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
 
 
+async def aio_prefetch(sq, *subqueries, prefetch_type):
+    """Asynchronous version of the `prefetch()` from peewee."""
+    if not subqueries:
+        return sq
+
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
+    deps = {}
+    rel_map = {}
+
+    for pq in reversed(fixed_queries):
+        query_model = pq.model
+        if pq.fields:
+            for rel_model in pq.rel_models:
+                rel_map.setdefault(rel_model, [])
+                rel_map[rel_model].append(pq)
+
+        deps[query_model] = {}
+        id_map = deps[query_model]
+        has_relations = bool(rel_map.get(query_model))
+
+        result = await pq.query.aio_execute()
+
+        for instance in result:
+            if pq.fields:
+                pq.store_instance(instance, id_map)
+            if has_relations:
+                for rel in rel_map[query_model]:
+                    rel.populate_instance(instance, deps[rel.model])
+
+    return result
+
+
 class AioQueryMixin:
     @peewee.database_required
     async def aio_execute(self, database):
@@ -746,6 +779,9 @@ class AioSelectMixin(AioQueryMixin):
         clone._offset = None
         return bool(await clone.aio_scalar())
 
+    def aio_prefetch(self, *subqueries, **kwargs):
+        return aio_prefetch(self, *subqueries, **kwargs)
+
 
 class AioSelect(peewee.Select, AioSelectMixin):
     pass
@@ -810,7 +846,6 @@ class AioModel(peewee.Model):
         if recursive:
             dependencies = self.dependencies(delete_nullable)
             for query, fk in reversed(list(dependencies)):
-                print(query, fk)
                 model = fk.model
                 if fk.null and not delete_nullable:
                     await model.update(**{fk.name: None}).where(query).aio_execute()
