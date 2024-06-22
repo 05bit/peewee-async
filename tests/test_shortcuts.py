@@ -3,6 +3,7 @@ import uuid
 import peewee
 import pytest
 
+import peewee_async
 from tests.conftest import manager_for_all_dbs
 from tests.models import TestModel, TestModelAlpha, TestModelBeta, TestModelGamma
 
@@ -32,7 +33,7 @@ async def test_prefetch(manager, prefetch_type):
     gamma_112 = await manager.create(
         TestModelGamma, beta=beta_11, text='Gamma 112')
 
-    result = await manager.prefetch(
+    result = await peewee_async.prefetch(
         TestModelAlpha.select().order_by(TestModelAlpha.id),
         TestModelBeta.select().order_by(TestModelBeta.id),
         TestModelGamma.select().order_by(TestModelGamma.id),

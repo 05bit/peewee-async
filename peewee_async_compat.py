@@ -106,6 +106,10 @@ async def count(query, clear_limit=False):
 
 async def prefetch(sq, *subqueries, prefetch_type):
     """Asynchronous version of the `prefetch()` from peewee."""
+    warnings.warn(
+        "`prefetch` method is deprecated, use `AioModel.aio_prefetch` or aio_prefetch instead.",
+        DeprecationWarning
+    )
     database = _query_db(sq)
     if not subqueries:
         result = await database.aio_execute(sq)
