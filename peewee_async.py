@@ -24,6 +24,7 @@ from importlib.metadata import version
 from typing import Optional, Type
 
 import peewee
+from playhouse import postgres_ext as ext
 from playhouse.db_url import register_database
 from peewee_async_compat import Manager, count, execute, prefetch, scalar, savepoint, atomic, transaction
 from peewee_async_compat import _patch_query_with_compat_methods
@@ -515,27 +516,6 @@ class AioPostgresqlMixin(AioDatabase):
         return cursor.lastrowid
 
 
-class PostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
-    """PosgreSQL database driver providing **single drop-in sync** connection
-    and **single async connection** interface.
-
-    Example::
-
-        database = PostgresqlDatabase('test')
-
-    See also:
-    http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
-    """
-    def init(self, database, **kwargs):
-        self.min_connections = 1
-        self.max_connections = 1
-        super().init(database, **kwargs)
-        self.init_async()
-
-
-register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
-
-
 class PooledPostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
@@ -566,6 +546,45 @@ class PooledPostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
 register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
 
 
+class PooledPostgresqlExtDatabase(
+    AioPostgresqlMixin,
+    ext.PostgresqlExtDatabase
+):
+    """PosgreSQL database extended driver providing **single drop-in sync**
+    connection and **async connections pool** interface.
+
+    JSON fields support is always enabled, HStore supports is enabled by
+    default, but can be disabled with ``register_hstore=False`` argument.
+
+    :param max_connections: connections pool size
+
+    Example::
+
+        database = PooledPostgresqlExtDatabase('test', register_hstore=False,
+                                               max_connections=20)
+
+    See also:
+    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
+    """
+
+    def init(self, database, **kwargs):
+        self.min_connections = kwargs.pop('min_connections', 1)
+        self.max_connections = kwargs.pop('max_connections', 20)
+        connection_timeout = kwargs.pop('connection_timeout', None)
+        if connection_timeout is not None:
+            warnings.warn(
+                "`connection_timeout` is deprecated, use `connect_timeout` instead.",
+                DeprecationWarning
+            )
+            kwargs['connect_timeout'] = connection_timeout
+        super().init(database, **kwargs)
+        self.init_async(
+            enable_json=True,
+            enable_hstore=self._register_hstore
+        )
+register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
+
+
 #########
 # MySQL #
 #########
@@ -583,13 +602,15 @@ class MysqlPoolBackend(PoolBackend):
         )
 
 
-class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
-    """MySQL database driver providing **single drop-in sync** connection
-    and **single async connection** interface.
+class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
+    """MySQL database driver providing **single drop-in sync**
+    connection and **async connections pool** interface.
+
+    :param max_connections: connections pool size
 
     Example::
 
-        database = MySQLDatabase('test')
+        database = PooledMySQLDatabase('test', max_connections=10)
 
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
@@ -602,8 +623,8 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     def init(self, database, **kwargs):
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
-        self.min_connections = 1
-        self.max_connections = 1
+        self.min_connections = kwargs.pop('min_connections', 1)
+        self.max_connections = kwargs.pop('max_connections', 20)
         super().init(database, **kwargs)
 
     @property
@@ -623,32 +644,8 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
         """
         return cursor.lastrowid
 
-
-register_database(MySQLDatabase, 'mysql+async')
-
-
-class PooledMySQLDatabase(MySQLDatabase):
-    """MySQL database driver providing **single drop-in sync**
-    connection and **async connections pool** interface.
-
-    :param max_connections: connections pool size
-
-    Example::
-
-        database = MySQLDatabase('test', max_connections=10)
-
-    See also:
-    http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
-    """
-    def init(self, database, **kwargs):
-        min_connections = kwargs.pop('min_connections', 1)
-        max_connections = kwargs.pop('max_connections', 10)
-        super().init(database, **kwargs)
-        self.min_connections = min_connections
-        self.max_connections = max_connections
-
-
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
+
 
 
 async def aio_prefetch(sq, *subqueries, prefetch_type):
@@ -940,3 +937,87 @@ class AioModel(peewee.Model):
                     return await query.aio_get(), False
                 except cls.DoesNotExist:
                     raise exc
+
+
+# DEPRECATED Databases
+
+
+class PostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
+    """PosgreSQL database driver providing **single drop-in sync** connection
+    and **single async connection** interface.
+
+    Example::
+
+        database = PostgresqlDatabase('test')
+
+    See also:
+    http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
+    """
+    def init(self, database, **kwargs):
+        warnings.warn(
+            "`PostgresqlDatabase` is deprecated, use `PooledPostgresqlDatabase` instead.",
+            DeprecationWarning
+        )
+        self.min_connections = 1
+        self.max_connections = 1
+        super().init(database, **kwargs)
+        self.init_async()
+
+
+register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
+
+
+class MySQLDatabase(PooledMySQLDatabase):
+    """MySQL database driver providing **single drop-in sync** connection
+    and **single async connection** interface.
+
+    Example::
+
+        database = MySQLDatabase('test')
+
+    See also:
+    http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
+    """
+    def init(self, database, **kwargs):
+        warnings.warn(
+            "`MySQLDatabase` is deprecated, use `PooledMySQLDatabase` instead.",
+            DeprecationWarning
+        )
+        super().init(database, **kwargs)
+        self.min_connections = 1
+        self.max_connections = 1
+
+
+register_database(MySQLDatabase, 'mysql+async')
+
+
+class PostgresqlExtDatabase(AioPostgresqlMixin, ext.PostgresqlExtDatabase):
+    """PosgreSQL database extended driver providing **single drop-in sync**
+    connection and **single async connection** interface.
+
+    JSON fields support is always enabled, HStore supports is enabled by
+    default, but can be disabled with ``register_hstore=False`` argument.
+
+    Example::
+
+        database = PostgresqlExtDatabase('test', register_hstore=False)
+
+    See also:
+    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
+    """
+
+    def init(self, database, **kwargs):
+        warnings.warn(
+            "`PostgresqlExtDatabase` is deprecated, use `PooledPostgresqlExtDatabase` instead.",
+            DeprecationWarning
+        )
+        self.min_connections = 1
+        self.max_connections = 1
+        super().init(database, **kwargs)
+        self.init_async(
+            enable_json=True,
+            enable_hstore=self._register_hstore
+        )
+
+
+register_database(PostgresqlExtDatabase, 'postgresext+async', 'postgresqlext+async')
