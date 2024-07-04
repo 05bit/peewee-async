@@ -11,10 +11,12 @@ Copyright (c) 2024, Alexey Kinëv <rudy@05bit.com>
 
 """
 import uuid
+import warnings
 from functools import partial
 
-import warnings
 import peewee
+
+from peewee_async.aio_model import AioModelSelect, AioModelInsert, AioModelUpdate, AioModelDelete
 
 IntegrityErrors = (peewee.IntegrityError,)
 
@@ -53,7 +55,6 @@ def _patch_query_with_compat_methods(query, async_query_cls):
     - aio_get (for SELECT)
     - aio_scalar (for SELECT)
     """
-    from peewee_async import AioModelSelect, AioModelUpdate, AioModelDelete, AioModelInsert
 
     if getattr(query, 'aio_execute', None):
         # No need to patch
@@ -95,7 +96,6 @@ async def count(query, clear_limit=False):
 
     :return: number of objects in `select()` query
     """
-    from peewee_async import AioModelSelect  # noqa
     warnings.warn(
         "`count` is deprecated, use `query.aio_count` method.",
         DeprecationWarning
@@ -152,7 +152,6 @@ async def execute(query):
 
 
 async def scalar(query, as_tuple=False):
-    from peewee_async import AioModelSelect  # noqa
     warnings.warn(
         "`scalar` is deprecated, use `query.aio_scalar` method.",
         DeprecationWarning

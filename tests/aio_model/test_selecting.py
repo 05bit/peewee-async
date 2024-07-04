@@ -1,4 +1,4 @@
-from peewee_async import AioModelRaw, AioModelCompoundSelectQuery
+from peewee_async.aio_model import AioModelCompoundSelectQuery, AioModelRaw
 from tests.conftest import dbs_all
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 

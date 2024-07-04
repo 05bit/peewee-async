@@ -14,7 +14,7 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
 import warnings
-from peewee_async import AioPostgresqlMixin, PooledPostgresqlExtDatabase, PostgresqlExtDatabase
+from peewee_async import PooledPostgresqlExtDatabase, PostgresqlExtDatabase
 
 warnings.warn(
     "import from `peewee_asyncext is deprecated the module will be removed",
