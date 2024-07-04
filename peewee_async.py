@@ -774,15 +774,35 @@ class AioSelectMixin(AioQueryMixin):
         clone._offset = None
         return bool(await clone.aio_scalar())
 
+    def union_all(self, rhs):
+        return AioModelCompoundSelectQuery(self.model, self, 'UNION ALL', rhs)
+    __add__ = union_all
+
+    def union(self, rhs):
+        return AioModelCompoundSelectQuery(self.model, self, 'UNION', rhs)
+    __or__ = union
+
+    def intersect(self, rhs):
+        return AioModelCompoundSelectQuery(self.model, self, 'INTERSECT', rhs)
+    __and__ = intersect
+
+    def except_(self, rhs):
+        return AioModelCompoundSelectQuery(self.model, self, 'EXCEPT', rhs)
+    __sub__ = except_
+
     def aio_prefetch(self, *subqueries, **kwargs):
         return aio_prefetch(self, *subqueries, **kwargs)
 
 
-class AioSelect(peewee.Select, AioSelectMixin):
+class AioSelect(AioSelectMixin, peewee.Select):
     pass
 
 
-class AioModelSelect(peewee.ModelSelect, AioSelectMixin):
+class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
+    pass
+
+
+class AioModelCompoundSelectQuery(AioSelectMixin, peewee.ModelCompoundSelectQuery):
     pass
 
 
