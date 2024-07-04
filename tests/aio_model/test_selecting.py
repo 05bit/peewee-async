@@ -1,7 +1,5 @@
-import peewee
-
-from peewee_async import AioModelRaw
-from tests.conftest import manager_for_all_dbs, dbs_all
+from peewee_async import AioModelRaw, AioModelCompoundSelectQuery
+from tests.conftest import dbs_all
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
 
@@ -31,18 +29,62 @@ async def test_raw_select(db):
     assert list(result) == [obj1, obj2]
 
 
-@manager_for_all_dbs
-async def test_select_compound(manager):
-    obj1 = await manager.create(TestModel, text="Test 1")
-    obj2 = await manager.create(TestModel, text="Test 2")
+@dbs_all
+async def test_union_all(db):
+    obj1 = await TestModel.aio_create(text="1")
+    obj2 = await TestModel.aio_create(text="2")
     query = (
-        TestModel.select().where(TestModel.id == obj1.id) |
+        TestModel.select().where(TestModel.id == obj1.id) +
+        TestModel.select().where(TestModel.id == obj2.id) +
         TestModel.select().where(TestModel.id == obj2.id)
     )
-    assert isinstance(query, peewee.ModelCompoundSelectQuery)
-    # NOTE: Two `AioModelSelect` when joining via `|` produce `ModelCompoundSelectQuery`
-    # without `aio_execute()` method, so using `database.aio_execute()` here.
-    result = await manager.database.aio_execute(query)
-    assert len(list(result)) == 2
-    assert obj1 in list(result)
-    assert obj2 in list(result)
+    result = await query.aio_execute()
+    assert sorted(r.text for r in result) == ["1", "2", "2"]
+
+
+@dbs_all
+async def test_union(db):
+    obj1 = await TestModel.aio_create(text="1")
+    obj2 = await TestModel.aio_create(text="2")
+    query = (
+        TestModel.select().where(TestModel.id == obj1.id) |
+        TestModel.select().where(TestModel.id == obj2.id) |
+        TestModel.select().where(TestModel.id == obj2.id)
+    )
+    assert isinstance(query, AioModelCompoundSelectQuery)
+    result = await query.aio_execute()
+    assert sorted(r.text for r in result) == ["1", "2"]
+
+
+@dbs_all
+async def test_intersect(db):
+    await TestModel.aio_create(text="1")
+    await TestModel.aio_create(text="2")
+    await TestModel.aio_create(text="3")
+    query = (
+        TestModel.select().where(
+            (TestModel.text == "1") | (TestModel.text == "2")
+        ) &
+        TestModel.select().where(
+            (TestModel.text == "2") | (TestModel.text == "3")
+        )
+    )
+    result = await query.aio_execute()
+    assert sorted(r.text for r in result) == ["2"]
+
+
+@dbs_all
+async def test_except(db):
+    await TestModel.aio_create(text="1")
+    await TestModel.aio_create(text="2")
+    await TestModel.aio_create(text="3")
+    query = (
+        TestModel.select().where(
+            (TestModel.text == "1") | (TestModel.text == "2") | (TestModel.text == "3")
+        ) -
+        TestModel.select().where(
+            (TestModel.text == "2")
+        )
+    )
+    result = await query.aio_execute()
+    assert sorted(r.text for r in result) == ["1", "3"]
