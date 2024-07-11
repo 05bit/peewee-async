@@ -5,17 +5,20 @@ import peewee
 import pytest
 
 import peewee_async
-from tests.conftest import manager_for_all_dbs
+from tests.conftest import manager_for_all_dbs, dbs_all
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
-from tests.models import UUIDTestModel, TestModelAlpha, CompositeTestModel, TestModel
+from tests.models import UUIDTestModel, TestModel, CompositeTestModel
 
 
-@manager_for_all_dbs
-async def test_composite_key(manager):
-    obj_uuid = await manager.create(UUIDTestModel, text='UUID')
-    obj_alpha = await manager.create(TestModelAlpha, text='Alpha')
-    comp = await manager.create(CompositeTestModel, uuid=obj_uuid, alpha=obj_alpha)
-    assert (obj_uuid, obj_alpha) == (comp.uuid, comp.alpha)
+@dbs_all
+async def test_composite_key(db):
+    task_id = 5
+    product_type = "boots"
+    comp = await CompositeTestModel.aio_create(task_id=task_id, product_type=product_type)
+    assert comp.get_id() == (task_id, product_type)
+
+
+# TODO rewrite tests below without manager. Move manager tests to compat folder
 
 
 @manager_for_all_dbs

@@ -58,11 +58,11 @@ class CompatTestModel(peewee.Model):
 
 class CompositeTestModel(peewee_async.AioModel):
     """A simple "through" table for many-to-many relationship."""
-    uuid = peewee.ForeignKeyField(UUIDTestModel)
-    alpha = peewee.ForeignKeyField(TestModelAlpha)
+    task_id = peewee.IntegerField()
+    product_type = peewee.CharField()
 
     class Meta:
-        primary_key = peewee.CompositeKey('uuid', 'alpha')
+        primary_key = peewee.CompositeKey('task_id', 'product_type')
 
 
 class IntegerTestModel(peewee_async.AioModel):
