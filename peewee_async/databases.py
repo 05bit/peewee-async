@@ -1,7 +1,7 @@
 import contextlib
 import logging
 import warnings
-from typing import Type
+from typing import Type, Optional, Any
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -18,8 +18,10 @@ class AioDatabase:
 
     pool_backend_cls: Type[PoolBackend]
 
-    def __init__(self, database, **kwargs):
+    def __init__(self, database: Optional[str], **kwargs: Any):
         super().__init__(database, **kwargs)
+        if not database:
+            raise Exception("Deferred initialization is not supported")
         self.pool_backend = self.pool_backend_cls(
             database=self.database,
             **self.connect_params_async
@@ -28,9 +30,6 @@ class AioDatabase:
     async def aio_connect(self):
         """Set up async connection on default event loop.
         """
-        if self.deferred:
-            raise Exception("Error, database not properly initialized "
-                            "before opening connection")
         await self.pool_backend.connect()
 
     @property

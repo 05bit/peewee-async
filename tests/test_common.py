@@ -178,26 +178,6 @@ async def test_connect_close(manager):
     [
         (DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()
     ]
-
-)
-async def test_deferred_init(params, db_cls):
-
-    database = db_cls(None)
-    assert database.deferred is True
-
-    database.init(**params)
-    assert database.deferred is False
-
-    TestModel._meta.database = database
-    TestModel.create_table(True)
-    TestModel.drop_table(True)
-
-
-@pytest.mark.parametrize(
-    "params, db_cls",
-    [
-        (DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()
-    ]
 )
 async def test_proxy_database(params, db_cls):
     database = peewee.Proxy()
