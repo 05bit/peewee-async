@@ -1,4 +1,5 @@
 import logging
+from typing import TypeVar, Any
 
 try:
     import aiopg
@@ -16,3 +17,5 @@ except ImportError:
 
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
+
+T_Connection = TypeVar("T_Connection", bound=Any)
