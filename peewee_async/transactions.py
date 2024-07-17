@@ -2,12 +2,12 @@ import uuid
 from types import TracebackType
 from typing import Optional, Type
 
-from peewee_async.utils import T_Connection
+from .utils import ConnectionProtocol
 
 
 class Transaction:
 
-    def __init__(self, connection: T_Connection, is_savepoint: bool=False):
+    def __init__(self, connection: ConnectionProtocol, is_savepoint: bool = False):
         self.connection = connection
         self.savepoint: Optional[str] = None
         if is_savepoint:

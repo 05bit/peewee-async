@@ -1,15 +1,15 @@
 import abc
 import asyncio
-from typing import Any, Generic
+from typing import Any, Optional
 
-from .utils import aiopg, aiomysql, T_Connection
+from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol
 
 
-class PoolBackend(Generic[T_Connection], metaclass=abc.ABCMeta):
+class PoolBackend(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
     def __init__(self, *, database: str, **kwargs: Any) -> None:
-        self.pool = None
+        self.pool: Optional[PoolProtocol] = None
         self.database = database
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()
@@ -30,7 +30,7 @@ class PoolBackend(Generic[T_Connection], metaclass=abc.ABCMeta):
             if self.is_connected is False:
                 await self.create()
 
-    async def acquire(self) -> T_Connection:
+    async def acquire(self) -> ConnectionProtocol:
         """Acquire connection from pool.
         """
         if self.pool is None:
@@ -38,7 +38,7 @@ class PoolBackend(Generic[T_Connection], metaclass=abc.ABCMeta):
         assert self.pool is not None, "Pool is not connected"
         return await self.pool.acquire()
 
-    def release(self, conn: T_Connection) -> None:
+    def release(self, conn: ConnectionProtocol) -> None:
         """Release connection to pool.
         """
         assert self.pool is not None, "Pool is not connected"
@@ -58,7 +58,7 @@ class PoolBackend(Generic[T_Connection], metaclass=abc.ABCMeta):
             await self.pool.wait_closed()
 
 
-class PostgresqlPoolBackend(PoolBackend[aiopg.Connection]):
+class PostgresqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool.
     """
 
@@ -73,7 +73,7 @@ class PostgresqlPoolBackend(PoolBackend[aiopg.Connection]):
         )
 
 
-class MysqlPoolBackend(PoolBackend[aiomysql.Connection]):
+class MysqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool.
     """
 

@@ -1,5 +1,5 @@
 import logging
-from typing import TypeVar, Any, Protocol, Optional, Sequence
+from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager
 
 try:
     import aiopg
@@ -27,5 +27,35 @@ class CursorProtocol(Protocol):
     def description(self) -> Optional[Sequence[Any]]:
         ...
 
+    async def execute(self, query: str, *args: Any, **kwargs: Any) -> None:
+        ...
 
-T_Connection = TypeVar("T_Connection", bound=Any)
+
+class ConnectionProtocol(Protocol):
+    def cursor(
+        self,
+        **kwargs: Any
+    ) -> AsyncContextManager[CursorProtocol]:
+        ...
+
+
+class PoolProtocol(Protocol):
+
+    _used: Set[ConnectionProtocol]
+
+    @property
+    def closed(self) -> bool:
+        ...
+
+    async def acquire(self) -> ConnectionProtocol:
+        ...
+
+    def release(self, conn: ConnectionProtocol) -> None:
+        ...
+
+    def terminate(self) -> None:
+        ...
+
+    async def wait_closed(self) -> None:
+        ...
+
