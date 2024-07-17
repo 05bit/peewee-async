@@ -1,5 +1,5 @@
 import logging
-from typing import TypeVar, Any
+from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager
 
 try:
     import aiopg
@@ -18,4 +18,44 @@ except ImportError:
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
 
-T_Connection = TypeVar("T_Connection", bound=Any)
+
+class CursorProtocol(Protocol):
+    async def fetchone(self) -> Any:
+        ...
+
+    @property
+    def description(self) -> Optional[Sequence[Any]]:
+        ...
+
+    async def execute(self, query: str, *args: Any, **kwargs: Any) -> None:
+        ...
+
+
+class ConnectionProtocol(Protocol):
+    def cursor(
+        self,
+        **kwargs: Any
+    ) -> AsyncContextManager[CursorProtocol]:
+        ...
+
+
+class PoolProtocol(Protocol):
+
+    _used: Set[ConnectionProtocol]
+
+    @property
+    def closed(self) -> bool:
+        ...
+
+    async def acquire(self) -> ConnectionProtocol:
+        ...
+
+    def release(self, conn: ConnectionProtocol) -> None:
+        ...
+
+    def terminate(self) -> None:
+        ...
+
+    async def wait_closed(self) -> None:
+        ...
+
