@@ -1,6 +1,6 @@
 import abc
 import asyncio
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol
 
@@ -67,9 +67,12 @@ class PostgresqlPoolBackend(PoolBackend):
         """
         if "connect_timeout" in self.connect_params:
             self.connect_params['timeout'] = self.connect_params.pop("connect_timeout")
-        self.pool = await aiopg.create_pool(
-            database=self.database,
-            **self.connect_params
+        self.pool = cast(
+            PoolProtocol,
+            await aiopg.create_pool(
+                database=self.database,
+                **self.connect_params
+            )
         )
 
 
@@ -80,6 +83,9 @@ class MysqlPoolBackend(PoolBackend):
     async def create(self) -> None:
         """Create connection pool asynchronously.
         """
-        self.pool = await aiomysql.create_pool(
-            db=self.database, **self.connect_params
+        self.pool = cast(
+            PoolProtocol,
+            await aiomysql.create_pool(
+                db=self.database, **self.connect_params
+            ),
         )
