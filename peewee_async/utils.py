@@ -24,7 +24,15 @@ class CursorProtocol(Protocol):
         ...
 
     @property
+    def lastrowid(self) -> int:
+        ...
+
+    @property
     def description(self) -> Optional[Sequence[Any]]:
+        ...
+
+    @property
+    def rowcount(self) -> int:
         ...
 
     async def execute(self, query: str, *args: Any, **kwargs: Any) -> None:

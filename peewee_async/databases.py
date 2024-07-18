@@ -213,17 +213,6 @@ class AioPostgresqlMixin(AioDatabase):
         })
         return kwargs
 
-    async def last_insert_id_async(self, cursor):
-        """Get ID of last inserted row.
-
-        NOTE: it's not clear, when this code is executed?
-        """
-        # try:
-        #     return cursor if query_type else cursor[0][0]
-        # except (IndexError, KeyError, TypeError):
-        #     pass
-        return cursor.lastrowid
-
 
 class PooledPostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
     """PosgreSQL database driver providing **single drop-in sync**
@@ -326,11 +315,6 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
             'autocommit': True,
         })
         return kwargs
-
-    async def last_insert_id_async(self, cursor):
-        """Get ID of last inserted row.
-        """
-        return cursor.lastrowid
 
 
 # DEPRECATED Databases

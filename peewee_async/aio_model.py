@@ -1,6 +1,7 @@
 import peewee
 
 from .result_wrappers import AsyncQueryWrapper
+from .utils import CursorProtocol
 
 
 async def aio_prefetch(sq, *subqueries, prefetch_type):
@@ -40,12 +41,12 @@ class AioQueryMixin:
     async def aio_execute(self, database):
         return await database.aio_execute(self)
 
-    async def make_async_query_wrapper(self, cursor):
+    async def make_async_query_wrapper(self, cursor: CursorProtocol):
         return await AsyncQueryWrapper.make_for_all_rows(cursor, self)
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
-    async def fetch_results(self, cursor):
+    async def fetch_results(self, cursor: CursorProtocol):
         if self._returning:
             return await self.make_async_query_wrapper(cursor)
         return cursor.rowcount
@@ -53,14 +54,14 @@ class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
 
 class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
 
-    async def fetch_results(self, cursor):
+    async def fetch_results(self, cursor: CursorProtocol):
         if self._returning:
             return await self.make_async_query_wrapper(cursor)
         return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
-    async def fetch_results(self, cursor):
+    async def fetch_results(self, cursor: CursorProtocol):
         if self._returning is not None and len(self._returning) > 1:
             return await self.make_async_query_wrapper(cursor)
 
@@ -68,17 +69,17 @@ class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
             row = await cursor.fetchone()
             return row[0] if row else None
         else:
-            return await self._database.last_insert_id_async(cursor)
+            return cursor.lastrowid
 
 
 class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
-    async def fetch_results(self, cursor):
+    async def fetch_results(self, cursor: CursorProtocol):
         return await self.make_async_query_wrapper(cursor)
 
 
 class AioSelectMixin(AioQueryMixin):
 
-    async def fetch_results(self, cursor):
+    async def fetch_results(self, cursor: CursorProtocol):
         return await self.make_async_query_wrapper(cursor)
 
     @peewee.database_required
