@@ -5,7 +5,11 @@ from .utils import CursorProtocol
 
 
 async def aio_prefetch(sq, *subqueries, prefetch_type):
-    """Asynchronous version of the `prefetch()` from peewee."""
+    """Asynchronous version of `prefetch()`.
+
+    See also:
+    http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#prefetch
+    """
     if not subqueries:
         return sq
 
@@ -88,6 +92,9 @@ class AioSelectMixin(AioQueryMixin):
         Get single value from ``select()`` query, i.e. for aggregation.
 
         :return: result is the same as after sync ``query.scalar()`` call
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.scalar
         """
         async def fetch_results(cursor):
             return await cursor.fetchone()
@@ -97,6 +104,12 @@ class AioSelectMixin(AioQueryMixin):
         return rows[0] if rows and not as_tuple else rows
 
     async def aio_get(self, database=None):
+        """
+        Async version of **peewee.SelectBase.get**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.get
+        """
         clone = self.paginate(1, 1)
         try:
             return (await clone.aio_execute(database))[0]
@@ -108,6 +121,12 @@ class AioSelectMixin(AioQueryMixin):
 
     @peewee.database_required
     async def aio_count(self, database, clear_limit=False):
+        """
+        Async version of **peewee.SelectBase.count**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.count
+        """
         clone = self.order_by().alias('_wrapped')
         if clear_limit:
             clone._limit = clone._offset = None
@@ -122,6 +141,12 @@ class AioSelectMixin(AioQueryMixin):
 
     @peewee.database_required
     async def aio_exists(self, database):
+        """
+        Async version of **peewee.SelectBase.exists**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.exists
+        """
         clone = self.columns(peewee.SQL('1'))
         clone._limit = 1
         clone._offset = None
@@ -144,6 +169,12 @@ class AioSelectMixin(AioQueryMixin):
     __sub__ = except_
 
     def aio_prefetch(self, *subqueries, **kwargs):
+        """
+        Async version of **peewee.ModelSelect.prefetch**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#ModelSelect.prefetch
+        """
         return aio_prefetch(self, *subqueries, **kwargs)
 
 
@@ -152,6 +183,8 @@ class AioSelect(AioSelectMixin, peewee.Select):
 
 
 class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
+    """Async version of **peewee.ModelSelect** that provides async versions of ModelSelect methods
+    """
     pass
 
 
@@ -211,6 +244,12 @@ class AioModel(peewee.Model):
         return AioModelDelete(cls)
 
     async def aio_delete_instance(self, recursive=False, delete_nullable=False):
+        """
+        Async version of **peewee.Model.delete_instance**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.delete_instance
+        """
         if recursive:
             dependencies = self.dependencies(delete_nullable)
             for query, fk in reversed(list(dependencies)):
@@ -222,6 +261,12 @@ class AioModel(peewee.Model):
         return await type(self).delete().where(self._pk_expr()).aio_execute()
 
     async def aio_save(self, force_insert=False, only=None):
+        """
+        Async version of **peewee.Model.save**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.save
+        """
         field_dict = self.__data__.copy()
         if self._meta.primary_key is not False:
             pk_field = self._meta.primary_key
@@ -266,7 +311,11 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_get(cls, *query, **filters):
-        """Async version of **peewee.Model.get**"""
+        """Async version of **peewee.Model.get**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get
+        """
         sq = cls.select()
         if query:
             if len(query) == 1 and isinstance(query[0], int):
@@ -281,6 +330,9 @@ class AioModel(peewee.Model):
     async def aio_get_or_none(cls, *query, **filters):
         """
         Async version of **peewee.Model.get_or_none**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get_or_none
         """
         try:
             return await cls.aio_get(*query, **filters)
@@ -289,12 +341,24 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_create(cls, **query):
+        """
+        Async version of **peewee.Model.create**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.create
+        """
         inst = cls(**query)
         await inst.aio_save(force_insert=True)
         return inst
 
     @classmethod
     async def aio_get_or_create(cls, **kwargs):
+        """
+        Async version of **peewee.Model.get_or_create**
+
+        See also:
+        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get_or_create
+        """
         defaults = kwargs.pop('defaults', {})
         query = cls.select()
         for field, value in kwargs.items():
