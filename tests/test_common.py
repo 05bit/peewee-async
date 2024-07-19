@@ -4,10 +4,9 @@ import uuid
 import peewee
 import pytest
 
-import peewee_async
-from tests.conftest import manager_for_all_dbs, dbs_all
+from tests.conftest import dbs_all
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
-from tests.models import UUIDTestModel, TestModel, CompositeTestModel
+from tests.models import TestModel, CompositeTestModel
 
 
 @dbs_all

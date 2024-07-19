@@ -5,7 +5,7 @@ import peewee
 import pytest
 
 import peewee_async
-from tests.conftest import manager_for_all_dbs
+from tests.compat.conftest import manager_for_all_dbs
 from tests.db_config import DB_DEFAULTS, DB_CLASSES
 from tests.models import CompositeTestModel, TestModel, UUIDTestModel
 

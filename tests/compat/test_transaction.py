@@ -1,7 +1,7 @@
 import asyncio
 
 from peewee_async import transaction, atomic
-from tests.conftest import manager_for_all_dbs
+from tests.compat.conftest import manager_for_all_dbs
 from tests.models import TestModel
 
 

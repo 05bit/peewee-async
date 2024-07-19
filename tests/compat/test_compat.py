@@ -1,7 +1,7 @@
 import uuid
 
 import peewee
-from tests.conftest import manager_for_all_dbs
+from tests.compat.conftest import manager_for_all_dbs
 from tests.models import CompatTestModel
 
 

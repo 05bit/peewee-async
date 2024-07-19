@@ -1,6 +1,6 @@
 import uuid
 
-from tests.conftest import postgres_only, manager_for_all_dbs
+from tests.compat.conftest import manager_for_all_dbs, postgres_only
 from tests.models import TestModel
 from tests.utils import model_has_fields
 
