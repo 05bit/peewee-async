@@ -4,7 +4,7 @@ import peewee
 import pytest
 
 import peewee_async
-from tests.conftest import manager_for_all_dbs
+from tests.compat.conftest import manager_for_all_dbs
 from tests.models import CompatTestModel
 from tests.models import TestModelAlpha, TestModelBeta, TestModelGamma, TestModel
 
