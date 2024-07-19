@@ -1,31 +1,19 @@
-High-level (new) API
+API Documentation
 ====================
 
-High-level API provides a single point for all async ORM calls. Meet the :class:`.Manager` class! The idea of ``Manager`` originally comes from `Django`_, but it's redesigned to meet new `asyncio`_ patterns.
-
-First of all, once ``Manager`` is initialized with database and event loop, it's easy and safe to perform async calls. And all async operations and transactions management methods are bundled with a single object. No need to pass around database instance, event loop, etc.
-
-Also there's no need to connect and re-connect before executing async queries with manager! It's all automatic. But you can run ``Manager.connect()`` or ``Manager.close()`` when you need it.
-
-.. _peewee: https://github.com/coleifer/peewee
-.. _Django: https://www.djangoproject.com
-.. _asyncio: https://docs.python.org/3/library/asyncio.html
-
-OK, let's provide an example::
+Let's provide an example::
 
     import asyncio
     import peewee
     import logging
-    from peewee_async import Manager, PostgresqlDatabase
+    from peewee_async import PostgresqlDatabase
 
-    loop = asyncio.new_event_loop() # Note: custom loop!
     database = PostgresqlDatabase('test')
-    objects = Manager(database, loop=loop)
 
--- once ``objects`` is created with specified ``loop``, all database connections **automatically** will be set up on **that loop**. Sometimes, it's so easy to forget to pass custom loop instance, but now it's not a problem! Just initialize with an event loop once.
+    # Disable sync queries
+    database.set_allow_sync(False)
 
-Let's define a simple model::
-
+    # Let's define a simple model:
     class PageBlock(peewee_async.AioModel):
         key = peewee.CharField(max_length=40, unique=True)
         text = peewee.TextField(default='')
@@ -33,11 +21,12 @@ Let's define a simple model::
         class Meta:
             database = database
 
--- as you can see, nothing special in this code, just plain ``peewee_async.AioModel`` definition.
+-- as you can see, nothing special in this code, just plain ``peewee_async.AioModel`` definition and disabling sync queries.
 
 Now we need to create a table for model::
 
-    PageBlock.create_table(True)
+    with database.allow_sync():
+       PageBlock.create_table(True)
 
 -- this code is **sync**, and will do **absolutely the same thing** as would do code with regular ``peewee.PostgresqlDatabase``. This is intentional, I believe there's just no need to run database initialization code asynchronously! *Less code, less errors*.
 
@@ -56,73 +45,41 @@ Finally, let's do something async::
 
         # Save with new text using manager
         title.text = "Peewee is SUPER awesome with async!"
-        await objects.update(title)
+        await title.aio_save()
         print("New:", title.text)
 
     loop.run_until_complete(my_async_func())
     loop.close()
 
-**That's it!**
+**That's it!** As you may notice there's no need to connect and re-connect before executing async queries! It's all automatic. But you can run ``AioDatabase.aio_connect()`` or ``AioDatabase.aio_close()`` when you need it.
 
-As you may notice you can use methods from **Manager** or from **AioModel** for operations like selecting, deleting etc.
+And you can use methods from from **AioModel** for operations like selecting, deleting etc.
 All of them are listed below.
-
-Manager
--------
-
-.. autoclass:: peewee_async.Manager
-
-.. autoattribute:: peewee_async.Manager.database
-
-.. automethod:: peewee_async.Manager.allow_sync
-
-.. automethod:: peewee_async.Manager.get
-
-.. automethod:: peewee_async.Manager.create
-
-.. automethod:: peewee_async.Manager.update
-
-.. automethod:: peewee_async.Manager.delete
-
-.. automethod:: peewee_async.Manager.get_or_create
-
-.. automethod:: peewee_async.Manager.create_or_get
-
-.. automethod:: peewee_async.Manager.execute
-
-.. automethod:: peewee_async.Manager.prefetch
-
-.. automethod:: peewee_async.Manager.count
-
-.. automethod:: peewee_async.Manager.scalar
-
-.. automethod:: peewee_async.Manager.connect
-
-.. automethod:: peewee_async.Manager.close
-
-.. automethod:: peewee_async.Manager.atomic
-
-.. automethod:: peewee_async.Manager.transaction
-
-.. automethod:: peewee_async.Manager.savepoint
 
 
 Databases
 ---------
 
-.. autoclass:: peewee_async.PostgresqlDatabase
-    :members: init
+.. autoclass:: peewee_async.databases.AioDatabase
+
+.. automethod:: peewee_async.databases.AioDatabase.aio_connect
+
+.. autoproperty:: peewee_async.databases.AioDatabase.is_connected
+
+.. automethod:: peewee_async.databases.AioDatabase.aio_close
+
+.. automethod:: peewee_async.databases.AioDatabase.aio_execute
+
+.. automethod:: peewee_async.databases.AioDatabase.set_allow_sync
+
+.. automethod:: peewee_async.databases.AioDatabase.allow_sync
+
+.. automethod:: peewee_async.databases.AioDatabase.aio_atomic
 
 .. autoclass:: peewee_async.PooledPostgresqlDatabase
     :members: init
 
-.. autoclass:: peewee_asyncext.PostgresqlExtDatabase
-    :members: init
-
 .. autoclass:: peewee_asyncext.PooledPostgresqlExtDatabase
-    :members: init
-
-.. autoclass:: peewee_async.MySQLDatabase
     :members: init
 
 .. autoclass:: peewee_async.PooledMySQLDatabase
@@ -138,3 +95,26 @@ AioModel
 .. automethod:: peewee_async.AioModel.aio_get_or_none
 
 .. automethod:: peewee_async.AioModel.aio_create
+
+.. automethod:: peewee_async.AioModel.aio_get_or_create
+
+.. automethod:: peewee_async.AioModel.aio_delete_instance
+
+.. automethod:: peewee_async.AioModel.aio_save
+
+.. autofunction:: peewee_async.aio_prefetch
+
+AioModelSelect
+--------------
+
+.. autoclass:: peewee_async.aio_model.AioModelSelect
+
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_scalar
+
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_get
+
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_count
+
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_exists
+
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_prefetch

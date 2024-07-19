@@ -1,4 +1,4 @@
-Low-level (older) API
+Deprecated API
 =====================
 
 **Note:** all query methods are **coroutines**.
@@ -34,14 +34,50 @@ Databases
     :members: connect_async, atomic_async, transaction_async, savepoint_async
     :noindex:
 
-.. autoclass:: peewee_async.PooledPostgresqlDatabase
-    :members: connect_async
-    :noindex:
-
 .. autoclass:: peewee_asyncext.PostgresqlExtDatabase
     :members: connect_async, atomic_async, transaction_async, savepoint_async
     :noindex:
 
-.. autoclass:: peewee_asyncext.PooledPostgresqlExtDatabase
-    :members: connect_async
+.. autoclass:: peewee_async.MySQLDatabase
+    :members: connect_async, atomic_async, transaction_async, savepoint_async
     :noindex:
+
+
+Manager
+-------
+
+.. autoclass:: peewee_async.Manager
+
+.. autoattribute:: peewee_async.Manager.database
+
+.. automethod:: peewee_async.Manager.allow_sync
+
+.. automethod:: peewee_async.Manager.get
+
+.. automethod:: peewee_async.Manager.create
+
+.. automethod:: peewee_async.Manager.update
+
+.. automethod:: peewee_async.Manager.delete
+
+.. automethod:: peewee_async.Manager.get_or_create
+
+.. automethod:: peewee_async.Manager.create_or_get
+
+.. automethod:: peewee_async.Manager.execute
+
+.. automethod:: peewee_async.Manager.prefetch
+
+.. automethod:: peewee_async.Manager.count
+
+.. automethod:: peewee_async.Manager.scalar
+
+.. automethod:: peewee_async.Manager.connect
+
+.. automethod:: peewee_async.Manager.close
+
+.. automethod:: peewee_async.Manager.atomic
+
+.. automethod:: peewee_async.Manager.transaction
+
+.. automethod:: peewee_async.Manager.savepoint

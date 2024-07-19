@@ -28,16 +28,18 @@ class AioDatabase:
         )
 
     async def aio_connect(self) -> None:
-        """Set up async connection on default event loop.
+        """Creates a connection pool
         """
         await self.pool_backend.connect()
 
     @property
     def is_connected(self) -> bool:
+        """Checks if pool is connected
+        """
         return self.pool_backend.is_connected
 
     async def aio_close(self) -> None:
-        """Close async connection.
+        """Terminate pool backend. The pool is closed until you run aio_connect manually
         """
         await self.pool_backend.terminate()
 
