@@ -30,6 +30,22 @@ async def test_raw_select(db):
 
 
 @dbs_all
+async def test_tuples(db):
+    obj = await TestModel.aio_create(text="Test 1")
+
+    result = await TestModel.select(TestModel.id, TestModel.text).tuples().aio_execute()
+    assert result[0] == (obj.id, obj.text)
+
+
+@dbs_all
+async def test_dicts(db):
+    obj = await TestModel.aio_create(text="Test 1")
+
+    result = await TestModel.select(TestModel.id, TestModel.text).dicts().aio_execute()
+    assert result[0] == {"id": obj.id, "text": obj.text}
+
+
+@dbs_all
 async def test_union_all(db):
     obj1 = await TestModel.aio_create(text="1")
     obj2 = await TestModel.aio_create(text="2")

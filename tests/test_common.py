@@ -18,159 +18,25 @@ async def test_composite_key(db):
     assert comp.get_id() == (task_id, product_type)
 
 
-# TODO rewrite tests below without manager. Move manager tests to compat folder
+@dbs_all
+async def test_multiple_iterate_over_result(db):
 
+    obj1 = await TestModel.aio_create(text="Test 1")
+    obj2 = await TestModel.aio_create(text="Test 2")
 
-@manager_for_all_dbs
-async def test_multiple_iterate_over_result(manager):
-
-    obj1 = await manager.create(TestModel, text="Test 1")
-    obj2 = await manager.create(TestModel, text="Test 2")
-
-    result = await manager.execute(
-        TestModel.select().order_by(TestModel.text))
+    result = await TestModel.select().order_by(TestModel.text).aio_execute()
 
     assert list(result) == [obj1, obj2]
 
 
-@manager_for_all_dbs
-async def test_indexing_result(manager):
+@dbs_all
+async def test_indexing_result(db):
 
-    await manager.create(TestModel, text="Test 1")
-    obj = await manager.create(TestModel, text="Test 2")
+    await TestModel.aio_create(text="Test 1")
+    obj = await TestModel.aio_create(text="Test 2")
 
-    result = await manager.execute(
-        TestModel.select().order_by(TestModel.text)
-    )
+    result = await TestModel.select().order_by(TestModel.text).aio_execute()
     assert obj == result[1]
-
-
-@manager_for_all_dbs
-async def test_select_many_objects(manager):
-    text = "Test 1"
-    obj1 = await manager.create(TestModel, text=text)
-    text = "Test 2"
-    obj2 = await manager.create(TestModel, text=text)
-
-    select1 = [obj1, obj2]
-    len1 = len(select1)
-
-    select2 = await manager.execute(
-        TestModel.select().order_by(TestModel.text))
-    len2 = len([o for o in select2])
-
-    assert len1 == len2
-    for o1, o2 in zip(select1, select2):
-        assert o1 == o2
-
-
-@manager_for_all_dbs
-async def test_raw_query(manager):
-
-    text = "Test %s" % uuid.uuid4()
-    await manager.create(TestModel, text=text)
-
-    result1 = await manager.execute(TestModel.raw(
-        'select id, text from testmodel'))
-    result1 = list(result1)
-    assert len(result1) == 1
-    assert isinstance(result1[0], TestModel) is True
-
-    result2 = await manager.execute(TestModel.raw(
-        'select id, text from testmodel').tuples())
-    result2 = list(result2)
-    assert len(result2) == 1
-    assert isinstance(result2[0], tuple) is True
-
-    result3 = await manager.execute(TestModel.raw(
-        'select id, text from testmodel').dicts())
-    result3 = list(result3)
-    assert len(result3) == 1
-    assert isinstance(result3[0], dict) is True
-
-
-@manager_for_all_dbs
-async def test_get_obj_by_id(manager):
-    text = "Test %s" % uuid.uuid4()
-    obj1 = await manager.create(TestModel, text=text)
-    obj2 = await manager.get(TestModel, id=obj1.id)
-
-    assert obj1 == obj2
-    assert obj1.id == obj2.id
-
-
-@manager_for_all_dbs
-async def test_get_obj_by_uuid(manager):
-
-    text = "Test %s" % uuid.uuid4()
-    obj1 = await manager.create(UUIDTestModel, text=text)
-    obj2 = await manager.get(UUIDTestModel, id=obj1.id)
-    assert obj1 == obj2
-    assert len(str(obj1.id)) == 36
-
-
-@manager_for_all_dbs
-async def test_create_uuid_obj(manager):
-
-    text = "Test %s" % uuid.uuid4()
-    obj = await manager.create(UUIDTestModel, text=text)
-    assert len(str(obj.id)) == 36
-
-
-@manager_for_all_dbs
-async def test_allow_sync_is_reverted_for_exc(manager):
-    try:
-        with manager.allow_sync():
-            ununique_text = "ununique_text"
-            await manager.create(TestModel, text=ununique_text)
-            await manager.create(TestModel, text=ununique_text)
-    except peewee.IntegrityError:
-        pass
-    assert manager.database._allow_sync is False
-
-
-@manager_for_all_dbs
-async def test_many_requests(manager):
-
-    max_connections = getattr(manager.database, 'max_connections', 1)
-    text = "Test %s" % uuid.uuid4()
-    obj = await manager.create(TestModel, text=text)
-    n = 2 * max_connections  # number of requests
-    done, not_done = await asyncio.wait(
-        {asyncio.create_task(manager.get(TestModel, id=obj.id)) for _ in range(n)}
-    )
-    assert len(done) == n
-
-
-@manager_for_all_dbs
-async def test_connect_close(manager):
-
-    async def get_conn(manager):
-        await manager.connect()
-        # await asyncio.sleep(0.05, loop=self.loop)
-        # NOTE: "private" member access
-        return manager.database.pool_backend
-
-
-    c1 = await get_conn(manager)
-    c2 = await get_conn(manager)
-    assert c1 == c2
-
-    assert manager.is_connected is True
-
-    await manager.close()
-
-    assert manager.is_connected is False
-
-    done, not_done = await asyncio.wait({asyncio.create_task(get_conn(manager)) for _ in range(3)})
-
-    conn = next(iter(done)).result()
-    assert len(done) == 3
-    assert manager.is_connected is True
-    assert all(map(lambda t: t.result() == conn, done)) is True
-
-    await manager.close()
-    assert manager.is_connected is False
 
 
 @pytest.mark.parametrize(
@@ -182,13 +48,45 @@ async def test_connect_close(manager):
 async def test_proxy_database(params, db_cls):
     database = peewee.Proxy()
     TestModel._meta.database = database
-    manager = peewee_async.Manager(database)
 
     database.initialize(db_cls(**params))
 
     TestModel.create_table(True)
 
     text = "Test %s" % uuid.uuid4()
-    await manager.create(TestModel, text=text)
-    await manager.get(TestModel, text=text)
+    await TestModel.aio_create(text=text)
+    await TestModel.aio_get(text=text)
     TestModel.drop_table(True)
+
+
+@dbs_all
+async def test_many_requests(db):
+
+    max_connections = getattr(dbs_all, 'max_connections', 1)
+    text = "Test %s" % uuid.uuid4()
+    obj = await TestModel.aio_create(text=text)
+    n = 2 * max_connections  # number of requests
+    done, not_done = await asyncio.wait(
+        {asyncio.create_task(TestModel.aio_get(id=obj.id)) for _ in range(n)}
+    )
+    assert len(done) == n
+
+
+@dbs_all
+async def test_allow_sync(db):
+    with db.allow_sync():
+        TestModel.create(text="text")
+    assert await TestModel.aio_get_or_none(text="text") is not None
+    assert db.is_closed() is True
+
+
+@dbs_all
+async def test_allow_sync_is_reverted_for_exc(db):
+    try:
+        with db.allow_sync():
+            ununique_text = "ununique_text"
+            TestModel.create(text=ununique_text)
+            TestModel.create(text=ununique_text)
+    except peewee.IntegrityError:
+        pass
+    assert db._allow_sync is False
