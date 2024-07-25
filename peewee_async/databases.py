@@ -1,12 +1,10 @@
 import contextlib
 import logging
-import warnings
 from typing import Type, Optional, Any, AsyncIterator, Iterator
 
 import peewee
 from playhouse import postgres_ext as ext
 
-from peewee_async_compat import _patch_query_with_compat_methods, savepoint
 from .connection import connection_context, ConnectionContextManager
 from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend
 from .transactions import Transaction
@@ -119,68 +117,10 @@ class AioDatabase:
                               don't need to close cursor It will be closed automatically.
         :return: result depends on query type, it's the same as for sync `query.execute()`
         """
-        # To make `Database.aio_execute` compatible with peewee's sync queries we
-        # apply optional patching, it will do nothing for Aio-counterparts:
-        _patch_query_with_compat_methods(query, None)
         ctx = self.get_sql_context()
         sql, params = ctx.sql(query).query()
         fetch_results = fetch_results or getattr(query, 'fetch_results', None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
-
-    #### Deprecated methods ####
-    def __setattr__(self, name, value) -> None:
-        if name == 'allow_sync':
-            warnings.warn(
-                "`.allow_sync` setter is deprecated, use either the "
-                "`.allow_sync()` context manager or `.set_allow_sync()` "
-                "method.", DeprecationWarning)
-            self._allow_sync = value
-        else:
-            super().__setattr__(name, value)
-
-    def atomic_async(self) -> Any:
-        """Similar to peewee `Database.atomic()` method, but returns
-        asynchronous context manager.
-        """
-        warnings.warn(
-            "`atomic_async` is deprecated, use `aio_atomic` instead.",
-            DeprecationWarning
-        )
-        return self.aio_atomic()
-
-    def savepoint_async(self, sid=None) -> Any:
-        """Similar to peewee `Database.savepoint()` method, but returns
-        asynchronous context manager.
-        """
-        warnings.warn(
-            "`savepoint` is deprecated, use `aio_atomic` instead.",
-            DeprecationWarning
-        )
-        return savepoint(self, sid=sid)
-
-    async def connect_async(self) -> None:
-        warnings.warn(
-            "`connect_async` is deprecated, use `aio_connect` instead.",
-            DeprecationWarning
-        )
-        await self.aio_connect()
-
-    async def close_async(self) -> None:
-        warnings.warn(
-            "`close_async` is deprecated, use `aio_close` instead.",
-            DeprecationWarning
-        )
-        await self.aio_close()
-
-    def transaction_async(self) -> Any:
-        """Similar to peewee `Database.transaction()` method, but returns
-        asynchronous context manager.
-        """
-        warnings.warn(
-            "`atomic_async` is deprecated, use `aio_atomic` instead.",
-            DeprecationWarning
-        )
-        return self.aio_atomic()
 
 
 class AioPostgresqlMixin(AioDatabase):
@@ -229,13 +169,6 @@ class PooledPostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
-        connection_timeout = kwargs.pop('connection_timeout', None)
-        if connection_timeout is not None:
-            warnings.warn(
-                "`connection_timeout` is deprecated, use `connect_timeout` instead.",
-                DeprecationWarning
-            )
-            kwargs['connect_timeout'] = connection_timeout
         super().init(database, **kwargs)
         self.init_async()
 
@@ -265,12 +198,6 @@ class PooledPostgresqlExtDatabase(
         self.min_connections = kwargs.pop('min_connections', 1)
         self.max_connections = kwargs.pop('max_connections', 20)
         connection_timeout = kwargs.pop('connection_timeout', None)
-        if connection_timeout is not None:
-            warnings.warn(
-                "`connection_timeout` is deprecated, use `connect_timeout` instead.",
-                DeprecationWarning
-            )
-            kwargs['connect_timeout'] = connection_timeout
         super().init(database, **kwargs)
         self.init_async(
             enable_json=True,
@@ -314,78 +241,3 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
             'autocommit': True,
         })
         return kwargs
-
-
-# DEPRECATED Databases
-
-
-class PostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
-    """PosgreSQL database driver providing **single drop-in sync** connection
-    and **single async connection** interface.
-
-    Example::
-
-        database = PostgresqlDatabase('test')
-
-    See also:
-    http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
-    """
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
-        warnings.warn(
-            "`PostgresqlDatabase` is deprecated, use `PooledPostgresqlDatabase` instead.",
-            DeprecationWarning
-        )
-        self.min_connections = 1
-        self.max_connections = 1
-        super().init(database, **kwargs)
-        self.init_async()
-
-
-class MySQLDatabase(PooledMySQLDatabase):
-    """MySQL database driver providing **single drop-in sync** connection
-    and **single async connection** interface.
-
-    Example::
-
-        database = MySQLDatabase('test')
-
-    See also:
-    http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
-    """
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
-        warnings.warn(
-            "`MySQLDatabase` is deprecated, use `PooledMySQLDatabase` instead.",
-            DeprecationWarning
-        )
-        super().init(database, **kwargs)
-        self.min_connections = 1
-        self.max_connections = 1
-
-
-class PostgresqlExtDatabase(AioPostgresqlMixin, ext.PostgresqlExtDatabase):
-    """PosgreSQL database extended driver providing **single drop-in sync**
-    connection and **single async connection** interface.
-
-    JSON fields support is always enabled, HStore supports is enabled by
-    default, but can be disabled with ``register_hstore=False`` argument.
-
-    Example::
-
-        database = PostgresqlExtDatabase('test', register_hstore=False)
-
-    See also:
-    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
-    """
-
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
-        warnings.warn(
-            "`PostgresqlExtDatabase` is deprecated, use `PooledPostgresqlExtDatabase` instead.",
-            DeprecationWarning
-        )
-        self.min_connections = 1
-        self.max_connections = 1
-        super().init(database, **kwargs)
-        self.init_async(
-            enable_json=True,
-            enable_hstore=self._register_hstore
-        )

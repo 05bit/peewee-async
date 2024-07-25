@@ -47,15 +47,6 @@ class UUIDTestModel(peewee_async.AioModel):
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
-class CompatTestModel(peewee.Model):
-    id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
-    text = peewee.CharField(max_length=100, unique=True)
-    data = peewee.TextField(default='')
-
-    def __str__(self):
-        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
-
-
 class CompositeTestModel(peewee_async.AioModel):
     """A simple "through" table for many-to-many relationship."""
     task_id = peewee.IntegerField()
@@ -72,5 +63,5 @@ class IntegerTestModel(peewee_async.AioModel):
 
 ALL_MODELS = (
     TestModel, UUIDTestModel, TestModelAlpha, TestModelBeta, TestModelGamma,
-    CompatTestModel, CompositeTestModel, IntegerTestModel
+    CompositeTestModel, IntegerTestModel
 )

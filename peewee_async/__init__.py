@@ -16,17 +16,12 @@ Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 from importlib.metadata import version
 
 from playhouse.db_url import register_database
-
-from peewee_async_compat import count, execute, prefetch, scalar, savepoint, atomic, transaction, Manager
 from .aio_model import aio_prefetch, AioModel
 from .connection import connection_context
 from .databases import (
     PooledPostgresqlDatabase,
     PooledPostgresqlExtDatabase,
     PooledMySQLDatabase,
-    PostgresqlDatabase,
-    MySQLDatabase,
-    PostgresqlExtDatabase
 )
 from .pool import PostgresqlPoolBackend, MysqlPoolBackend
 from .transactions import Transaction
@@ -44,25 +39,8 @@ __all__ = [
     'connection_context',
     'PostgresqlPoolBackend',
     'MysqlPoolBackend',
-
-    # Compatibility API (deprecated in v1.0 release)
-    'Manager',
-    'execute',
-    'count',
-    'scalar',
-    'prefetch',
-    'atomic',
-    'transaction',
-    'savepoint',
 ]
 
 register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
 register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
-
-
-# DEPRECATED Databases
-
-register_database(PostgresqlDatabase, 'postgres+async', 'postgresql+async')
-register_database(MySQLDatabase, 'mysql+async')
-register_database(PostgresqlExtDatabase, 'postgresext+async', 'postgresqlext+async')
