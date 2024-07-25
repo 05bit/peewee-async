@@ -14,7 +14,7 @@ Overview
 * Requires Python 3.8+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
-* Single point for high-level async API
+* Asynchronous analogues of peewee sync methods with prefix aio_
 * Drop-in replacement for sync code, sync will remain sync
 * Basic operations are supported
 * Transactions support is present, yet not heavily tested
@@ -53,7 +53,7 @@ import peewee_async
 
 # Nothing special, just define model and database:
 
-database = peewee_async.PostgresqlDatabase(
+database = peewee_async.PooledPostgresqlDatabase(
     database='db_name',
     user='user',
     host='127.0.0.1',
@@ -61,7 +61,7 @@ database = peewee_async.PostgresqlDatabase(
     password='password',
 )
 
-class TestModel(peewee.Model):
+class TestModel(peewee_async.AioModel):
     text = peewee.CharField()
 
     class Meta:
@@ -73,17 +73,13 @@ TestModel.create_table(True)
 TestModel.create(text="Yo, I can do it sync!")
 database.close()
 
-# Create async models manager:
-
-objects = peewee_async.Manager(database)
-
 # No need for sync anymore!
 
 database.set_allow_sync(False)
 
 async def handler():
-    await objects.create(TestModel, text="Not bad. Watch this, I'm async!")
-    all_objects = await objects.execute(TestModel.select())
+    await TestModel.aio_create(text="Not bad. Watch this, I'm async!")
+    all_objects = await TestModel.select().aio_execute()
     for obj in all_objects:
         print(obj.text)
 
@@ -92,7 +88,7 @@ loop.run_until_complete(handler())
 loop.close()
 
 # Clean up, can do it sync again:
-with objects.allow_sync():
+with database.allow_sync():
     TestModel.drop_table(True)
 
 # Expected output:

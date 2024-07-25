@@ -4,8 +4,8 @@ import os
 from secrets import token_hex
 from datetime import datetime
 from aiohttp import web
-from peewee import Model, CharField, TextField, DateTimeField
-from peewee_async import PooledPostgresqlDatabase, Manager
+from peewee import CharField, TextField, DateTimeField
+from peewee_async import PooledPostgresqlDatabase, AioModel
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,12 @@ database = PooledPostgresqlDatabase(
     max_connections=10,
 )
 
-objects = Manager(database)
-
 app = web.Application()
 
 routes = web.RouteTableDef()
 
 
-class Post(Model):
+class Post(AioModel):
     title = CharField(unique=True)
     key = CharField(unique=True, default=lambda: token_hex(8))
     text = TextField()
@@ -48,7 +46,7 @@ def add_post(title, text):
 async def get_post_endpoint(request):
     query = dict(request.query)
     post_id = query.pop('p', 1)
-    post = await objects.get_or_none(Post, id=post_id)
+    post = await Post.aio_get_or_none(id=post_id)
     if post:
         return web.Response(text=post.text)
     else:
@@ -68,10 +66,10 @@ async def update_post_endpoint(request):
     except Exception as exc:
         return web.Response(text=str(exc), status=400)
 
-    post = await objects.get_or_none(Post, id=post_id)
+    post = await Post.aio_get_or_none(id=post_id)
     if post:
         post.text = text
-        await objects.update(post)
+        await post.aio_save()
         return web.Response(text=post.text)
     else:
         return web.Response(text="Not found", status=404)

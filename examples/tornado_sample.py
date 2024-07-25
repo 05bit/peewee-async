@@ -26,14 +26,16 @@ from tornado.platform.asyncio import AsyncIOMainLoop
 # Set up database and manager
 database = peewee_async.PooledPostgresqlDatabase('test')
 
+
 # Define model
-class TestNameModel(peewee.Model):
+class TestNameModel(peewee_async.AioModel):
     name = peewee.CharField()
     class Meta:
         database = database
 
     def __str__(self):
         return self.name
+
 
 # Create table, add some instances
 TestNameModel.create_table(True)
@@ -45,7 +47,8 @@ database.close()
 AsyncIOMainLoop().install()
 app = tornado.web.Application(debug=True)
 app.listen(port=8888)
-app.objects = peewee_async.Manager(database)
+app.database = database
+
 
 # Add handlers
 class RootHandler(tornado.web.RequestHandler):
@@ -56,7 +59,7 @@ class RootHandler(tornado.web.RequestHandler):
     """
     async def post(self):
         name = self.get_argument('name')
-        obj = await self.application.objects.create(TestNameModel, name=name)
+        obj = await TestNameModel.aio_create(name=name)
         self.write({
             'id': obj.id,
             'name': obj.name
@@ -70,13 +73,14 @@ class RootHandler(tornado.web.RequestHandler):
             return
 
         try:
-            obj = await self.application.objects.get(TestNameModel, id=obj_id)
+            obj = await TestNameModel.aio_get(id=obj_id)
             self.write({
                 'id': obj.id,
                 'name': obj.name,
             })
         except TestNameModel.DoesNotExist:
             raise tornado.web.HTTPError(404, "Object not found!")
+
 
 class CreateHandler(tornado.web.RequestHandler):
     async def get(self):
@@ -95,11 +99,12 @@ class CreateHandler(tornado.web.RequestHandler):
 
     async def get_or_create(self):
         obj_id = self.get_argument('id', None)
-        async with self.application.objects.atomic():
-            obj, created = await self.application.objects.get_or_create(
-                TestNameModel, id=obj_id,
+        async with self.application.database.aio_atomic():
+            obj, created = await TestNameModel.aio_get_or_create(
+                id=obj_id,
                 defaults={'name': "TestNameModel id=%s" % obj_id})
             return obj
+
 
 app.add_handlers('', [
     (r"/", RootHandler),
