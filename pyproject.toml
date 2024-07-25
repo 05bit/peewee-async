@@ -1,10 +1,9 @@
 [tool.poetry]
 name = "peewee-async"
-version = "0.10.1-beta"
+version = "1.0.0"
 description = "Asynchronous interface for peewee ORM powered by asyncio."
 authors = ["Alexey Kinev <rudy@05bit.com>", "Gorshkov Nikolay(contributor) <nogamemorebrain@gmail.com>"]
 readme = "README.md"
-include = ["peewee_async_compat.py", "peewee_asyncext.py"]
 
 
 [tool.poetry.dependencies]
