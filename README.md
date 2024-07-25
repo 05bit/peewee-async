@@ -14,7 +14,7 @@ Overview
 * Requires Python 3.8+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
-* Single point for high-level async API
+* Asynchronous analogues of peewee sync methods with prefix aio_
 * Drop-in replacement for sync code, sync will remain sync
 * Basic operations are supported
 * Transactions support is present, yet not heavily tested
