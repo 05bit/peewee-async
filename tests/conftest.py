@@ -41,13 +41,11 @@ async def db(request):
 
 
 PG_DBS = [
-    "postgres",
-    "postgres-ext",
     "postgres-pool",
     "postgres-pool-ext"
 ]
 
-MYSQL_DBS = ["mysql", "mysql-pool"]
+MYSQL_DBS = ["mysql-pool"]
 
 
 dbs_postgres = pytest.mark.parametrize(
@@ -58,6 +56,5 @@ dbs_postgres = pytest.mark.parametrize(
 dbs_all = pytest.mark.parametrize(
     "db", PG_DBS + MYSQL_DBS, indirect=["db"]
 )
-
 
 

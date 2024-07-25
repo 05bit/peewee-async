@@ -16,8 +16,6 @@ docker compose up postgres
 
 ## Example for `aiohttp` server
 
-The example `aiohttp_example.py` is using older interface with `Manager` class. The `Manager`
-will be deprecated in v1.0 but we aim to support it until that milestone.
 
 Define database connection settings if needed, environment variables used:
 
