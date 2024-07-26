@@ -32,7 +32,7 @@ import peewee_async
 
 
 logging.basicConfig()
-pg_db = peewee_async.PooledPostgresqlDatabase(
+database = peewee_async.PooledPostgresqlDatabase(
     database='postgres',
     user='postgres',
     password='postgres',
@@ -42,14 +42,6 @@ pg_db = peewee_async.PooledPostgresqlDatabase(
 )
 
 
-class Manager(peewee_async.Manager):
-    """Async models manager."""
-
-    database = pg_db
-
-
-manager = Manager()
-
 
 def setup_logging():
     logger = logging.getLogger("uvicorn.error")
@@ -57,21 +49,21 @@ def setup_logging():
     logger.addHandler(handler)
 
 
-class MySimplestModel(peewee.Model):
+class MySimplestModel(peewee_async.AioModel):
     id = peewee.IntegerField(primary_key=True, sequence=True)
 
     class Meta:
-        database = pg_db
+        database = database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await manager.database.aio_execute_sql('CREATE TABLE IF NOT EXISTS MySimplestModel (id SERIAL PRIMARY KEY);')
-    await manager.database.aio_execute_sql('TRUNCATE TABLE MySimplestModel;')
+    await database.aio_execute_sql('CREATE TABLE IF NOT EXISTS MySimplestModel (id SERIAL PRIMARY KEY);')
+    await database.aio_execute_sql('TRUNCATE TABLE MySimplestModel;')
     setup_logging()
     yield
     # Clean up the ML models and release the resources
-    await manager.close()
+    await database.aio_close()
 
 app = FastAPI(lifespan=lifespan)
 errors = set()
@@ -80,7 +72,7 @@ errors = set()
 @app.get("/select")
 async def select():
     try:
-        await manager.execute(MySimplestModel.select())
+        await MySimplestModel.select().aio_execute()
     except Exception as e:
         errors.add(str(e))
         raise
@@ -88,20 +80,20 @@ async def select():
 
 
 async def nested_transaction():
-    async with manager.transaction():
-        await manager.execute(MySimplestModel.update(id=1))
+    async with database.aio_atomic():
+        await MySimplestModel.update(id=1).aio_execute()
 
 
 async def nested_atomic():
-    async with manager.database.aio_atomic():
-        await manager.database.aio_execute(MySimplestModel.update(id=1))
+    async with database.aio_atomic():
+        await MySimplestModel.update(id=1).aio_execute()
 
 
 @app.get("/transaction")
 async def transaction():
     try:
-        async with manager.transaction():
-            await manager.execute(MySimplestModel.update(id=1))
+        async with database.aio_atomic():
+            await MySimplestModel.update(id=1).aio_execute()
             await nested_transaction()
     except Exception as e:
         errors.add(str(e))
@@ -112,8 +104,8 @@ async def transaction():
 @app.get("/atomic")
 async def atomic():
     try:
-        async with manager.database.aio_atomic():
-            await manager.database.aio_execute(MySimplestModel.update(id=1))
+        async with database.aio_atomic():
+            await MySimplestModel.update(id=1).aio_execute()
             await nested_atomic()
     except Exception as e:
         errors.add(str(e))
@@ -123,8 +115,8 @@ async def atomic():
 
 @app.get("/recreate_pool")
 async def atomic():
-    await manager.database.aio_close()
-    await manager.database.aio_connect()
+    await database.aio_close()
+    await database.aio_connect()
 
 
 if __name__ == "__main__":
