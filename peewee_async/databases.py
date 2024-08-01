@@ -1,6 +1,6 @@
 import contextlib
 import logging
-from typing import Type, Optional, Any, AsyncIterator, Iterator
+from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -18,7 +18,7 @@ class AioDatabase(peewee.Database):
     pool_backend: PoolBackend
 
     @property
-    def connect_params_async(self) -> dict[str, Any]:
+    def connect_params_async(self) -> Dict[str, Any]:
         ...
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
@@ -259,7 +259,7 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
         super().init(database, **kwargs)
 
     @property
-    def connect_params_async(self) -> dict[str, Any]:
+    def connect_params_async(self) -> Dict[str, Any]:
         """Connection parameters for `aiomysql.Connection`
         """
         kwargs = self.connect_params.copy()
