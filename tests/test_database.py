@@ -1,7 +1,9 @@
 import pytest
 
 from peewee_async import connection_context
-from tests.conftest import dbs_all
+from peewee_async.databases import AioDatabase
+from tests.conftest import dbs_all, MYSQL_DBS, PG_DBS
+from tests.db_config import DB_DEFAULTS, DB_CLASSES
 from tests.models import TestModel
 
 
@@ -53,3 +55,20 @@ async def test_aio_close_idempotent(db):
 
     await db.aio_close()
     assert db.is_connected is False
+
+
+@pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
+async def test_deferred_init(db_name):
+    init_params = DB_DEFAULTS[db_name]
+    database_host = init_params.pop('database')
+    init_params['database'] = None
+
+    database: AioDatabase = DB_CLASSES[db_name](**init_params)
+
+    with pytest.raises(Exception, match='Cannot create connection before db inited'):
+        await database.aio_execute_sql(sql='SELECT 1;')
+
+    init_params['database'] = database_host
+    database.init(**init_params)
+
+    await database.aio_connect()
