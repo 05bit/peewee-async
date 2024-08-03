@@ -9,7 +9,7 @@ PG_DEFAULTS = {
     'port': int(os.environ.get('POSTGRES_PORT', 5432)),
     'password': 'postgres',
     'user': 'postgres',
-    'connect_timeout': 30
+    'connection_timeout': 30
 }
 
 MYSQL_DEFAULTS = {
@@ -18,7 +18,7 @@ MYSQL_DEFAULTS = {
     'port': int(os.environ.get('MYSQL_PORT', 3306)),
     'user': 'root',
     'password': 'mysql',
-    'connect_timeout': 30
+    'connection_timeout': 30
 }
 
 DB_DEFAULTS = {
