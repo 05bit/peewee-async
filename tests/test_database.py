@@ -59,16 +59,11 @@ async def test_aio_close_idempotent(db):
 
 @pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
 async def test_deferred_init(db_name):
-    init_params = DB_DEFAULTS[db_name]
-    database_host = init_params.pop('database')
-    init_params['database'] = None
+    database: AioDatabase = DB_CLASSES[db_name](None)
 
-    database: AioDatabase = DB_CLASSES[db_name](**init_params)
-
-    with pytest.raises(Exception, match='Cannot create connection before db inited'):
+    with pytest.raises(Exception, match='Error, database must be initialized before creating a connection pool'):
         await database.aio_execute_sql(sql='SELECT 1;')
 
-    init_params['database'] = database_host
-    database.init(**init_params)
+    database.init(**DB_DEFAULTS[db_name])
 
-    await database.aio_connect()
+    await database.aio_execute_sql(sql='SELECT 1;')

@@ -32,7 +32,7 @@ class AioDatabase(peewee.Database):
         """Creates a connection pool
         """
         if self.deferred:
-            raise Exception('Cannot connect before db inited')
+            raise Exception('Error, database must be initialized before creating a connection pool')
         await self.pool_backend.connect()
 
     @property
@@ -45,7 +45,7 @@ class AioDatabase(peewee.Database):
         """Terminate pool backend. The pool is closed until you run aio_connect manually
         """
         if self.deferred:
-            raise Exception('Cannot connect before db inited')
+            raise Exception('Error, database must be initialized before creating a connection pool')
 
         await self.pool_backend.terminate()
 
@@ -108,7 +108,7 @@ class AioDatabase(peewee.Database):
 
     def aio_connection(self) -> ConnectionContextManager:
         if self.deferred:
-            raise Exception('Cannot create connection before db inited')
+            raise Exception('Error, database must be initialized before creating a connection pool')
 
         return ConnectionContextManager(self.pool_backend)
 

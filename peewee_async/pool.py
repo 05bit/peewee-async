@@ -9,7 +9,7 @@ class PoolBackend(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
 
-    def __init__(self, *, database: Optional[str] = None, **kwargs: Any) -> None:
+    def __init__(self, *, database: str, **kwargs: Any) -> None:
         self.pool: Optional[PoolProtocol] = None
         self.database = database
         self.connect_params = kwargs
