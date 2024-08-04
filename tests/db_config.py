@@ -7,7 +7,8 @@ PG_DEFAULTS = {
     'port': int(os.environ.get('POSTGRES_PORT', 5432)),
     'password': 'postgres',
     'user': 'postgres',
-    'connect_timeout': 30
+    'connect_timeout': 30,
+    "enable_json": False
 }
 
 MYSQL_DEFAULTS = {
