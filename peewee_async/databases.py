@@ -354,14 +354,16 @@ class PostgresqlDatabase(PooledPostgresqlDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
     """
+
+    min_connections: int = 1
+    max_connections: int = 1
+
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         warnings.warn(
             "`PostgresqlDatabase` is deprecated, use `PooledPostgresqlDatabase` instead.",
             DeprecationWarning
         )
         super().init(database, **kwargs)
-        self.min_connections = 1
-        self.max_connections = 1
 
 
 class MySQLDatabase(PooledMySQLDatabase):
@@ -375,14 +377,16 @@ class MySQLDatabase(PooledMySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
+
+    min_connections: int = 1
+    max_connections: int = 1
+
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         warnings.warn(
             "`MySQLDatabase` is deprecated, use `PooledMySQLDatabase` instead.",
             DeprecationWarning
         )
         super().init(database, **kwargs)
-        self.min_connections = 1
-        self.max_connections = 1
 
 
 class PostgresqlExtDatabase(PooledPostgresqlExtDatabase):
@@ -400,12 +404,12 @@ class PostgresqlExtDatabase(PooledPostgresqlExtDatabase):
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
 
+    min_connections: int = 1
+    max_connections: int = 1
+
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         warnings.warn(
             "`PostgresqlExtDatabase` is deprecated, use `PooledPostgresqlExtDatabase` instead.",
             DeprecationWarning
         )
-
         super().init(database, **kwargs)
-        self.min_connections = 1
-        self.max_connections = 1
