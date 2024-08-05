@@ -25,6 +25,7 @@ async def db(request):
 
     params = DB_DEFAULTS[db]
     database = DB_CLASSES[db](**params)
+
     database._allow_sync = False
     with database.allow_sync():
         for model in ALL_MODELS:

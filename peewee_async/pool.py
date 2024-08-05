@@ -8,6 +8,7 @@ from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol
 class PoolBackend(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool.
     """
+
     def __init__(self, *, database: str, **kwargs: Any) -> None:
         self.pool: Optional[PoolProtocol] = None
         self.database = database

@@ -1,7 +1,9 @@
 import pytest
 
 from peewee_async import connection_context
-from tests.conftest import dbs_all
+from peewee_async.databases import AioDatabase
+from tests.conftest import dbs_all, MYSQL_DBS, PG_DBS
+from tests.db_config import DB_DEFAULTS, DB_CLASSES
 from tests.models import TestModel
 
 
@@ -53,3 +55,15 @@ async def test_aio_close_idempotent(db):
 
     await db.aio_close()
     assert db.is_connected is False
+
+
+@pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
+async def test_deferred_init(db_name):
+    database: AioDatabase = DB_CLASSES[db_name](None)
+
+    with pytest.raises(Exception, match='Error, database must be initialized before creating a connection pool'):
+        await database.aio_execute_sql(sql='SELECT 1;')
+
+    database.init(**DB_DEFAULTS[db_name])
+
+    await database.aio_execute_sql(sql='SELECT 1;')
