@@ -8,7 +8,6 @@ PG_DEFAULTS = {
     'password': 'postgres',
     'user': 'postgres',
     'connect_timeout': 30,
-    "enable_json": False
 }
 
 MYSQL_DEFAULTS = {

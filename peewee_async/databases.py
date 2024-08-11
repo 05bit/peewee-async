@@ -8,7 +8,7 @@ from playhouse import postgres_ext as ext
 from .connection import connection_context, ConnectionContextManager
 from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend
 from .transactions import Transaction
-from .utils import psycopg2, aiopg, pymysql, aiomysql, __log__
+from .utils import aiopg, aiomysql, __log__
 
 
 class AioDatabase(peewee.Database):
@@ -22,6 +22,7 @@ class AioDatabase(peewee.Database):
         super().__init__(*args, **kwargs)
 
     def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
+        # TODO remove minsize, maxsize maybe
         minsize = kwargs.pop("minsize", 1)
         maxsize = kwargs.pop("maxsize", 20)
         minsize = kwargs.pop("min_connections", minsize)
@@ -32,7 +33,6 @@ class AioDatabase(peewee.Database):
             {
                 "minsize": minsize,
                 "maxsize": maxsize,
-                "autocommit": True
             }
         )
 
@@ -198,8 +198,10 @@ class PooledPostgresqlExtDatabase(
     def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
         super().init_pool_connect_params(**kwargs)
         self.pool_connect_params.update({
+            # TODO enable_json already true by default should be removed?
             "enable_json": kwargs.pop("enable_json", True),
             "enable_hstore": self._register_hstore
+            # TODO _register_hstore should be true by default?
         })
 
 
@@ -222,3 +224,9 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
         super().init(database, **kwargs)
+
+    def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
+        super().init_pool_connect_params(**kwargs)
+        self.pool_connect_params.update({
+            "autocommit": kwargs.pop("autocommit", True)
+        })
