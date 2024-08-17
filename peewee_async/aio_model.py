@@ -45,6 +45,9 @@ class AioQueryMixin:
     async def aio_execute(self, database):
         return await database.aio_execute(self)
 
+    async def fetch_results(self, cursor: CursorProtocol):
+        return await fetch_models(cursor, self)
+
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
     async def fetch_results(self, cursor: CursorProtocol):
@@ -74,14 +77,10 @@ class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
 
 
 class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol):
-        return await fetch_models(cursor, self)
+    pass
 
 
 class AioSelectMixin(AioQueryMixin):
-
-    async def fetch_results(self, cursor: CursorProtocol):
-        return await fetch_models(cursor, self)
 
     @peewee.database_required
     async def aio_scalar(self, database, as_tuple=False):
