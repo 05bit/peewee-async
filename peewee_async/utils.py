@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager
+from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager, List
 
 try:
     import aiopg
@@ -21,6 +21,9 @@ __log__.addHandler(logging.NullHandler())
 
 class CursorProtocol(Protocol):
     async def fetchone(self) -> Any:
+        ...
+
+    async def fetchall(self) -> List[Any]:
         ...
 
     @property

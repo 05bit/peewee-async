@@ -54,6 +54,7 @@ async def test_count_query(db):
     for num in range(5):
         await IntegerTestModel.aio_create(num=num)
     count = await IntegerTestModel.select().limit(3).aio_count()
+    print(type(count))
     assert count == 3
 
 

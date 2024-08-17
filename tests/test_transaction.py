@@ -2,8 +2,10 @@ import asyncio
 
 import pytest
 from peewee import IntegrityError
+from pytest_mock import MockerFixture
 
 from peewee_async import Transaction
+from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
 from tests.models import TestModel
 
@@ -13,7 +15,7 @@ class FakeConnectionError(Exception):
 
 
 @dbs_all
-async def test_transaction_error_on_begin(db, mocker):
+async def test_transaction_error_on_begin(db: AioDatabase, mocker: MockerFixture) -> None:
     mocker.patch.object(Transaction, "begin", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
         async with db.aio_atomic():
@@ -22,7 +24,7 @@ async def test_transaction_error_on_begin(db, mocker):
 
 
 @dbs_all
-async def test_transaction_error_on_commit(db, mocker):
+async def test_transaction_error_on_commit(db: AioDatabase, mocker: MockerFixture) -> None:
     mocker.patch.object(Transaction, "commit", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
         async with db.aio_atomic():
@@ -31,7 +33,7 @@ async def test_transaction_error_on_commit(db, mocker):
 
 
 @dbs_all
-async def test_transaction_error_on_rollback(db, mocker):
+async def test_transaction_error_on_rollback(db: AioDatabase, mocker: MockerFixture) -> None:
     await TestModel.aio_create(text='FOO', data="")
     mocker.patch.object(Transaction, "rollback", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
@@ -44,7 +46,7 @@ async def test_transaction_error_on_rollback(db, mocker):
 
 
 @dbs_all
-async def test_transaction_success(db):
+async def test_transaction_success(db: AioDatabase) -> None:
     async with db.aio_atomic():
         await TestModel.aio_create(text='FOO')
 
@@ -53,7 +55,7 @@ async def test_transaction_success(db):
 
 
 @dbs_all
-async def test_transaction_rollback(db):
+async def test_transaction_rollback(db: AioDatabase) -> None:
     await TestModel.aio_create(text='FOO', data="")
 
     with pytest.raises(IntegrityError):
@@ -67,22 +69,22 @@ async def test_transaction_rollback(db):
 
 
 @dbs_all
-async def test_several_transactions(db):
+async def test_several_transactions(db: AioDatabase) -> None:
     """Run several transactions in parallel tasks.
     """
 
-    async def t1():
+    async def t1() -> None:
         async with db.aio_atomic():
             await TestModel.aio_create(text='FOO1', data="")
 
-    async def t2():
+    async def t2() -> None:
         async with db.aio_atomic():
             await TestModel.aio_create(text='FOO2', data="")
             with pytest.raises(IntegrityError):
                 async with db.aio_atomic():
                     await TestModel.aio_create(text='FOO2', data="not_created")
 
-    async def t3():
+    async def t3() -> None:
         async with db.aio_atomic():
             await TestModel.aio_create(text='FOO3', data="")
             async with db.aio_atomic():
@@ -97,7 +99,7 @@ async def test_several_transactions(db):
 
 
 @dbs_all
-async def test_transaction_manual_work(db):
+async def test_transaction_manual_work(db: AioDatabase) -> None:
     async with db.aio_connection() as connection:
         tr = Transaction(connection)
         await tr.begin()
@@ -115,7 +117,7 @@ async def test_transaction_manual_work(db):
 
 
 @dbs_all
-async def test_savepoint_success(db):
+async def test_savepoint_success(db: AioDatabase) -> None:
     async with db.aio_atomic():
         await TestModel.aio_create(text='FOO')
 
@@ -127,7 +129,7 @@ async def test_savepoint_success(db):
 
 
 @dbs_all
-async def test_savepoint_rollback(db):
+async def test_savepoint_rollback(db: AioDatabase) -> None:
     await TestModel.aio_create(text='FOO', data="")
 
     async with db.aio_atomic():
@@ -142,7 +144,7 @@ async def test_savepoint_rollback(db):
 
 
 @dbs_all
-async def test_savepoint_manual_work(db):
+async def test_savepoint_manual_work(db: AioDatabase) -> None:
     async with db.aio_connection() as connection:
         tr = Transaction(connection)
         await tr.begin()
@@ -164,7 +166,7 @@ async def test_savepoint_manual_work(db):
 
 
 @dbs_all
-async def test_acid_when_connetion_has_been_broken(db):
+async def test_acid_when_connetion_has_been_broken(db: AioDatabase) -> None:
     async def restart_connections(event_for_lock: asyncio.Event) -> None:
         event_for_lock.set()
         await asyncio.sleep(0.05)
@@ -181,7 +183,7 @@ async def test_acid_when_connetion_has_been_broken(db):
         event_for_lock.set()
         return None
 
-    async def insert_records(event_for_wait: asyncio.Event):
+    async def insert_records(event_for_wait: asyncio.Event) -> None:
         await event_for_wait.wait()
         async with db.aio_atomic():
             # BEGIN
