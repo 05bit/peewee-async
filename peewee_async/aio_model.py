@@ -1,6 +1,6 @@
 import peewee
 
-from .result_wrappers import AsyncQueryWrapper
+from .result_wrappers import fetch_models
 from .utils import CursorProtocol
 
 
@@ -45,14 +45,14 @@ class AioQueryMixin:
     async def aio_execute(self, database):
         return await database.aio_execute(self)
 
-    async def make_async_query_wrapper(self, cursor: CursorProtocol):
-        return await AsyncQueryWrapper.make_for_all_rows(cursor, self)
+    async def fetch_results(self, cursor: CursorProtocol):
+        return await fetch_models(cursor, self)
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
     async def fetch_results(self, cursor: CursorProtocol):
         if self._returning:
-            return await self.make_async_query_wrapper(cursor)
+            return await fetch_models(cursor, self)
         return cursor.rowcount
 
 
@@ -60,14 +60,14 @@ class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
 
     async def fetch_results(self, cursor: CursorProtocol):
         if self._returning:
-            return await self.make_async_query_wrapper(cursor)
+            return await fetch_models(cursor, self)
         return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
     async def fetch_results(self, cursor: CursorProtocol):
         if self._returning is not None and len(self._returning) > 1:
-            return await self.make_async_query_wrapper(cursor)
+            return await fetch_models(cursor, self)
 
         if self._returning:
             row = await cursor.fetchone()
@@ -77,14 +77,10 @@ class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
 
 
 class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol):
-        return await self.make_async_query_wrapper(cursor)
+    pass
 
 
 class AioSelectMixin(AioQueryMixin):
-
-    async def fetch_results(self, cursor: CursorProtocol):
-        return await self.make_async_query_wrapper(cursor)
 
     @peewee.database_required
     async def aio_scalar(self, database, as_tuple=False):
