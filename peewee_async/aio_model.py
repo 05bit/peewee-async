@@ -1,5 +1,7 @@
 import peewee
 from peewee import PREFETCH_TYPE
+
+from .databases import AioDatabase
 from .result_wrappers import fetch_models
 from .utils import CursorProtocol
 from typing_extensions import Self
@@ -44,7 +46,7 @@ async def aio_prefetch(sq, *subqueries, prefetch_type: PREFETCH_TYPE = PREFETCH_
 
 class AioQueryMixin:
     @peewee.database_required
-    async def aio_execute(self, database) -> Any:
+    async def aio_execute(self, database: AioDatabase) -> Any:
         return await database.aio_execute(self)
 
     async def fetch_results(self, cursor: CursorProtocol) -> List[Any]:
@@ -244,7 +246,7 @@ class AioModel(peewee.Model):
     def delete(cls) -> AioModelDelete:
         return AioModelDelete(cls)
 
-    async def aio_delete_instance(self, recursive=False, delete_nullable=False):
+    async def aio_delete_instance(self, recursive: bool = False, delete_nullable: bool = False) -> int:
         """
         Async version of **peewee.Model.delete_instance**
 
@@ -259,9 +261,9 @@ class AioModel(peewee.Model):
                     await model.update(**{fk.name: None}).where(query).aio_execute()
                 else:
                     await model.delete().where(query).aio_execute()
-        return await type(self).delete().where(self._pk_expr()).aio_execute()
+        return cast(int, await type(self).delete().where(self._pk_expr()).aio_execute())
 
-    async def aio_save(self, force_insert=False, only=None):
+    async def aio_save(self, force_insert: bool = False, only=None) -> int:
         """
         Async version of **peewee.Model.save**
 

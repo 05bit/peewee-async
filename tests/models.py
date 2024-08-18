@@ -9,7 +9,7 @@ class TestModel(peewee_async.AioModel):
     text = peewee.CharField(max_length=100, unique=True)
     data = peewee.TextField(default='')
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
@@ -17,7 +17,7 @@ class TestModelAlpha(peewee_async.AioModel):
     __test__ = False
     text = peewee.CharField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
@@ -26,7 +26,7 @@ class TestModelBeta(peewee_async.AioModel):
     alpha = peewee.ForeignKeyField(TestModelAlpha, backref='betas')
     text = peewee.CharField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
@@ -35,7 +35,7 @@ class TestModelGamma(peewee_async.AioModel):
     text = peewee.CharField()
     beta = peewee.ForeignKeyField(TestModelBeta, backref='gammas')
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
@@ -43,7 +43,7 @@ class UUIDTestModel(peewee_async.AioModel):
     id = peewee.UUIDField(primary_key=True, default=uuid.uuid4)
     text = peewee.CharField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
 
 
