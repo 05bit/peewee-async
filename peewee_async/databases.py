@@ -1,6 +1,6 @@
 import contextlib
 import logging
-from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict
+from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -56,6 +56,7 @@ class AioDatabase(peewee.Database):
         """
         async with self.aio_connection() as connection:
             _connection_context = connection_context.get()
+            assert _connection_context is not None
             begin_transaction = _connection_context.transaction_is_opened is False
             try:
                 async with Transaction(connection, is_savepoint=begin_transaction is False):
@@ -92,7 +93,7 @@ class AioDatabase(peewee.Database):
             self._allow_sync = old_allow_sync
             self.close()
 
-    def execute_sql(self, *args, **kwargs):
+    def execute_sql(self, *args: Any, **kwargs: Any):
         """Sync execute SQL query, `allow_sync` must be set to True.
         """
         assert self._allow_sync, (
@@ -112,7 +113,7 @@ class AioDatabase(peewee.Database):
 
         return ConnectionContextManager(self.pool_backend)
 
-    async def aio_execute_sql(self, sql: str, params=None, fetch_results=None):
+    async def aio_execute_sql(self, sql: str, params: List[Any] | None = None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
             async with self.aio_connection() as connection:
@@ -121,7 +122,7 @@ class AioDatabase(peewee.Database):
                     if fetch_results is not None:
                         return await fetch_results(cursor)
 
-    async def aio_execute(self, query, fetch_results=None):
+    async def aio_execute(self, query, fetch_results=None) -> Any:
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
         :param query: peewee query instance created with ``Model.select()``,

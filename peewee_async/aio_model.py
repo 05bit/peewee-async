@@ -8,7 +8,7 @@ from typing_extensions import Self
 from typing import Tuple, List, Any, cast
 
 
-async def aio_prefetch(sq, *subqueries, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> List[Any]:
+async def aio_prefetch(sq, *subqueries, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE):
     """Asynchronous version of `prefetch()`.
 
     See also:
@@ -87,7 +87,7 @@ class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
 class AioSelectMixin(AioQueryMixin):
 
     @peewee.database_required
-    async def aio_scalar(self, database, as_tuple=False):
+    async def aio_scalar(self, database, as_tuple: bool = False):
         """
         Get single value from ``select()`` query, i.e. for aggregation.
 
@@ -330,7 +330,7 @@ class AioModel(peewee.Model):
         return await sq.aio_get()
 
     @classmethod
-    async def aio_get_or_none(cls, *query, **filters) -> Self | None:
+    async def aio_get_or_none(cls, *query: Any, **filters: Any) -> Self | None:
         """
         Async version of **peewee.Model.get_or_none**
 
@@ -343,7 +343,7 @@ class AioModel(peewee.Model):
             return None
 
     @classmethod
-    async def aio_create(cls, **query) -> "Self":
+    async def aio_create(cls, **query: Any) -> Self:
         """
         Async version of **peewee.Model.create**
 
@@ -355,7 +355,7 @@ class AioModel(peewee.Model):
         return inst
 
     @classmethod
-    async def aio_get_or_create(cls, **kwargs) -> Tuple[Self, bool]:
+    async def aio_get_or_create(cls, **kwargs: Any) -> Tuple[Self, bool]:
         """
         Async version of **peewee.Model.get_or_create**
 
