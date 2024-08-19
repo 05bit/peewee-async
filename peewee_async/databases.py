@@ -113,7 +113,7 @@ class AioDatabase(peewee.Database):
 
         return ConnectionContextManager(self.pool_backend)
 
-    async def aio_execute_sql(self, sql: str, params: List[Any] | None = None, fetch_results=None):
+    async def aio_execute_sql(self, sql: str, params: Optional[List[Any]] = None, fetch_results=None):
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
             async with self.aio_connection() as connection:
