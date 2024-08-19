@@ -1,11 +1,12 @@
 import uuid
 
+from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all, dbs_postgres
 from tests.models import TestModel
 
 
 @dbs_all
-async def test_update__count(db):
+async def test_update__count(db: AioDatabase) -> None:
     for n in range(3):
         await TestModel.aio_create(text=f"{n}")
     count = await TestModel.update(data="new_data").aio_execute()
@@ -14,7 +15,7 @@ async def test_update__count(db):
 
 
 @dbs_all
-async def test_update__field_updated(db):
+async def test_update__field_updated(db: AioDatabase) -> None:
     text = "Test %s" % uuid.uuid4()
     obj1 = await TestModel.aio_create(text=text)
     await TestModel.update(text="Test update query").where(TestModel.id == obj1.id).aio_execute()
@@ -24,7 +25,7 @@ async def test_update__field_updated(db):
 
 
 @dbs_postgres
-async def test_update__returning_model(db):
+async def test_update__returning_model(db: AioDatabase) -> None:
     await TestModel.aio_create(text="text1", data="data")
     await TestModel.aio_create(text="text2", data="data")
     new_data = "New_data"

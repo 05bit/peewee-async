@@ -8,7 +8,7 @@ from tests.models import TestModel
 
 
 @dbs_all
-async def test_nested_connection(db):
+async def test_nested_connection(db: AioDatabase) -> None:
     async with db.aio_connection() as connection_1:
         async with connection_1.cursor() as cursor:
             await cursor.execute("SELECT 1")
@@ -24,7 +24,7 @@ async def test_nested_connection(db):
 
 
 @dbs_all
-async def test_db_should_connect_manually_after_close(db):
+async def test_db_should_connect_manually_after_close(db: AioDatabase) -> None:
     await TestModel.aio_create(text='test')
 
     await db.aio_close()
@@ -36,7 +36,7 @@ async def test_db_should_connect_manually_after_close(db):
 
 
 @dbs_all
-async def test_is_connected(db):
+async def test_is_connected(db: AioDatabase) -> None:
     assert db.is_connected is False
 
     await db.aio_connect()
@@ -47,7 +47,7 @@ async def test_is_connected(db):
 
 
 @dbs_all
-async def test_aio_close_idempotent(db):
+async def test_aio_close_idempotent(db: AioDatabase) -> None:
     assert db.is_connected is False
 
     await db.aio_close()
@@ -58,7 +58,7 @@ async def test_aio_close_idempotent(db):
 
 
 @pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
-async def test_deferred_init(db_name):
+async def test_deferred_init(db_name: str) -> None:
     database: AioDatabase = DB_CLASSES[db_name](None)
 
     with pytest.raises(Exception, match='Error, database must be initialized before creating a connection pool'):

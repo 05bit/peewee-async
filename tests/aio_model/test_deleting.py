@@ -1,12 +1,13 @@
 import uuid
 
+from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all, dbs_postgres
 from tests.models import TestModel
 from tests.utils import model_has_fields
 
 
 @dbs_all
-async def test_delete__count(db):
+async def test_delete__count(db: AioDatabase) -> None:
     query = TestModel.insert_many([
         {'text': "Test %s" % uuid.uuid4()},
         {'text': "Test %s" % uuid.uuid4()},
@@ -19,7 +20,7 @@ async def test_delete__count(db):
 
 
 @dbs_all
-async def test_delete__by_condition(db):
+async def test_delete__by_condition(db: AioDatabase) -> None:
     expected_text = "text1"
     deleted_text = "text2"
     query = TestModel.insert_many([
@@ -36,7 +37,7 @@ async def test_delete__by_condition(db):
 
 
 @dbs_postgres
-async def test_delete__return_model(db):
+async def test_delete__return_model(db: AioDatabase) -> None:
     m = await TestModel.aio_create(text="text", data="data")
 
     res = await TestModel.delete().returning(TestModel).aio_execute()

@@ -1,10 +1,11 @@
 from peewee_async.aio_model import AioModelCompoundSelectQuery, AioModelRaw
+from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
 
 
 @dbs_all
-async def test_select_w_join(db):
+async def test_select_w_join(db: AioDatabase) -> None:
     alpha = await TestModelAlpha.aio_create(text="Test 1")
     beta = await TestModelBeta.aio_create(alpha_id=alpha.id, text="text")
 
@@ -18,7 +19,7 @@ async def test_select_w_join(db):
 
 
 @dbs_all
-async def test_raw_select(db):
+async def test_raw_select(db: AioDatabase) -> None:
     obj1 = await TestModel.aio_create(text="Test 1")
     obj2 = await TestModel.aio_create(text="Test 2")
     query = TestModel.raw(
@@ -30,7 +31,7 @@ async def test_raw_select(db):
 
 
 @dbs_all
-async def test_tuples(db):
+async def test_tuples(db: AioDatabase) -> None:
     obj = await TestModel.aio_create(text="Test 1")
 
     result = await TestModel.select(TestModel.id, TestModel.text).tuples().aio_execute()
@@ -38,7 +39,7 @@ async def test_tuples(db):
 
 
 @dbs_all
-async def test_dicts(db):
+async def test_dicts(db: AioDatabase) -> None:
     obj = await TestModel.aio_create(text="Test 1")
 
     result = await TestModel.select(TestModel.id, TestModel.text).dicts().aio_execute()
@@ -46,7 +47,7 @@ async def test_dicts(db):
 
 
 @dbs_all
-async def test_union_all(db):
+async def test_union_all(db: AioDatabase) -> None:
     obj1 = await TestModel.aio_create(text="1")
     obj2 = await TestModel.aio_create(text="2")
     query = (
@@ -59,7 +60,7 @@ async def test_union_all(db):
 
 
 @dbs_all
-async def test_union(db):
+async def test_union(db: AioDatabase) -> None:
     obj1 = await TestModel.aio_create(text="1")
     obj2 = await TestModel.aio_create(text="2")
     query = (
@@ -73,7 +74,7 @@ async def test_union(db):
 
 
 @dbs_all
-async def test_intersect(db):
+async def test_intersect(db: AioDatabase) -> None:
     await TestModel.aio_create(text="1")
     await TestModel.aio_create(text="2")
     await TestModel.aio_create(text="3")
@@ -90,7 +91,7 @@ async def test_intersect(db):
 
 
 @dbs_all
-async def test_except(db):
+async def test_except(db: AioDatabase) -> None:
     await TestModel.aio_create(text="1")
     await TestModel.aio_create(text="2")
     await TestModel.aio_create(text="3")
