@@ -8,7 +8,7 @@ from playhouse import postgres_ext as ext
 from .connection import connection_context, ConnectionContextManager
 from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend
 from .transactions import Transaction
-from .utils import psycopg2, aiopg, pymysql, aiomysql, __log__
+from .utils import aiopg, aiomysql, __log__
 
 
 class AioDatabase(peewee.Database):
@@ -17,15 +17,31 @@ class AioDatabase(peewee.Database):
     pool_backend_cls: Type[PoolBackend]
     pool_backend: PoolBackend
 
-    @property
-    def connect_params_async(self) -> Dict[str, Any]:
-        ...
+    def __init__(self, *args, **kwargs):
+        self.pool_params = {}
+        super().__init__(*args, **kwargs)
+
+    def init_pool_params_defaults(self):
+        pass
+
+    def init_pool_params(self):
+        self.init_pool_params_defaults()
+        self.pool_params.update(
+            {
+                "minsize": self.connect_params.pop("min_connections", 1),
+                "maxsize": self.connect_params.pop("max_connections", 20),
+            }
+        )
+        pool_params = self.connect_params.pop('pool_params', {})
+        self.pool_params.update(pool_params)
+        self.pool_params.update(self.connect_params)
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         super().init(database, **kwargs)
+        self.init_pool_params()
         self.pool_backend = self.pool_backend_cls(
             database=self.database,
-            **self.connect_params_async
+            **self.pool_params
         )
 
     async def aio_connect(self) -> None:
@@ -137,66 +153,20 @@ class AioDatabase(peewee.Database):
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 
-class AioPostgresqlMixin(AioDatabase, peewee.PostgresqlDatabase):
+class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
     """
 
-    _enable_json: bool
-    _enable_hstore: bool
-
     pool_backend_cls = PostgresqlPoolBackend
 
-    if psycopg2:
-        Error = psycopg2.Error
-
-    def init_async(self, enable_json: bool = False, enable_hstore: bool = False) -> None:
-        if not aiopg:
-            raise Exception("Error, aiopg is not installed!")
-        self._enable_json = enable_json
-        self._enable_hstore = enable_hstore
-
-
-class PooledPostgresqlDatabase(AioPostgresqlMixin, peewee.PostgresqlDatabase):
-    """PostgreSQL database driver providing **single drop-in sync**
-    connection and **async connections pool** interface.
-
-    :param max_connections: connections pool size
-
-    Example::
-
-        database = PooledPostgresqlDatabase('test', max_connections=20)
-
-    See also:
-    http://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
-    """
-    min_connections: int = 1
-    max_connections: int = 20
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({"enable_json": False, "enable_hstore": False})
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
-        if min_connections := kwargs.pop('min_connections', False):
-            self.min_connections = min_connections
-
-        if max_connections := kwargs.pop('max_connections', False):
-            self.max_connections = max_connections
-
-        self.init_async()
+        if not aiopg:
+            raise Exception("Error, aiopg is not installed!")
         super().init(database, **kwargs)
-
-    @property
-    def connect_params_async(self):
-        """Connection parameters for `aiopg.Connection`
-        """
-        kwargs = self.connect_params.copy()
-        kwargs.update(
-            {
-                'minsize': self.min_connections,
-                'maxsize': self.max_connections,
-                'enable_json': self._enable_json,
-                'enable_hstore': self._enable_hstore,
-            }
-        )
-        return kwargs
 
 
 class PooledPostgresqlExtDatabase(
@@ -206,8 +176,8 @@ class PooledPostgresqlExtDatabase(
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
-    JSON fields support is always enabled, HStore supports is enabled by
-    default, but can be disabled with ``register_hstore=False`` argument.
+    JSON fields support is enabled by default, HStore supports is disabled by
+    default, but can be enabled or through pool_params with ``register_hstore=False`` argument.
 
     Example::
 
@@ -217,13 +187,11 @@ class PooledPostgresqlExtDatabase(
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
-
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
-        self.init_async(
-            enable_json=True,
-            enable_hstore=self._register_hstore
-        )
-        super().init(database, **kwargs)
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({
+            "enable_json": True,
+            "enable_hstore": self._register_hstore
+        })
 
 
 class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
@@ -239,36 +207,12 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
-    min_connections: int = 1
-    max_connections: int = 20
-
     pool_backend_cls = MysqlPoolBackend
 
-    if pymysql:
-        Error = pymysql.Error
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({"autocommit": True})
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
-
-        if min_connections := kwargs.pop('min_connections', False):
-            self.min_connections = min_connections
-
-        if max_connections := kwargs.pop('max_connections', False):
-            self.max_connections = max_connections
-
         super().init(database, **kwargs)
-
-    @property
-    def connect_params_async(self) -> Dict[str, Any]:
-        """Connection parameters for `aiomysql.Connection`
-        """
-        kwargs = self.connect_params.copy()
-        kwargs.update(
-            {
-                'minsize': self.min_connections,
-                'maxsize': self.max_connections,
-                'autocommit': True,
-            }
-        )
-        return kwargs
