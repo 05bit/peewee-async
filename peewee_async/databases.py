@@ -18,31 +18,30 @@ class AioDatabase(peewee.Database):
     pool_backend: PoolBackend
 
     def __init__(self, *args, **kwargs):
-        self.pool_connect_params = {}
+        self.pool_params = {}
         super().__init__(*args, **kwargs)
 
-    def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
-        # TODO remove minsize, maxsize maybe
-        minsize = kwargs.pop("minsize", 1)
-        maxsize = kwargs.pop("maxsize", 20)
-        minsize = kwargs.pop("min_connections", minsize)
-        maxsize = kwargs.pop("max_connections", maxsize)
+    def init_pool_params_defaults(self):
+        pass
 
-        self.pool_connect_params.update(kwargs)
-        self.pool_connect_params.update(
+    def init_pool_params(self):
+        self.init_pool_params_defaults()
+        self.pool_params.update(
             {
-                "minsize": minsize,
-                "maxsize": maxsize,
+                "minsize": self.connect_params.pop("min_connections", 1),
+                "maxsize": self.connect_params.pop("max_connections", 20),
             }
         )
-
+        pool_params = self.connect_params.pop('pool_params', {})
+        self.pool_params.update(pool_params)
+        self.pool_params.update(self.connect_params)
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
-        self.init_pool_connect_params(**kwargs)
         super().init(database, **kwargs)
+        self.init_pool_params()
         self.pool_backend = self.pool_backend_cls(
             database=self.database,
-            **self.pool_connect_params
+            **self.pool_params
         )
 
     async def aio_connect(self) -> None:
@@ -158,23 +157,15 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     for managing async connection.
     """
 
-    _enable_json: bool
-    _enable_hstore: bool
-
     pool_backend_cls = PostgresqlPoolBackend
 
-    def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
-        super().init_pool_connect_params(**kwargs)
-        self.pool_connect_params.update({
-            "enable_json": kwargs.pop("enable_json", False),
-            "enable_hstore": kwargs.pop("enable_hstore", False)
-        })
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({"enable_json": False, "enable_hstore": False})
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
         super().init(database, **kwargs)
-
 
 
 class PooledPostgresqlExtDatabase(
@@ -184,8 +175,8 @@ class PooledPostgresqlExtDatabase(
     """PosgreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
-    JSON fields support is enabled by default, HStore supports is enabled by
-    default, but can be disabled with ``register_hstore=False`` argument.
+    JSON fields support is enabled by default, HStore supports is disabled by
+    default, but can be enabled or through pool_params with ``register_hstore=False`` argument.
 
     Example::
 
@@ -195,13 +186,10 @@ class PooledPostgresqlExtDatabase(
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
-    def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
-        super().init_pool_connect_params(**kwargs)
-        self.pool_connect_params.update({
-            # TODO enable_json already true by default should be removed?
-            "enable_json": kwargs.pop("enable_json", True),
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({
+            "enable_json": True,
             "enable_hstore": self._register_hstore
-            # TODO _register_hstore should be true by default?
         })
 
 
@@ -220,13 +208,10 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     """
     pool_backend_cls = MysqlPoolBackend
 
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({"autocommit": True})
+
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
         super().init(database, **kwargs)
-
-    def init_pool_connect_params(self, **kwargs: Dict[str, Any]):
-        super().init_pool_connect_params(**kwargs)
-        self.pool_connect_params.update({
-            "autocommit": kwargs.pop("autocommit", True)
-        })

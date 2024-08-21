@@ -2,7 +2,7 @@ import pytest
 
 from peewee_async import connection_context
 from peewee_async.databases import AioDatabase
-from tests.conftest import dbs_all, MYSQL_DBS, PG_DBS
+from tests.conftest import dbs_all, MYSQL_DBS, PG_DBS, dbs_mysql
 from tests.db_config import DB_DEFAULTS, DB_CLASSES
 from tests.models import TestModel
 
@@ -67,3 +67,51 @@ async def test_deferred_init(db_name):
     database.init(**DB_DEFAULTS[db_name])
 
     await database.aio_execute_sql(sql='SELECT 1;')
+    await database.aio_close()
+
+
+@pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
+async def test_connections_param(db_name):
+    default_params = DB_DEFAULTS[db_name].copy()
+    default_params['min_connections'] = 2
+    default_params['max_connections'] = 3
+
+    db_cls = DB_CLASSES[db_name]
+    database = db_cls(**default_params)
+    await database.aio_connect()
+
+    assert database.pool_backend.pool._minsize == 2
+    assert database.pool_backend.pool._free.maxlen == 3
+
+    await database.aio_close()
+
+
+@dbs_mysql
+async def test_mysql_params(db):
+    async with db.aio_connection() as connection_1:
+        assert connection_1.autocommit_mode is True
+    assert db.pool_backend.pool._recycle == 2
+
+
+@pytest.mark.parametrize(
+    "db",
+    ["postgres-pool"], indirect=["db"]
+)
+async def test_pg_json_hstore__params(db):
+    await db.aio_connect()
+    assert db.pool_backend.pool._enable_json is False
+    assert db.pool_backend.pool._enable_hstore is False
+    assert db.pool_backend.pool._timeout == 30
+    assert db.pool_backend.pool._recycle == 1.5
+
+
+@pytest.mark.parametrize(
+    "db",
+    ["postgres-pool-ext"], indirect=["db"]
+)
+async def test_pg_ext_json_hstore__params(db):
+    await db.aio_connect()
+    assert db.pool_backend.pool._enable_json is True
+    assert db.pool_backend.pool._enable_hstore is False
+    assert db.pool_backend.pool._timeout == 30
+    assert db.pool_backend.pool._recycle == 1.5
