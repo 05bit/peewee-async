@@ -1,22 +1,24 @@
 import asyncio
+from typing import AsyncGenerator, Generator
 
 import pytest
 from peewee import sort_models
 
+from peewee_async.databases import AioDatabase
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import ALL_MODELS
 from peewee_async.utils import aiopg, aiomysql
 
 
 @pytest.fixture(scope="session", autouse=True)
-def event_loop():
+def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
 
 
 @pytest.fixture
-async def db(request):
+async def db(request: pytest.FixtureRequest) -> AsyncGenerator[AioDatabase, None]:
     db = request.param
     if db.startswith('postgres') and aiopg is None:
         pytest.skip("aiopg is not installed")

@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import pytest
 
 from peewee_async import connection_context
@@ -15,7 +17,9 @@ async def test_nested_connection(db: AioDatabase) -> None:
         await TestModel.aio_get_or_none(id=5)
         async with db.aio_connection() as connection_2:
             assert connection_1 is connection_2
-            _connection = connection_context.get().connection
+            _connection_context = connection_context.get()
+            assert _connection_context is not None
+            _connection = _connection_context.connection
             assert _connection is connection_2
             async with connection_2.cursor() as cursor:
                 await cursor.execute("SELECT 1")
@@ -64,6 +68,7 @@ async def test_deferred_init(db_name: str) -> None:
     with pytest.raises(Exception, match='Error, database must be initialized before creating a connection pool'):
         await database.aio_execute_sql(sql='SELECT 1;')
 
-    database.init(**DB_DEFAULTS[db_name])
+    db_params: Dict[str, Any] = DB_DEFAULTS[db_name]
+    database.init(**db_params)
 
     await database.aio_execute_sql(sql='SELECT 1;')
