@@ -87,7 +87,7 @@ class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
 class AioSelectMixin(AioQueryMixin):
 
     @peewee.database_required
-    async def aio_scalar(self, database, as_tuple: bool = False):
+    async def aio_scalar(self, database: AioDatabase, as_tuple: bool = False) -> Any:
         """
         Get single value from ``select()`` query, i.e. for aggregation.
 
@@ -103,7 +103,7 @@ class AioSelectMixin(AioQueryMixin):
 
         return rows[0] if rows and not as_tuple else rows
 
-    async def aio_get(self, database=None):
+    async def aio_get(self, database: Optional[AioDatabase] = None):
         """
         Async version of **peewee.SelectBase.get**
 
@@ -120,7 +120,7 @@ class AioSelectMixin(AioQueryMixin):
                                           (clone.model, sql, params))
 
     @peewee.database_required
-    async def aio_count(self, database, clear_limit: bool =False) -> int:
+    async def aio_count(self, database: AioDatabase, clear_limit: bool = False) -> int:
         """
         Async version of **peewee.SelectBase.count**
 
@@ -143,7 +143,7 @@ class AioSelectMixin(AioQueryMixin):
         )
 
     @peewee.database_required
-    async def aio_exists(self, database):
+    async def aio_exists(self, database: AioDatabase) -> bool:
         """
         Async version of **peewee.SelectBase.exists**
 

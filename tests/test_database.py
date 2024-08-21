@@ -76,7 +76,7 @@ async def test_deferred_init(db_name: str) -> None:
 
 
 @pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
-async def test_connections_param(db_name):
+async def test_connections_param(db_name: str) -> None:
     default_params = DB_DEFAULTS[db_name].copy()
     default_params['min_connections'] = 2
     default_params['max_connections'] = 3
@@ -85,38 +85,38 @@ async def test_connections_param(db_name):
     database = db_cls(**default_params)
     await database.aio_connect()
 
-    assert database.pool_backend.pool._minsize == 2
-    assert database.pool_backend.pool._free.maxlen == 3
+    assert database.pool_backend.pool._minsize == 2  # type: ignore
+    assert database.pool_backend.pool._free.maxlen == 3  # type: ignore
 
     await database.aio_close()
 
 
 @dbs_mysql
-async def test_mysql_params(db):
+async def test_mysql_params(db: AioDatabase) -> None:
     async with db.aio_connection() as connection_1:
-        assert connection_1.autocommit_mode is True
-    assert db.pool_backend.pool._recycle == 2
+        assert connection_1.autocommit_mode is True  # type: ignore
+    assert db.pool_backend.pool._recycle == 2  # type: ignore
 
 
 @pytest.mark.parametrize(
     "db",
     ["postgres-pool"], indirect=["db"]
 )
-async def test_pg_json_hstore__params(db):
+async def test_pg_json_hstore__params(db: AioDatabase) -> None:
     await db.aio_connect()
-    assert db.pool_backend.pool._enable_json is False
-    assert db.pool_backend.pool._enable_hstore is False
-    assert db.pool_backend.pool._timeout == 30
-    assert db.pool_backend.pool._recycle == 1.5
+    assert db.pool_backend.pool._enable_json is False  # type: ignore
+    assert db.pool_backend.pool._enable_hstore is False  # type: ignore
+    assert db.pool_backend.pool._timeout == 30  # type: ignore
+    assert db.pool_backend.pool._recycle == 1.5  # type: ignore
 
 
 @pytest.mark.parametrize(
     "db",
     ["postgres-pool-ext"], indirect=["db"]
 )
-async def test_pg_ext_json_hstore__params(db):
+async def test_pg_ext_json_hstore__params(db: AioDatabase) -> None:
     await db.aio_connect()
-    assert db.pool_backend.pool._enable_json is True
-    assert db.pool_backend.pool._enable_hstore is False
-    assert db.pool_backend.pool._timeout == 30
-    assert db.pool_backend.pool._recycle == 1.5
+    assert db.pool_backend.pool._enable_json is True  # type: ignore
+    assert db.pool_backend.pool._enable_hstore is False  # type: ignore
+    assert db.pool_backend.pool._timeout == 30  # type: ignore
+    assert db.pool_backend.pool._recycle == 1.5  # type: ignore
