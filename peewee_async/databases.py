@@ -8,7 +8,7 @@ from playhouse import postgres_ext as ext
 from .connection import connection_context, ConnectionContextManager
 from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend
 from .transactions import Transaction
-from .utils import aiopg, aiomysql, __log__
+from .utils import aiopg, aiomysql, __log__, FetchResults
 
 
 class AioDatabase(peewee.Database):
@@ -109,7 +109,7 @@ class AioDatabase(peewee.Database):
             self._allow_sync = old_allow_sync
             self.close()
 
-    def execute_sql(self, *args: Any, **kwargs: Any):
+    def execute_sql(self, *args: Any, **kwargs: Any) -> Any:
         """Sync execute SQL query, `allow_sync` must be set to True.
         """
         assert self._allow_sync, (
@@ -129,7 +129,12 @@ class AioDatabase(peewee.Database):
 
         return ConnectionContextManager(self.pool_backend)
 
-    async def aio_execute_sql(self, sql: str, params: Optional[List[Any]] = None, fetch_results=None):
+    async def aio_execute_sql(
+        self,
+        sql: str,
+        params: Optional[List[Any]] = None,
+        fetch_results: Optional[FetchResults] = None
+    ) -> Any:
         __log__.debug(sql, params)
         with peewee.__exception_wrapper__:
             async with self.aio_connection() as connection:
@@ -138,7 +143,7 @@ class AioDatabase(peewee.Database):
                     if fetch_results is not None:
                         return await fetch_results(cursor)
 
-    async def aio_execute(self, query, fetch_results=None) -> Any:
+    async def aio_execute(self, query: Any, fetch_results: Optional[FetchResults] = None) -> Any:
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
         :param query: peewee query instance created with ``Model.select()``,

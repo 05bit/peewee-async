@@ -1,11 +1,11 @@
 import logging
-from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager, List
+from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager, List, Callable, Awaitable
 
 try:
     import aiopg
     import psycopg2
 except ImportError:
-    aiopg = None
+    aiopg = None  # type: ignore
     psycopg2 = None
 
 try:
@@ -13,7 +13,7 @@ try:
     import pymysql
 except ImportError:
     aiomysql = None
-    pymysql = None
+    pymysql = None  # type: ignore
 
 __log__ = logging.getLogger('peewee.async')
 __log__.addHandler(logging.NullHandler())
@@ -70,3 +70,5 @@ class PoolProtocol(Protocol):
     async def wait_closed(self) -> None:
         ...
 
+
+FetchResults = Callable[[CursorProtocol], Awaitable[Any]]
