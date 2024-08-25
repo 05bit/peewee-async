@@ -17,14 +17,14 @@ class AioDatabase(peewee.Database):
     pool_backend_cls: Type[PoolBackend]
     pool_backend: PoolBackend
 
-    def __init__(self, *args, **kwargs):
-        self.pool_params = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.pool_params: Dict[str, Any] = {}
         super().__init__(*args, **kwargs)
 
-    def init_pool_params_defaults(self):
+    def init_pool_params_defaults(self) -> None:
         pass
 
-    def init_pool_params(self):
+    def init_pool_params(self) -> None:
         self.init_pool_params_defaults()
         self.pool_params.update(
             {
