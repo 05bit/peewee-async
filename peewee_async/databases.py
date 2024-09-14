@@ -135,7 +135,7 @@ class AioDatabase(peewee.Database):
         params: Optional[List[Any]] = None,
         fetch_results: Optional[FetchResults] = None
     ) -> Any:
-        __log__.debug(sql, params)
+        __log__.debug((sql, params))
         with peewee.__exception_wrapper__:
             async with self.aio_connection() as connection:
                 async with connection.cursor() as cursor:
