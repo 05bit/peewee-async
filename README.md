@@ -17,7 +17,7 @@ Overview
 * Asynchronous analogues of peewee sync methods with prefix aio_
 * Drop-in replacement for sync code, sync will remain sync
 * Basic operations are supported
-* Transactions support is present, yet not heavily tested
+* Transactions support is present
 
 The complete documentation:  
 http://peewee-async-lib.readthedocs.io

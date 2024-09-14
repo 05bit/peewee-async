@@ -79,7 +79,7 @@ Databases
 .. autoclass:: peewee_async.PooledPostgresqlDatabase
     :members: init
 
-.. autoclass:: peewee_asyncext.PooledPostgresqlExtDatabase
+.. autoclass:: peewee_async.PooledPostgresqlExtDatabase
     :members: init
 
 .. autoclass:: peewee_async.PooledMySQLDatabase
