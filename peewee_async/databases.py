@@ -12,6 +12,26 @@ from .utils import aiopg, aiomysql, __log__, FetchResults
 
 
 class AioDatabase(peewee.Database):
+    """Base async database driver providing **single drop-in sync**
+    connection and **async connections pool** interface.
+
+    :param pool_params: parameters that are passed to the pool
+    :param min_connections: min connections pool size. Alias for pool_params.minsize
+    :param max_connections: max connections pool size. Alias for pool_params.maxsize
+
+    Example::
+
+        database = PooledPostgresqlExtDatabase(
+            'test',
+            'min_connections': 1,
+            'max_connections': 5,
+            'pool_params': {"timeout": 30, 'pool_recycle': 1.5}
+        )
+
+    See also:
+    https://peewee.readthedocs.io/en/latest/peewee/api.html#Database
+    """
+
     _allow_sync = True  # whether sync queries are allowed
 
     pool_backend_cls: Type[PoolBackend]
@@ -161,6 +181,9 @@ class AioDatabase(peewee.Database):
 class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection.
+
+    See also:
+    https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
     """
 
     pool_backend_cls = PostgresqlPoolBackend
@@ -178,11 +201,11 @@ class PooledPostgresqlExtDatabase(
     PooledPostgresqlDatabase,
     ext.PostgresqlExtDatabase
 ):
-    """PosgreSQL database extended driver providing **single drop-in sync**
+    """PosgtreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
     JSON fields support is enabled by default, HStore supports is disabled by
-    default, but can be enabled or through pool_params with ``register_hstore=False`` argument.
+    default, but can be enabled through pool_params or with ``register_hstore=False`` argument.
 
     Example::
 
@@ -202,8 +225,6 @@ class PooledPostgresqlExtDatabase(
 class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     """MySQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
-
-    :param max_connections: connections pool size
 
     Example::
 
