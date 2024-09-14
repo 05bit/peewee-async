@@ -330,7 +330,7 @@ class AioModel(peewee.Model):
         return cast(Self, await sq.aio_get())
 
     @classmethod
-    async def aio_get_or_none(cls, *query: Any, **filters: Any):
+    async def aio_get_or_none(cls, *query: Any, **filters: Any) -> Optional[Self]:
         """
         Async version of **peewee.Model.get_or_none**
 
