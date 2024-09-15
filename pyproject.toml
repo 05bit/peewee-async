@@ -9,6 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.8"
 peewee = "^3.15.4"
+typing-extensions = "^4.12.2"
 
 aiopg = { version = "^1.4.0", optional = true }
 aiomysql = { version = "^0.2.0", optional = true }
