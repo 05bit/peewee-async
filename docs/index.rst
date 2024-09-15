@@ -39,13 +39,13 @@ For PostgreSQL:
 
 .. code-block:: console
 
-    pip install peewee-async aiopg
+    pip install peewee-async[postgresql]
 
 For MySQL:
 
 .. code-block:: console
 
-    pip install peewee-async aiomysql
+    pip install peewee-async[mysql]
 
 Install from sources
 ++++++++++++++++++++
@@ -54,7 +54,7 @@ Install from sources
 
     git clone https://github.com/05bit/peewee-async.git
     cd peewee-async
-    python setup.py install
+    pip install .
 
 Running tests
 +++++++++++++

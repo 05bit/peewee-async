@@ -88,5 +88,5 @@ The complete working example is provided below. And here are some general notes:
 
   **Also note:** if you spawn an extra task during a transaction, it will run outside of that transaction.
 
-.. literalinclude:: ../../examples/tornado_sample.py
+.. literalinclude:: ../samples/tornado_sample.py
   :start-after: # Start example
