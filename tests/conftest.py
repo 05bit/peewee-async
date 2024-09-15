@@ -24,7 +24,6 @@ def enable_debug_log_level() -> Generator[None, None, None]:
     logger.setLevel(logging.INFO)
 
 
-
 @pytest.fixture(scope="session", autouse=True)
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     loop = asyncio.get_event_loop_policy().new_event_loop()
