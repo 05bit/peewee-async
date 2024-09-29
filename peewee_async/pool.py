@@ -2,7 +2,13 @@ import abc
 import asyncio
 from typing import Any, Optional, cast
 
+import psycopg_pool
+from psycopg import AsyncClientCursor
+from psycopg.types import TypeInfo
+from psycopg.types.hstore import register_hstore
+
 from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol
+from .utils import format_dsn
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
@@ -20,6 +26,14 @@ class PoolBackend(metaclass=abc.ABCMeta):
         if self.pool is not None:
             return self.pool.closed is False
         return False
+
+    @property
+    def min_size(self) -> int:
+        return self.pool.minsize
+
+    @property
+    def max_size(self) -> int:
+        return self.pool.maxsize
 
     def has_acquired_connections(self) -> bool:
         if self.pool is not None:
@@ -39,7 +53,7 @@ class PoolBackend(metaclass=abc.ABCMeta):
         assert self.pool is not None, "Pool is not connected"
         return await self.pool.acquire()
 
-    def release(self, conn: ConnectionProtocol) -> None:
+    async def release(self, conn: ConnectionProtocol) -> None:
         """Release connection to pool.
         """
         assert self.pool is not None, "Pool is not connected"
@@ -75,6 +89,70 @@ class PostgresqlPoolBackend(PoolBackend):
                 **self.connect_params
             )
         )
+
+
+class Psycopg3PoolBackend(PoolBackend):
+    """Asynchronous database connection pool based on psycopg + psycopg_pool libraries.
+    """
+
+    async def create(self) -> None:
+        """Create connection pool asynchronously.
+        """
+
+        pool = psycopg_pool.AsyncConnectionPool(
+            format_dsn(
+                'postgresql',
+                host=self.connect_params['host'],
+                port=self.connect_params['port'],
+                user=self.connect_params['user'],
+                password=self.connect_params['password'],
+                path=self.database,
+            ),
+            min_size=self.connect_params.get('minsize', 1),
+            max_size=self.connect_params.get('maxsize', 20),
+            max_lifetime=self.connect_params.get('pool_recycle', 60 * 60.0),
+            open=False,
+            kwargs={
+                'cursor_factory': AsyncClientCursor,
+                'autocommit': True,
+            }
+        )
+
+        await pool.open()
+        self.pool = pool
+
+    def has_acquired_connections(self) -> bool:
+        if self.pool is not None:
+            return self.pool._nconns - self.pool._num_pool > 0
+        return False
+
+    async def acquire(self) -> ConnectionProtocol:
+        """Acquire connection from pool.
+        """
+        if self.pool is None:
+            await self.connect()
+        assert self.pool is not None, "Pool is not connected"
+        return await self.pool.getconn()
+
+    async def release(self, conn: ConnectionProtocol) -> None:
+        """Release connection to pool.
+        """
+        assert self.pool is not None, "Pool is not connected"
+        await self.pool.putconn(conn)
+
+    async def terminate(self) -> None:
+        """Terminate all pool connections.
+        """
+        if self.pool is not None:
+            await self.pool.close()
+
+    @property
+    def min_size(self) -> int:
+        return self.pool.min_size
+
+    @property
+    def max_size(self) -> int:
+        return self.pool.max_size
 
 
 class MysqlPoolBackend(PoolBackend):

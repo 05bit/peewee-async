@@ -6,9 +6,9 @@ import peewee
 from playhouse import postgres_ext as ext
 
 from .connection import connection_context, ConnectionContextManager
-from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend
+from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend, Psycopg3PoolBackend
 from .transactions import Transaction
-from .utils import aiopg, aiomysql, __log__, FetchResults
+from .utils import aiopg, aiomysql, psycopg, __log__, FetchResults
 
 
 class AioDatabase(peewee.Database):
@@ -194,6 +194,25 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
+        super().init(database, **kwargs)
+
+
+class PooledPsycopg3PostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
+    """Extension for `peewee.PostgresqlDatabase` providing extra methods
+    for managing async connection based on psycopg3 pool backend.
+
+    See also:
+    https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
+    """
+
+    pool_backend_cls = Psycopg3PoolBackend
+
+    def init_pool_params_defaults(self) -> None:
+        self.pool_params.update({"enable_json": False, "enable_hstore": False})
+
+    def init(self, database: Optional[str], **kwargs: Any) -> None:
+        if not psycopg:
+            raise Exception("Error, psycopg is not installed!")
         super().init(database, **kwargs)
 
 
