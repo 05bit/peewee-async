@@ -29,7 +29,7 @@ postgresql = ["aiopg"]
 mysql = ["aiomysql", "cryptography"]
 develop = ["aiopg", "aiomysql", "cryptography", "pytest", "pytest-asyncio", "pytest-mock", "mypy", "types-PyMySQL", "psycopg", "psycopg-pool"]
 docs = ["aiopg", "aiomysql", "cryptography", "sphinx", "sphinx-rtd-theme"]
-psycopg3 = ["psycopg"]
+psycopg = ["psycopg", "psycopg-pool"]
 
 [build-system]
 requires = ["poetry-core"]

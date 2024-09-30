@@ -4,11 +4,8 @@ from typing import Any, Optional, cast
 
 import psycopg_pool
 from psycopg import AsyncClientCursor
-from psycopg.types import TypeInfo
-from psycopg.types.hstore import register_hstore
 
-from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol
-from .utils import format_dsn
+from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol, format_dsn
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
