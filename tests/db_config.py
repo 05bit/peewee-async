@@ -34,6 +34,6 @@ DB_DEFAULTS = {
 DB_CLASSES = {
     'postgres-pool': peewee_async.PooledPostgresqlDatabase,
     'postgres-pool-ext': peewee_async.PooledPostgresqlExtDatabase,
-    'psycopg-pool': peewee_async.PooledPsycopg3PostgresqlDatabase,
+    'psycopg-pool': peewee_async.Psycopg3Database,
     'mysql-pool': peewee_async.PooledMySQLDatabase
 }

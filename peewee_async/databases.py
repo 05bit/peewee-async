@@ -197,7 +197,7 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
         super().init(database, **kwargs)
 
 
-class PooledPsycopg3PostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
+class Psycopg3Database(AioDatabase, peewee.PostgresqlDatabase):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 

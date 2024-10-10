@@ -2,10 +2,7 @@ import abc
 import asyncio
 from typing import Any, Optional, cast
 
-import psycopg_pool
-from psycopg import AsyncClientCursor
-
-from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol, format_dsn
+from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol, format_dsn, psycopg, psycopg_pool
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
@@ -110,7 +107,7 @@ class Psycopg3PoolBackend(PoolBackend):
             max_lifetime=self.connect_params.get('pool_recycle', 60 * 60.0),
             open=False,
             kwargs={
-                'cursor_factory': AsyncClientCursor,
+                'cursor_factory': psycopg.AsyncClientCursor,
                 'autocommit': True,
             }
         )

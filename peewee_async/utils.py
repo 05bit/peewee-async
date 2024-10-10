@@ -10,8 +10,10 @@ except ImportError:
 
 try:
     import psycopg
+    import psycopg_pool
 except ImportError:
     psycopg = None  # type: ignore
+    psycopg_pool = None  # type: ignore
 
 try:
     import aiomysql
