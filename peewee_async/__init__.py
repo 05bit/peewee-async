@@ -22,6 +22,7 @@ from .databases import (
     PooledPostgresqlDatabase,
     PooledPostgresqlExtDatabase,
     PooledMySQLDatabase,
+    Psycopg3Database,
 )
 from .pool import PostgresqlPoolBackend, MysqlPoolBackend
 from .transactions import Transaction
@@ -43,4 +44,6 @@ __all__ = [
 
 register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
 register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
+register_database(Psycopg3Database, 'postgres+psycopg+pool+async', 'postgres+psycopg+pool+async')
 register_database(PooledMySQLDatabase, 'mysql+pool+async')
+
