@@ -12,6 +12,15 @@ PG_DEFAULTS = {
     'pool_params': {"timeout": 30, 'pool_recycle': 1.5}
 }
 
+PSYCOPG3_DEFAULTS = {
+    'database': 'postgres',
+    'host': '127.0.0.1',
+    'port': int(os.environ.get('POSTGRES_PORT', 5432)),
+    'password': 'postgres',
+    'user': 'postgres',
+    'pool_params': {"min_size": 1, "max_size": 5, "open": False, 'max_lifetime': 60 * 60.0}
+}
+
 MYSQL_DEFAULTS = {
     'database': 'mysql',
     'host': '127.0.0.1',
@@ -27,7 +36,7 @@ MYSQL_DEFAULTS = {
 DB_DEFAULTS = {
     'postgres-pool': PG_DEFAULTS,
     'postgres-pool-ext': PG_DEFAULTS,
-    'psycopg-pool': PG_DEFAULTS,
+    'psycopg-pool': PSYCOPG3_DEFAULTS,
     'mysql-pool': MYSQL_DEFAULTS
 }
 

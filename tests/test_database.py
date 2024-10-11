@@ -79,15 +79,13 @@ async def test_deferred_init(db_name: str) -> None:
 @pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
 async def test_connections_param(db_name: str) -> None:
     default_params = DB_DEFAULTS[db_name].copy()
-    default_params['min_connections'] = 2
-    default_params['max_connections'] = 3
 
     db_cls = DB_CLASSES[db_name]
     database = db_cls(**default_params)
     await database.aio_connect()
 
-    assert database.pool_backend.min_size == 2
-    assert database.pool_backend.max_size == 3
+    assert database.pool_backend.min_size == 1
+    assert database.pool_backend.max_size == 5
 
     await database.aio_close()
 

@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import warnings
 from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List
 
 import peewee
@@ -46,12 +47,17 @@ class AioDatabase(peewee.Database):
 
     def init_pool_params(self) -> None:
         self.init_pool_params_defaults()
-        self.pool_params.update(
-            {
-                "minsize": self.connect_params.pop("min_connections", 1),
-                "maxsize": self.connect_params.pop("max_connections", 20),
-            }
-        )
+        if "min_connections" in self.connect_params or "max_connections" in self.connect_params:
+            warnings.warn(
+                "`min_connections` and `max_connections` are deprecated, use `pool_params` instead.",
+                DeprecationWarning
+            )
+            self.pool_params.update(
+                {
+                    "minsize": self.connect_params.pop("min_connections", 1),
+                    "maxsize": self.connect_params.pop("max_connections", 20),
+                }
+            )
         pool_params = self.connect_params.pop('pool_params', {})
         self.pool_params.update(pool_params)
         self.pool_params.update(self.connect_params)
@@ -206,9 +212,6 @@ class Psycopg3Database(AioDatabase, peewee.PostgresqlDatabase):
     """
 
     pool_backend_cls = Psycopg3PoolBackend
-
-    def init_pool_params_defaults(self) -> None:
-        self.pool_params.update({"enable_json": False, "enable_hstore": False})
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         if not psycopg:

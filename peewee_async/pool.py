@@ -91,24 +91,21 @@ class Psycopg3PoolBackend(PoolBackend):
     async def create(self) -> None:
         """Create connection pool asynchronously.
         """
-
+        params = self.connect_params.copy()
         pool = psycopg_pool.AsyncConnectionPool(
             format_dsn(
                 'postgresql',
-                host=self.connect_params['host'],
-                port=self.connect_params['port'],
-                user=self.connect_params['user'],
-                password=self.connect_params['password'],
+                host=params.pop('host'),
+                port=params.pop('port'),
+                user=params.pop('user'),
+                password=params.pop('password'),
                 path=self.database,
             ),
-            min_size=self.connect_params.get('minsize', 1),
-            max_size=self.connect_params.get('maxsize', 20),
-            max_lifetime=self.connect_params.get('pool_recycle', 60 * 60.0),
-            open=False,
             kwargs={
                 'cursor_factory': psycopg.AsyncClientCursor,
                 'autocommit': True,
-            }
+            },
+            **params,
         )
 
         await pool.open()
