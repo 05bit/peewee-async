@@ -86,8 +86,8 @@ async def test_connections_param(db_name: str) -> None:
     database = db_cls(**default_params)
     await database.aio_connect()
 
-    assert database.pool_backend.min_size == 2  # type: ignore
-    assert database.pool_backend.max_size == 3  # type: ignore
+    assert database.pool_backend.min_size == 2
+    assert database.pool_backend.max_size == 3
 
     await database.aio_close()
 

@@ -57,27 +57,6 @@ class ConnectionProtocol(Protocol):
         ...
 
 
-class PoolProtocol(Protocol):
-
-    _used: Set[ConnectionProtocol]
-
-    @property
-    def closed(self) -> bool:
-        ...
-
-    async def acquire(self) -> ConnectionProtocol:
-        ...
-
-    def release(self, conn: ConnectionProtocol) -> None:
-        ...
-
-    def terminate(self) -> None:
-        ...
-
-    async def wait_closed(self) -> None:
-        ...
-
-
 FetchResults = Callable[[CursorProtocol], Awaitable[Any]]
 
 
