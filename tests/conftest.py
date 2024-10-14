@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from typing import Generator
 
 import pytest
 from peewee import sort_models
@@ -6,6 +8,19 @@ from peewee import sort_models
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import ALL_MODELS
 from peewee_async.utils import aiopg, aiomysql
+
+
+@pytest.fixture
+def enable_debug_log_level() -> Generator[None, None, None]:
+    logger = logging.getLogger('peewee.async')
+    handler = logging.StreamHandler()
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+    yield
+
+    logger.removeHandler(handler)
+    logger.setLevel(logging.INFO)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -59,6 +74,3 @@ dbs_postgres = pytest.mark.parametrize(
 dbs_all = pytest.mark.parametrize(
     "db", PG_DBS + MYSQL_DBS, indirect=["db"]
 )
-
-
-
