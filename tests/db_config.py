@@ -12,7 +12,7 @@ PG_DEFAULTS = {
     'pool_params': {"timeout": 30, 'pool_recycle': 1.5}
 }
 
-PSYCOPG3_DEFAULTS = {
+PSYCOPG_DEFAULTS = {
     'database': 'postgres',
     'host': '127.0.0.1',
     'port': int(os.environ.get('POSTGRES_PORT', 5432)),
@@ -36,13 +36,13 @@ MYSQL_DEFAULTS = {
 DB_DEFAULTS = {
     'postgres-pool': PG_DEFAULTS,
     'postgres-pool-ext': PG_DEFAULTS,
-    'psycopg-pool': PSYCOPG3_DEFAULTS,
+    'psycopg-pool': PSYCOPG_DEFAULTS,
     'mysql-pool': MYSQL_DEFAULTS
 }
 
 DB_CLASSES = {
     'postgres-pool': peewee_async.PooledPostgresqlDatabase,
     'postgres-pool-ext': peewee_async.PooledPostgresqlExtDatabase,
-    'psycopg-pool': peewee_async.Psycopg3Database,
+    'psycopg-pool': peewee_async.PsycopgDatabase,
     'mysql-pool': peewee_async.PooledMySQLDatabase
 }

@@ -7,7 +7,7 @@ import peewee
 from playhouse import postgres_ext as ext
 
 from .connection import connection_context, ConnectionContextManager
-from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend, Psycopg3PoolBackend
+from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
 from .utils import aiopg, aiomysql, psycopg, __log__, FetchResults
 
@@ -184,9 +184,25 @@ class AioDatabase(peewee.Database):
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 
+class PsycopgDatabase(AioDatabase, peewee.PostgresqlDatabase):
+    """Extension for `peewee.PostgresqlDatabase` providing extra methods
+    for managing async connection based on psycopg3 pool backend.
+
+    See also:
+    https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
+    """
+
+    pool_backend_cls = PsycopgPoolBackend
+
+    def init(self, database: Optional[str], **kwargs: Any) -> None:
+        if not psycopg:
+            raise Exception("Error, psycopg is not installed!")
+        super().init(database, **kwargs)
+
+
 class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
-    for managing async connection.
+    for managing async connection based on aiopg pool backend.
 
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
@@ -203,28 +219,12 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
         super().init(database, **kwargs)
 
 
-class Psycopg3Database(AioDatabase, peewee.PostgresqlDatabase):
-    """Extension for `peewee.PostgresqlDatabase` providing extra methods
-    for managing async connection based on psycopg3 pool backend.
-
-    See also:
-    https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
-    """
-
-    pool_backend_cls = Psycopg3PoolBackend
-
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
-        if not psycopg:
-            raise Exception("Error, psycopg is not installed!")
-        super().init(database, **kwargs)
-
-
 class PooledPostgresqlExtDatabase(
     PooledPostgresqlDatabase,
     ext.PostgresqlExtDatabase
 ):
     """PosgtreSQL database extended driver providing **single drop-in sync**
-    connection and **async connections pool** interface.
+    connection and **async connections pool** interface based on aiopg pool backend.
 
     JSON fields support is enabled by default, HStore supports is disabled by
     default, but can be enabled through pool_params or with ``register_hstore=False`` argument.

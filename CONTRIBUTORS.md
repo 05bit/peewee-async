@@ -1,6 +1,8 @@
 # Contributors
 
 * @rudyryk | Alexey Kinev <rudy@05bit.com>
+* @kalombos | Nikolay Gorshkov <nogamemorebrain@gmail.com>
+* @akerlay | Kirill Mineev
 * @mrbox | Jakub Paczkowski
 * @CyberROFL | Ilnaz Nizametdinov
 * @insolite | Oleg

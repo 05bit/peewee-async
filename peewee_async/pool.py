@@ -84,7 +84,7 @@ class PostgresqlPoolBackend(PoolBackend):
         )
 
 
-class Psycopg3PoolBackend(PoolBackend):
+class PsycopgPoolBackend(PoolBackend):
     """Asynchronous database connection pool based on psycopg + psycopg_pool libraries.
     """
 
