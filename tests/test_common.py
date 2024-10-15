@@ -3,7 +3,9 @@ import uuid
 
 import peewee
 import pytest
+from pytest import LogCaptureFixture
 
+from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import TestModel, CompositeTestModel
@@ -89,3 +91,13 @@ async def test_allow_sync_is_reverted_for_exc(db):
     except peewee.IntegrityError:
         pass
     assert db._allow_sync is False
+
+
+@dbs_all
+async def test_logging(db: AioDatabase, caplog: LogCaptureFixture, enable_debug_log_level: None) -> None:
+
+    await TestModel.aio_create(text="Test 1")
+
+    assert 'INSERT INTO' in caplog.text
+    assert 'testmodel' in caplog.text
+    assert 'VALUES' in caplog.text
