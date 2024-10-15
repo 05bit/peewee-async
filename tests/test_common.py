@@ -3,7 +3,7 @@ import uuid
 
 import peewee
 import pytest
-from _pytest.logging import LogCaptureFixture
+from pytest import LogCaptureFixture
 
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
