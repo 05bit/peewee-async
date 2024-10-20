@@ -113,7 +113,7 @@ class PsycopgPoolBackend(PoolBackend):
 
     def has_acquired_connections(self) -> bool:
         if self.pool is not None:
-            return bool(self.pool._nconns - self.pool._num_pool > 0)
+            return bool(self.pool._nconns - len(self.pool._pool) > 0)
         return False
 
     async def acquire(self) -> ConnectionProtocol:
