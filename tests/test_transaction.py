@@ -15,7 +15,7 @@ class FakeConnectionError(Exception):
 
 
 @dbs_all
-async def test_transaction_error_on_begin(db: AioDatabase, mocker: MockerFixture, enable_debug_log_level) -> None:
+async def test_transaction_error_on_begin(db: AioDatabase, mocker: MockerFixture) -> None:
     mocker.patch.object(Transaction, "begin", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
         async with db.aio_atomic():
