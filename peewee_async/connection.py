@@ -39,5 +39,5 @@ class ConnectionContextManager:
     ) -> None:
         if self.resuing_connection is False:
             if self.connection_context is not None:
-                self.pool_backend.release(self.connection_context.connection)
+                await self.pool_backend.release(self.connection_context.connection)
             connection_context.set(None)

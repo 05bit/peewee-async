@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager, List, Callable, Awaitable
+from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager, List, Callable, Awaitable, Union
 
 try:
     import aiopg
@@ -7,6 +7,13 @@ try:
 except ImportError:
     aiopg = None  # type: ignore
     psycopg2 = None
+
+try:
+    import psycopg
+    import psycopg_pool
+except ImportError:
+    psycopg = None  # type: ignore
+    psycopg_pool = None  # type: ignore
 
 try:
     import aiomysql
@@ -50,25 +57,8 @@ class ConnectionProtocol(Protocol):
         ...
 
 
-class PoolProtocol(Protocol):
-
-    _used: Set[ConnectionProtocol]
-
-    @property
-    def closed(self) -> bool:
-        ...
-
-    async def acquire(self) -> ConnectionProtocol:
-        ...
-
-    def release(self, conn: ConnectionProtocol) -> None:
-        ...
-
-    def terminate(self) -> None:
-        ...
-
-    async def wait_closed(self) -> None:
-        ...
-
-
 FetchResults = Callable[[CursorProtocol], Awaitable[Any]]
+
+
+def format_dsn(protocol: str, host: str, port: Union[str, int], user: str, password: str, path: str = '') -> str:
+    return f'{protocol}://{user}:{password}@{host}:{port}/{path}'

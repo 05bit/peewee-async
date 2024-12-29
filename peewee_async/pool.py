@@ -2,7 +2,7 @@ import abc
 import asyncio
 from typing import Any, Optional, cast
 
-from .utils import aiopg, aiomysql, PoolProtocol, ConnectionProtocol
+from .utils import aiopg, aiomysql, ConnectionProtocol, format_dsn, psycopg, psycopg_pool
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
@@ -10,7 +10,7 @@ class PoolBackend(metaclass=abc.ABCMeta):
     """
 
     def __init__(self, *, database: str, **kwargs: Any) -> None:
-        self.pool: Optional[PoolProtocol] = None
+        self.pool: Optional[Any] = None
         self.database = database
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()
@@ -20,6 +20,16 @@ class PoolBackend(metaclass=abc.ABCMeta):
         if self.pool is not None:
             return self.pool.closed is False
         return False
+
+    @property
+    def min_size(self) -> int:
+        assert self.pool is not None, "Pool is not connected"
+        return cast(int, self.pool.minsize)
+
+    @property
+    def max_size(self) -> int:
+        assert self.pool is not None, "Pool is not connected"
+        return cast(int, self.pool.maxsize)
 
     def has_acquired_connections(self) -> bool:
         if self.pool is not None:
@@ -37,9 +47,9 @@ class PoolBackend(metaclass=abc.ABCMeta):
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return await self.pool.acquire()
+        return cast(ConnectionProtocol, await self.pool.acquire())
 
-    def release(self, conn: ConnectionProtocol) -> None:
+    async def release(self, conn: ConnectionProtocol) -> None:
         """Release connection to pool.
         """
         assert self.pool is not None, "Pool is not connected"
@@ -68,13 +78,73 @@ class PostgresqlPoolBackend(PoolBackend):
         """
         if "connect_timeout" in self.connect_params:
             self.connect_params['timeout'] = self.connect_params.pop("connect_timeout")
-        self.pool = cast(
-            PoolProtocol,
-            await aiopg.create_pool(
-                database=self.database,
-                **self.connect_params
-            )
+        self.pool = await aiopg.create_pool(
+            database=self.database,
+            **self.connect_params
         )
+
+
+class PsycopgPoolBackend(PoolBackend):
+    """Asynchronous database connection pool based on psycopg + psycopg_pool libraries.
+    """
+
+    async def create(self) -> None:
+        """Create connection pool asynchronously.
+        """
+        params = self.connect_params.copy()
+        pool = psycopg_pool.AsyncConnectionPool(
+            format_dsn(
+                'postgresql',
+                host=params.pop('host'),
+                port=params.pop('port'),
+                user=params.pop('user'),
+                password=params.pop('password'),
+                path=self.database,
+            ),
+            kwargs={
+                'cursor_factory': psycopg.AsyncClientCursor,
+                'autocommit': True,
+            },
+            **params,
+        )
+
+        await pool.open()
+        self.pool = pool
+
+    def has_acquired_connections(self) -> bool:
+        if self.pool is not None:
+            return bool(self.pool._nconns - len(self.pool._pool) > 0)
+        return False
+
+    async def acquire(self) -> ConnectionProtocol:
+        """Acquire connection from pool.
+        """
+        if self.pool is None:
+            await self.connect()
+        assert self.pool is not None, "Pool is not connected"
+        return cast(ConnectionProtocol, await self.pool.getconn())
+
+    async def release(self, conn: ConnectionProtocol) -> None:
+        """Release connection to pool.
+        """
+        assert self.pool is not None, "Pool is not connected"
+        await self.pool.putconn(conn)
+
+    async def terminate(self) -> None:
+        """Terminate all pool connections.
+        """
+        if self.pool is not None:
+            await self.pool.close()
+
+    @property
+    def min_size(self) -> int:
+        assert self.pool is not None, "Pool is not connected"
+        return cast(int, self.pool.min_size)
+
+    @property
+    def max_size(self) -> int:
+        assert self.pool is not None, "Pool is not connected"
+        return cast(int, self.pool.max_size)
 
 
 class MysqlPoolBackend(PoolBackend):
@@ -84,9 +154,6 @@ class MysqlPoolBackend(PoolBackend):
     async def create(self) -> None:
         """Create connection pool asynchronously.
         """
-        self.pool = cast(
-            PoolProtocol,
-            await aiomysql.create_pool(
-                db=self.database, **self.connect_params
-            ),
+        self.pool = await aiomysql.create_pool(
+            db=self.database, **self.connect_params
         )
