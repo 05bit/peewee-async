@@ -11,7 +11,7 @@ ORM powered by **[asyncio](https://docs.python.org/3/library/asyncio.html)**.
 Overview
 --------
 
-* Requires Python 3.8+
+* Requires Python 3.9+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
 * Asynchronous analogues of peewee sync methods with prefix aio_
