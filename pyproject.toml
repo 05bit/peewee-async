@@ -7,7 +7,7 @@ readme = "README.md"
 
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 peewee = "^3.15.4"
 typing-extensions = "^4.12.2"
 
@@ -31,3 +31,22 @@ docs = ["aiopg", "aiomysql", "cryptography", "sphinx", "sphinx-rtd-theme"]
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+no_implicit_optional = true
+strict_equality = true
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+warn_return_any = true
+disallow_any_generics = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+exclude = "(venv|load-testing|examples|docs)"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
