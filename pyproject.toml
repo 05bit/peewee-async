@@ -7,7 +7,7 @@ readme = "README.md"
 
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 peewee = "^3.15.4"
 typing-extensions = "^4.12.2"
 
@@ -33,7 +33,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.9"
 ignore_missing_imports = true
 no_implicit_optional = true
 strict_equality = true
