@@ -18,7 +18,7 @@ PSYCOPG_DEFAULTS = {
     'port': int(os.environ.get('POSTGRES_PORT', 5432)),
     'password': 'postgres',
     'user': 'postgres',
-    'pool_params': {"min_size": 0, "max_size": 5, "open": False, 'max_lifetime': 60 * 60.0}
+    'pool_params': {"min_size": 0, "max_size": 5, 'max_lifetime': 60 * 60.0}
 }
 
 MYSQL_DEFAULTS = {

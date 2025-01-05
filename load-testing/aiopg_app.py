@@ -62,7 +62,6 @@ async def lifespan(app: FastAPI):
     await database.aio_execute_sql('TRUNCATE TABLE MySimplestModel;')
     setup_logging()
     yield
-    # Clean up the ML models and release the resources
     await database.aio_close()
 
 app = FastAPI(lifespan=lifespan)
@@ -79,11 +78,6 @@ async def select():
     return errors
 
 
-async def nested_transaction():
-    async with database.aio_atomic():
-        await MySimplestModel.update(id=1).aio_execute()
-
-
 async def nested_atomic():
     async with database.aio_atomic():
         await MySimplestModel.update(id=1).aio_execute()
@@ -94,7 +88,6 @@ async def transaction():
     try:
         async with database.aio_atomic():
             await MySimplestModel.update(id=1).aio_execute()
-            await nested_transaction()
     except Exception as e:
         errors.add(str(e))
         raise

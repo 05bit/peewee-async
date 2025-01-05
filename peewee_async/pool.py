@@ -105,6 +105,7 @@ class PsycopgPoolBackend(PoolBackend):
                 'cursor_factory': psycopg.AsyncClientCursor,
                 'autocommit': True,
             },
+            open=False,
             **params,
         )
 
