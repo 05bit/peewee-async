@@ -7,9 +7,12 @@ PG_DEFAULTS = {
     'port': int(os.environ.get('POSTGRES_PORT', 5432)),
     'password': 'postgres',
     'user': 'postgres',
-    'min_connections': 0,
-    'max_connections': 5,
-    'pool_params': {"timeout": 30, 'pool_recycle': 1.5}
+    'pool_params': {
+        "minsize": 0,
+        "maxsize": 5,    
+        "timeout": 30, 
+        'pool_recycle': 1.5
+    }
 }
 
 PSYCOPG_DEFAULTS = {
@@ -18,7 +21,11 @@ PSYCOPG_DEFAULTS = {
     'port': int(os.environ.get('POSTGRES_PORT', 5432)),
     'password': 'postgres',
     'user': 'postgres',
-    'pool_params': {"min_size": 0, "max_size": 5, 'max_lifetime': 60 * 60.0}
+    'pool_params': {
+        "min_size": 0, 
+        "max_size": 5, 
+        'max_lifetime': 15
+    }
 }
 
 MYSQL_DEFAULTS = {
@@ -28,9 +35,11 @@ MYSQL_DEFAULTS = {
     'user': 'root',
     'password': 'mysql',
     'connect_timeout': 30,
-    'min_connections': 0,
-    'max_connections': 5,
-    "pool_params": {"pool_recycle": 2}
+    "pool_params": {
+        "minsize": 0,
+        "maxsize": 5,    
+        "pool_recycle": 2
+    }
 }
 
 DB_DEFAULTS = {
