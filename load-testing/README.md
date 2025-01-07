@@ -15,14 +15,10 @@ pip install requirments
 Run the app:
 
 ```bash
-uvicorn psycopg_app:app
+uvicorn app:app
 ```
 
-or
 
-```bash
-uvicorn aiopg_app:app
-```
 
 Run yandex-tank:
 

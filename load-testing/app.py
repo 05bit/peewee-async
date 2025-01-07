@@ -106,15 +106,12 @@ async def select():
 async def transaction() -> None:
     async with database.aio_atomic():
         await AppTestModel.update(text="5").where(AppTestModel.id==1).aio_execute()
-
-        await asyncio.sleep(0.05)
-
         await AppTestModel.update(text="10").where(AppTestModel.id==1).aio_execute()
 
 
 async def nested_atomic() -> None:
     async with database.aio_atomic():
-        await AppTestModel.update(text="1").where(AppTestModel.id==1).aio_execute()
+        await AppTestModel.update(text="1").where(AppTestModel.id==2).aio_execute()
 
 
 @app.get("/savepoint")
