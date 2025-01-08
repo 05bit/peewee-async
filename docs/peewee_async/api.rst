@@ -76,6 +76,9 @@ Databases
 
 .. automethod:: peewee_async.databases.AioDatabase.aio_atomic
 
+.. autoclass:: peewee_async.PsycopgDatabase
+    :members: init
+
 .. autoclass:: peewee_async.PooledPostgresqlDatabase
     :members: init
 

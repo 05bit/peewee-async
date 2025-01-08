@@ -3,6 +3,7 @@
 .vscode
 .venv/
 .env
+load-testing/logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,56 +1,77 @@
 import logging
-import random
 from contextlib import asynccontextmanager
 
 import peewee
 import uvicorn
+from fastapi import FastAPI
+import asyncio
 from aiopg.connection import Connection
 from aiopg.pool import Pool
-from fastapi import FastAPI
+import random
 
-acquire = Pool.acquire
-cursor = Connection.cursor
-
-
-def new_acquire(self):
-    choice = random.randint(1, 5)
-    if choice == 5:
-        raise Exception("some network error")  # network error imitation
-    return acquire(self)
-
-
-def new_cursor(self):
-    choice = random.randint(1, 5)
-    if choice == 5:
-        raise Exception("some network error")  # network error imitation
-    return cursor(self)
-
-Connection.cursor = new_cursor
-Pool.acquire = new_acquire
 
 import peewee_async
 
 
-logging.basicConfig()
-database = peewee_async.PooledPostgresqlDatabase(
+aiopg_database = peewee_async.PooledPostgresqlDatabase(
     database='postgres',
     user='postgres',
     password='postgres',
     host='localhost',
     port=5432,
-    max_connections=3
+        pool_params = { 
+        "minsize": 0,
+        "maxsize": 3,
+    }
 )
 
+psycopg_database = peewee_async.PsycopgDatabase(
+    database='postgres',
+    user='postgres',
+    password='postgres',
+    host='localhost',
+    port=5432,
+    pool_params = { 
+        "min_size": 0,
+        "max_size": 3,
+    }
+)
+
+database = psycopg_database
+
+
+def patch_aiopg():
+    acquire = Pool.acquire
+    cursor = Connection.cursor
+
+
+    def new_acquire(self):
+        choice = random.randint(1, 5)
+        if choice == 5:
+            raise Exception("some network error")  # network error imitation
+        return acquire(self)
+
+
+    def new_cursor(self):
+        choice = random.randint(1, 5)
+        if choice == 5:
+            raise Exception("some network error")  # network error imitation
+        return cursor(self)
+
+    Connection.cursor = new_cursor
+    Pool.acquire = new_acquire
 
 
 def setup_logging():
+    logging.basicConfig()
+    # logging.getLogger("psycopg.pool").setLevel(logging.DEBUG)
     logger = logging.getLogger("uvicorn.error")
     handler = logging.FileHandler(filename="app.log", mode="w")
     logger.addHandler(handler)
 
 
-class MySimplestModel(peewee_async.AioModel):
-    id = peewee.IntegerField(primary_key=True, sequence=True)
+class AppTestModel(peewee_async.AioModel):
+    text = peewee.CharField(max_length=100)
 
     class Meta:
         database = database
@@ -58,59 +79,47 @@ class MySimplestModel(peewee_async.AioModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await database.aio_execute_sql('CREATE TABLE IF NOT EXISTS MySimplestModel (id SERIAL PRIMARY KEY);')
-    await database.aio_execute_sql('TRUNCATE TABLE MySimplestModel;')
+    AppTestModel.drop_table()
+    AppTestModel.create_table()
+    await AppTestModel.aio_create(id=1, text="1")
+    await AppTestModel.aio_create(id=2, text="2")
     setup_logging()
     yield
-    # Clean up the ML models and release the resources
     await database.aio_close()
 
 app = FastAPI(lifespan=lifespan)
 errors = set()
 
 
-@app.get("/select")
+@app.get("/errors")
 async def select():
-    try:
-        await MySimplestModel.select().aio_execute()
-    except Exception as e:
-        errors.add(str(e))
-        raise
     return errors
 
 
-async def nested_transaction():
-    async with database.aio_atomic():
-        await MySimplestModel.update(id=1).aio_execute()
+@app.get("/select")
+async def select():
+    await AppTestModel.select().aio_execute()
 
-
-async def nested_atomic():
-    async with database.aio_atomic():
-        await MySimplestModel.update(id=1).aio_execute()
 
 
 @app.get("/transaction")
-async def transaction():
-    try:
-        async with database.aio_atomic():
-            await MySimplestModel.update(id=1).aio_execute()
-            await nested_transaction()
-    except Exception as e:
-        errors.add(str(e))
-        raise
-    return errors
+async def transaction() -> None:
+    async with database.aio_atomic():
+        await AppTestModel.update(text="5").where(AppTestModel.id==1).aio_execute()
+        await AppTestModel.update(text="10").where(AppTestModel.id==1).aio_execute()
 
 
-@app.get("/atomic")
-async def atomic():
-    try:
-        async with database.aio_atomic():
-            await MySimplestModel.update(id=1).aio_execute()
-            await nested_atomic()
-    except Exception as e:
-        errors.add(str(e))
-        raise
-    return errors
+async def nested_atomic() -> None:
+    async with database.aio_atomic():
+        await AppTestModel.update(text="1").where(AppTestModel.id==2).aio_execute()
+
+
+@app.get("/savepoint")
+async def savepoint():
+    async with database.aio_atomic():
+        await AppTestModel.update(text="2").where(AppTestModel.id==2).aio_execute()
+        await nested_atomic()
+
 
 
 @app.get("/recreate_pool")

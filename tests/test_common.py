@@ -59,6 +59,7 @@ async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase])
     await TestModel.aio_create(text=text)
     await TestModel.aio_get(text=text)
     TestModel.drop_table(True)
+    await database.aio_close()
 
 
 @dbs_all

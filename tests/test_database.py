@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 import pytest
+from peewee import OperationalError
 
 from peewee_async import connection_context
 from peewee_async.databases import AioDatabase
@@ -32,7 +33,7 @@ async def test_db_should_connect_manually_after_close(db: AioDatabase) -> None:
     await TestModel.aio_create(text='test')
 
     await db.aio_close()
-    with pytest.raises(RuntimeError):
+    with pytest.raises((RuntimeError, OperationalError)):
         await TestModel.aio_get_or_none(text='test')
     await db.aio_connect()
 
@@ -75,18 +76,25 @@ async def test_deferred_init(db_name: str) -> None:
     await database.aio_close()
 
 
-@pytest.mark.parametrize('db_name', PG_DBS + MYSQL_DBS)
-async def test_connections_param(db_name: str) -> None:
+@pytest.mark.parametrize(
+    'db_name',
+    [
+        "postgres-pool",
+        "postgres-pool-ext",
+        "mysql-pool"
+    ]
+)
+async def test_deprecated_min_max_connections_param(db_name: str) -> None:
     default_params = DB_DEFAULTS[db_name].copy()
-    default_params['min_connections'] = 2
-    default_params['max_connections'] = 3
-
+    del default_params['pool_params']
+    default_params["min_connections"] = 1
+    default_params["max_connections"] = 3
     db_cls = DB_CLASSES[db_name]
     database = db_cls(**default_params)
     await database.aio_connect()
 
-    assert database.pool_backend.pool._minsize == 2  # type: ignore
-    assert database.pool_backend.pool._free.maxlen == 3  # type: ignore
+    assert database.pool_backend.pool.minsize == 1 # type: ignore
+    assert database.pool_backend.pool.maxsize == 3 # type: ignore
 
     await database.aio_close()
 
@@ -96,6 +104,8 @@ async def test_mysql_params(db: AioDatabase) -> None:
     async with db.aio_connection() as connection_1:
         assert connection_1.autocommit_mode is True  # type: ignore
     assert db.pool_backend.pool._recycle == 2  # type: ignore
+    assert db.pool_backend.pool.minsize == 0  # type: ignore
+    assert db.pool_backend.pool.maxsize == 5  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -108,6 +118,8 @@ async def test_pg_json_hstore__params(db: AioDatabase) -> None:
     assert db.pool_backend.pool._enable_hstore is False  # type: ignore
     assert db.pool_backend.pool._timeout == 30  # type: ignore
     assert db.pool_backend.pool._recycle == 1.5  # type: ignore
+    assert db.pool_backend.pool.minsize == 0  # type: ignore
+    assert db.pool_backend.pool.maxsize == 5  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -120,3 +132,17 @@ async def test_pg_ext_json_hstore__params(db: AioDatabase) -> None:
     assert db.pool_backend.pool._enable_hstore is False  # type: ignore
     assert db.pool_backend.pool._timeout == 30  # type: ignore
     assert db.pool_backend.pool._recycle == 1.5  # type: ignore
+    assert db.pool_backend.pool._recycle == 1.5  # type: ignore
+    assert db.pool_backend.pool.minsize == 0  # type: ignore
+    assert db.pool_backend.pool.maxsize == 5  # type: ignore
+
+
+@pytest.mark.parametrize(
+    "db",
+    ["psycopg-pool"], indirect=["db"]
+)
+async def test_psycopg__params(db: AioDatabase) -> None:
+    await db.aio_connect()
+    assert db.pool_backend.pool.min_size == 0  # type: ignore
+    assert db.pool_backend.pool.max_size == 5  # type: ignore
+    assert db.pool_backend.pool.max_lifetime == 15  # type: ignore

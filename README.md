@@ -26,10 +26,16 @@ http://peewee-async-lib.readthedocs.io
 Install
 -------
 
-Install with `pip` for PostgreSQL:
+Install with `pip` for PostgreSQL aiopg backend:
 
 ```bash
 pip install peewee-async[postgresql]
+```
+
+or for PostgreSQL psycopg3 backend:
+
+```bash
+pip install peewee-async[psycopg]
 ```
 
 or for MySQL:

@@ -6,7 +6,7 @@ import pytest
 from peewee import sort_models
 
 from peewee_async.databases import AioDatabase
-from peewee_async.utils import aiopg, aiomysql
+from peewee_async.utils import aiopg, aiomysql, psycopg
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import ALL_MODELS
 
@@ -38,6 +38,8 @@ async def db(request: pytest.FixtureRequest) -> AsyncGenerator[AioDatabase, None
         pytest.skip("aiopg is not installed")
     if db.startswith('mysql') and aiomysql is None:
         pytest.skip("aiomysql is not installed")
+    if db.startswith('psycopg') and psycopg is None:
+        pytest.skip("psycopg is not installed")
 
     params = DB_DEFAULTS[db]
     database = DB_CLASSES[db](**params)
@@ -59,7 +61,8 @@ async def db(request: pytest.FixtureRequest) -> AsyncGenerator[AioDatabase, None
 
 PG_DBS = [
     "postgres-pool",
-    "postgres-pool-ext"
+    "postgres-pool-ext",
+    "psycopg-pool",
 ]
 
 MYSQL_DBS = ["mysql-pool"]
