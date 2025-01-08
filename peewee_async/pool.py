@@ -21,16 +21,6 @@ class PoolBackend(metaclass=abc.ABCMeta):
             return self.pool.closed is False
         return False
 
-    @property
-    def min_size(self) -> int:
-        assert self.pool is not None, "Pool is not connected"
-        return cast(int, self.pool.minsize)
-
-    @property
-    def max_size(self) -> int:
-        assert self.pool is not None, "Pool is not connected"
-        return cast(int, self.pool.maxsize)
-
     def has_acquired_connections(self) -> bool:
         if self.pool is not None:
             return len(self.pool._used) > 0
@@ -137,16 +127,6 @@ class PsycopgPoolBackend(PoolBackend):
         """
         if self.pool is not None:
             await self.pool.close()
-
-    @property
-    def min_size(self) -> int:
-        assert self.pool is not None, "Pool is not connected"
-        return cast(int, self.pool.min_size)
-
-    @property
-    def max_size(self) -> int:
-        assert self.pool is not None, "Pool is not connected"
-        return cast(int, self.pool.max_size)
 
 
 class MysqlPoolBackend(PoolBackend):

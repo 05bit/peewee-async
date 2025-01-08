@@ -18,14 +18,11 @@ Run the app:
 uvicorn app:app
 ```
 
-
-
 Run yandex-tank:
 
 ```bash
 docker run -v $(pwd):/var/loadtest --net host -it yandex/yandex-tank
 ```
-
 
 Firewall rulle to make postgreql connection unreacheable
 
