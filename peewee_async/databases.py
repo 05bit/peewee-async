@@ -84,12 +84,12 @@ class AioDatabase(peewee.Database):
         return self.pool_backend.is_connected
 
     async def aio_close(self) -> None:
-        """Terminate pool backend. The pool is closed until you run aio_connect manually
-        """
+        """Close pool backend. The pool is closed until you run aio_connect manually."""
+        
         if self.deferred:
             raise Exception('Error, database must be initialized before creating a connection pool')
 
-        await self.pool_backend.terminate()
+        await self.pool_backend.close()
 
     @contextlib.asynccontextmanager
     async def aio_atomic(self) -> AsyncIterator[None]:
