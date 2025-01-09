@@ -5,6 +5,7 @@ from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List
 
 import peewee
 from playhouse import postgres_ext as ext
+from playhouse.psycopg3_ext import Psycopg3Database
 
 from .connection import connection_context, ConnectionContextManager
 from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend, PsycopgPoolBackend
@@ -84,12 +85,12 @@ class AioDatabase(peewee.Database):
         return self.pool_backend.is_connected
 
     async def aio_close(self) -> None:
-        """Terminate pool backend. The pool is closed until you run aio_connect manually
-        """
+        """Close pool backend. The pool is closed until you run aio_connect manually."""
+        
         if self.deferred:
             raise Exception('Error, database must be initialized before creating a connection pool')
 
-        await self.pool_backend.terminate()
+        await self.pool_backend.close()
 
     @contextlib.asynccontextmanager
     async def aio_atomic(self) -> AsyncIterator[None]:
@@ -184,7 +185,7 @@ class AioDatabase(peewee.Database):
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 
-class PsycopgDatabase(AioDatabase, peewee.PostgresqlDatabase):
+class PsycopgDatabase(AioDatabase, Psycopg3Database):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
