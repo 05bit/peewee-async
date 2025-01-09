@@ -5,6 +5,7 @@ from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List
 
 import peewee
 from playhouse import postgres_ext as ext
+from playhouse.psycopg3_ext import Psycopg3Database
 
 from .connection import connection_context, ConnectionContextManager
 from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend, PsycopgPoolBackend
@@ -184,7 +185,7 @@ class AioDatabase(peewee.Database):
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 
-class PsycopgDatabase(AioDatabase, peewee.PostgresqlDatabase):
+class PsycopgDatabase(AioDatabase, Psycopg3Database):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
