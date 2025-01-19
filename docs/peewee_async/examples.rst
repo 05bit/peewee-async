@@ -3,7 +3,7 @@ Examples
 
 
 Using both sync and async calls
--------------------------------
++++++++++++++++++++++++++++++++
 
 .. code-block:: python
 
@@ -40,7 +40,7 @@ Using both sync and async calls
 
 
 Using transactions
-------------------
+++++++++++++++++++
 
 .. code-block:: python
 
@@ -66,7 +66,7 @@ Using transactions
     loop.run_until_complete(test())
 
 Using async peewee with Tornado
--------------------------------
++++++++++++++++++++++++++++++++
 
 `Tornado`_ is a mature and powerful asynchronous web framework. It provides its own event loop, but there's an option to run Tornado on asyncio event loop. And that's exactly what we need!
 

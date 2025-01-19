@@ -24,58 +24,6 @@ The source code is hosted on `GitHub`_.
 
 .. _GitHub: https://github.com/05bit/peewee-async
 
-Quickstart
-----------
-
-.. literalinclude:: ./samples/quickstart.py
-
-
-Install
--------
-
-Install latest version from PyPI.
-
-For PostgreSQL:
-
-.. code-block:: console
-
-    pip install peewee-async[postgresql]
-
-For MySQL:
-
-.. code-block:: console
-
-    pip install peewee-async[mysql]
-
-Install from sources
-++++++++++++++++++++
-
-.. code-block:: console
-
-    git clone https://github.com/05bit/peewee-async.git
-    cd peewee-async
-    pip install .
-
-Running tests
-+++++++++++++
-
-Prepare environment for tests:
-
-* Clone source code from GitHub as shown above
-* Run docker environment with PostgreSQL database for testing
-
-Then run tests:
-
-.. code-block:: console
-
-    pytest -s -v
-
-Report bugs and discuss
------------------------
-
-You are welcome to add discussion topics or bug reports to `tracker on GitHub`_!
-
-.. _tracker on GitHub: https://github.com/05bit/peewee-async/issues
 
 Contents
 --------
@@ -83,7 +31,10 @@ Contents
 .. toctree::
    :maxdepth: 2
 
+   peewee_async/installing
+   peewee_async/quickstart
    peewee_async/api
+   peewee_async/connection
    peewee_async/examples
 
 Indices and tables
