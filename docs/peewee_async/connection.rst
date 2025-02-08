@@ -1,5 +1,5 @@
-Working with connections
-========================
+Connections
+===========
 
 Every time some query is executed, for example, like this:
 
@@ -33,8 +33,8 @@ It releases the connection at the exit and set the ``connection_context`` to ``N
     await MyModel.aio_get(id=3)
     # release the connection and set the connection_context to None
 
-Connections manual management
-++++++++++++++++++++++++++++
+Manual management
++++++++++++++++++++++++++++++
 
 If you want to manage connections manually or you want to use one connection for a batch of queries you 
 can run ``database.aio_connection`` by yourself and run the queries under the context manager.
