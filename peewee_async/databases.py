@@ -18,16 +18,21 @@ class AioDatabase(peewee.Database):
     connection and **async connections pool** interface.
 
     :param pool_params: parameters that are passed to the pool
-    :param min_connections: min connections pool size. Alias for pool_params.minsize
-    :param max_connections: max connections pool size. Alias for pool_params.maxsize
 
     Example::
 
         database = PooledPostgresqlExtDatabase(
-            'test',
-            'min_connections': 1,
-            'max_connections': 5,
-            'pool_params': {"timeout": 30, 'pool_recycle': 1.5}
+            'database': 'postgres',
+            'host': '127.0.0.1',
+            'port':5432,
+            'password': 'postgres',
+            'user': 'postgres',
+            'pool_params': {
+                "minsize": 0,
+                "maxsize": 5,    
+                "timeout": 30, 
+                'pool_recycle': 1.5
+            }
         )
 
     See also:
@@ -189,8 +194,23 @@ class PsycopgDatabase(AioDatabase, Psycopg3Database):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
+    Example::
+
+        database = PsycopgDatabase(
+            'database': 'postgres',
+            'host': '127.0.0.1',
+            'port': 5432,
+            'password': 'postgres',
+            'user': 'postgres',
+            'pool_params': {
+                "min_size": 0, 
+                "max_size": 5, 
+                'max_lifetime': 15
+            }
+        )
+
     See also:
-    https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
+    https://www.psycopg.org/psycopg3/docs/advanced/pool.html
     """
 
     pool_backend_cls = PsycopgPoolBackend
@@ -204,6 +224,23 @@ class PsycopgDatabase(AioDatabase, Psycopg3Database):
 class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     """Extension for `peewee.PostgresqlDatabase` providing extra methods
     for managing async connection based on aiopg pool backend.
+
+
+    Example::
+
+        database = PooledPostgresqlExtDatabase(
+            'database': 'postgres',
+            'host': '127.0.0.1',
+            'port':5432,
+            'password': 'postgres',
+            'user': 'postgres',
+            'pool_params': {
+                "minsize": 0,
+                "maxsize": 5,    
+                "timeout": 30, 
+                'pool_recycle': 1.5
+            }
+        )
 
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
@@ -230,11 +267,6 @@ class PooledPostgresqlExtDatabase(
     JSON fields support is enabled by default, HStore supports is disabled by
     default, but can be enabled through pool_params or with ``register_hstore=False`` argument.
 
-    Example::
-
-        database = PooledPostgresqlExtDatabase('test', register_hstore=False,
-                                               max_connections=20)
-
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
@@ -251,7 +283,19 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
 
     Example::
 
-        database = PooledMySQLDatabase('test', max_connections=10)
+        database = PooledMySQLDatabase(
+            'database': 'mysql',
+            'host': '127.0.0.1',
+            'port': 3306,
+            'user': 'root',
+            'password': 'mysql',
+            'connect_timeout': 30,
+            "pool_params": {
+                "minsize": 0,
+                "maxsize": 5,    
+                "pool_recycle": 2
+            }
+        )
 
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase

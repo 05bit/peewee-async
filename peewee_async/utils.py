@@ -33,6 +33,9 @@ class CursorProtocol(Protocol):
     async def fetchall(self) -> List[Any]:
         ...
 
+    async def fetchmany(self, size: int) -> List[Any]:
+        ...
+
     @property
     def lastrowid(self) -> int:
         ...

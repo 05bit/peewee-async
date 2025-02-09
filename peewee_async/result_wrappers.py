@@ -23,8 +23,11 @@ class SyncCursorAdapter(object):
         pass
 
 
-async def fetch_models(cursor: CursorProtocol, query: BaseQuery) -> List[Any]:
-    rows = await cursor.fetchall()
+async def fetch_models(cursor: CursorProtocol, query: BaseQuery, count: Optional[int] = None) -> List[Any]:
+    if count is None:
+        rows = await cursor.fetchall()
+    else:
+        rows = await cursor.fetchmany(count)
     sync_cursor = SyncCursorAdapter(rows, cursor.description)
     _result_wrapper = query._get_cursor_wrapper(sync_cursor)
     return list(_result_wrapper)
