@@ -84,50 +84,72 @@ class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
     pass
 
 
-class AioSelectMixin(AioQueryMixin):
+class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
+
 
     @peewee.database_required
-    async def aio_scalar(self, database: AioDatabase, as_tuple: bool = False) -> Any:
+    async def aio_peek(self, database: AioDatabase, n: int = 1) -> Any:
         """
-        Get single value from ``select()`` query, i.e. for aggregation.
-
-        :return: result is the same as after sync ``query.scalar()`` call
-
-        See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.scalar
+        Asynchronous version of 
+        `peewee.SelectBase.peek <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.peek>`_
         """
+
         async def fetch_results(cursor: CursorProtocol) -> Any:
-            return await cursor.fetchone()
+            return await fetch_models(cursor, self, n)
 
         rows = await database.aio_execute(self, fetch_results=fetch_results)
+        if rows:
+            return rows[0] if n == 1 else rows
 
-        return rows[0] if rows and not as_tuple else rows
+    @peewee.database_required
+    async def aio_scalar(
+        self, 
+        database: AioDatabase, 
+        as_tuple: bool = False,
+        as_dict: bool = False
+    ) -> Any:
+        """        
+        Asynchronous version of `peewee.SelectBase.scalar 
+        <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.scalar>`_
+        """
+        if as_dict:
+            return await self.dicts().aio_peek(database)
+        row = await self.tuples().aio_peek(database)
+
+        return row[0] if row and not as_tuple else row
+    
+    @peewee.database_required
+    async def aio_first(self, database: AioDatabase, n: int = 1) -> Any:
+        """
+        Asynchronous version of `peewee.SelectBase.first 
+        <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.first>`_
+        """
+
+        if self._limit != n: # type: ignore
+            self._limit = n
+        return await self.aio_peek(database, n=n)
 
     async def aio_get(self, database: Optional[AioDatabase] = None) -> Any:
         """
-        Async version of **peewee.SelectBase.get**
-
-        See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.get
+        Asynchronous version of `peewee.SelectBase.get 
+        <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.get>`_
         """
-        clone = self.paginate(1, 1) # type: ignore
+        clone = self.paginate(1, 1)
         try:
             return (await clone.aio_execute(database))[0]
         except IndexError:
             sql, params = clone.sql()
-            raise self.model.DoesNotExist('%s instance matching query does '  # type: ignore
+            raise self.model.DoesNotExist('%s instance matching query does '
                                           'not exist:\nSQL: %s\nParams: %s' %
                                           (clone.model, sql, params))
 
     @peewee.database_required
     async def aio_count(self, database: AioDatabase, clear_limit: bool = False) -> int:
         """
-        Async version of **peewee.SelectBase.count**
-
-        See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.count
+        Asynchronous version of `peewee.SelectBase.count 
+        <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.count>`_
         """
-        clone = self.order_by().alias('_wrapped')  # type: ignore
+        clone = self.order_by().alias('_wrapped')
         if clear_limit:
             clone._limit = clone._offset = None
         try:
@@ -145,38 +167,34 @@ class AioSelectMixin(AioQueryMixin):
     @peewee.database_required
     async def aio_exists(self, database: AioDatabase) -> bool:
         """
-        Async version of **peewee.SelectBase.exists**
-
-        See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#SelectBase.exists
+        Asynchronous version of `peewee.SelectBase.exists 
+        <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.exists>`_
         """
-        clone = self.columns(peewee.SQL('1'))  # type: ignore
+        clone = self.columns(peewee.SQL('1'))
         clone._limit = 1
         clone._offset = None
         return bool(await clone.aio_scalar())
 
     def union_all(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'UNION ALL', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'UNION ALL', rhs)
     __add__ = union_all
 
     def union(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'UNION', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'UNION', rhs)
     __or__ = union
 
     def intersect(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'INTERSECT', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'INTERSECT', rhs)
     __and__ = intersect
 
     def except_(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'EXCEPT', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'EXCEPT', rhs)
     __sub__ = except_
 
     def aio_prefetch(self, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
         """
-        Async version of **peewee.ModelSelect.prefetch**
-
-        See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#ModelSelect.prefetch
+        Asynchronous version of `peewee.ModelSelect.prefetch 
+        <https://docs.peewee-orm.com/en/latest/peewee/api.html#ModelSelect.prefetch>`_
         """
         return aio_prefetch(self, *subqueries, prefetch_type=prefetch_type)
 
@@ -186,7 +204,7 @@ class AioSelect(AioSelectMixin, peewee.Select):
 
 
 class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
-    """Async version of **peewee.ModelSelect** that provides async versions of ModelSelect methods
+    """Asynchronous version of **peewee.ModelSelect** that provides async versions of ModelSelect methods
     """
     pass
 

@@ -1,3 +1,4 @@
+from typing import List, Union
 import uuid
 
 import peewee
@@ -36,6 +37,64 @@ async def test_aio_get_or_none(db: AioDatabase) -> None:
 
 
 @dbs_all
+@pytest.mark.parametrize(
+    ["peek_num", "expected"],
+    (
+        (1, 1),
+        (2, [1,2]),
+        (5, [1,2,3]),
+    )
+)
+async def test_aio_peek(
+    db: AioDatabase,
+    peek_num: int,
+    expected: Union[int, List[int]]
+) -> None:
+    await IntegerTestModel.aio_create(num=1)
+    await IntegerTestModel.aio_create(num=2)
+    await IntegerTestModel.aio_create(num=3)
+
+    rows = await IntegerTestModel.select().order_by(
+        IntegerTestModel.num
+    ).aio_peek(n=peek_num)
+
+    if isinstance(rows, list):
+        result = [r.num for r in rows]
+    else:
+        result = rows.num
+    assert result == expected
+
+
+@dbs_all
+@pytest.mark.parametrize(
+    ["first_num", "expected"],
+    (
+        (1, 1),
+        (2, [1,2]),
+        (5, [1,2,3]),
+    )
+)
+async def test_aio_first(
+    db: AioDatabase,
+    first_num: int,
+    expected: Union[int, List[int]]
+) -> None:
+    await IntegerTestModel.aio_create(num=1)
+    await IntegerTestModel.aio_create(num=2)
+    await IntegerTestModel.aio_create(num=3)
+
+    rows = await IntegerTestModel.select().order_by(
+        IntegerTestModel.num
+    ).aio_first(n=first_num)
+
+    if isinstance(rows, list):
+        result = [r.num for r in rows]
+    else:
+        result = rows.num
+    assert result == expected
+
+
+@dbs_all
 async def test_aio_scalar(db: AioDatabase) -> None:
     await IntegerTestModel.aio_create(num=1)
     await IntegerTestModel.aio_create(num=2)
@@ -45,6 +104,11 @@ async def test_aio_scalar(db: AioDatabase) -> None:
     assert await IntegerTestModel.select(
         fn.MAX(IntegerTestModel.num),fn.Min(IntegerTestModel.num)
     ).aio_scalar(as_tuple=True) == (2, 1)
+
+    assert await IntegerTestModel.select(
+        fn.MAX(IntegerTestModel.num).alias('max'),
+        fn.Min(IntegerTestModel.num).alias('min')
+    ).aio_scalar(as_dict=True) == {'max': 2, 'min': 1}
 
     assert await TestModel.select().aio_scalar() is None
 

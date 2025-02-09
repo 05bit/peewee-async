@@ -57,7 +57,11 @@ AioModelSelect
 
 .. autoclass:: peewee_async.aio_model.AioModelSelect
 
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_peek
+
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_scalar
+
+.. automethod:: peewee_async.aio_model.AioModelSelect.aio_first
 
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_get
 
