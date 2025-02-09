@@ -125,7 +125,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.first>`_
         """
 
-        if self._limit != n:
+        if self._limit != n: # type: ignore
             self._limit = n
         return await self.aio_peek(database, n=n)
 
@@ -134,12 +134,12 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         Asynchronous version of `peewee.SelectBase.get 
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.get>`_
         """
-        clone = self.paginate(1, 1) # type: ignore
+        clone = self.paginate(1, 1)
         try:
             return (await clone.aio_execute(database))[0]
         except IndexError:
             sql, params = clone.sql()
-            raise self.model.DoesNotExist('%s instance matching query does '  # type: ignore
+            raise self.model.DoesNotExist('%s instance matching query does '
                                           'not exist:\nSQL: %s\nParams: %s' %
                                           (clone.model, sql, params))
 
@@ -149,7 +149,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         Asynchronous version of `peewee.SelectBase.count 
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.count>`_
         """
-        clone = self.order_by().alias('_wrapped')  # type: ignore
+        clone = self.order_by().alias('_wrapped')
         if clear_limit:
             clone._limit = clone._offset = None
         try:
@@ -170,25 +170,25 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         Asynchronous version of `peewee.SelectBase.exists 
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.exists>`_
         """
-        clone = self.columns(peewee.SQL('1'))  # type: ignore
+        clone = self.columns(peewee.SQL('1'))
         clone._limit = 1
         clone._offset = None
         return bool(await clone.aio_scalar())
 
     def union_all(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'UNION ALL', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'UNION ALL', rhs)
     __add__ = union_all
 
     def union(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'UNION', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'UNION', rhs)
     __or__ = union
 
     def intersect(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'INTERSECT', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'INTERSECT', rhs)
     __and__ = intersect
 
     def except_(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'EXCEPT', rhs)  # type: ignore
+        return AioModelCompoundSelectQuery(self.model, self, 'EXCEPT', rhs)
     __sub__ = except_
 
     def aio_prefetch(self, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
