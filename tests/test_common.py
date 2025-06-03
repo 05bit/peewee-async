@@ -53,12 +53,14 @@ async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase])
 
     database.initialize(db_cls(**params))
 
-    TestModel.create_table(True)
+    with database.allow_sync():
+        TestModel.create_table(True)
 
     text = "Test %s" % uuid.uuid4()
     await TestModel.aio_create(text=text)
     await TestModel.aio_get(text=text)
-    TestModel.drop_table(True)
+    with database.allow_sync():
+        TestModel.drop_table(True)
     await database.aio_close()
 
 

@@ -10,8 +10,6 @@ Let's provide an example::
 
     database = PooledPostgresqlDatabase('test')
 
-    # Disable sync queries
-    database.set_allow_sync(False)
 
     # Let's define a simple model:
     class PageBlock(peewee_async.AioModel):
@@ -55,3 +53,21 @@ Finally, let's do something async::
 
 And you can use methods from from **AioModel** for operations like selecting, deleting etc.
 All of them you can find in the next section.
+
+
+Using sync calls
++++++++++++++++++++++++++++++++
+
+If you may notice in the example above if you need to run sync query you can use :py:meth:`~peewee_async.databases.AioDatabase.allow_sync` context manager:
+
+.. code-block:: python
+
+    with database.allow_sync():
+       PageBlock.create_table(True)
+
+Be careful when using such queries. It is not recommended to use them in an asynchronous application for the following reasons:
+
+1. For each such query, a new connection to the database is open and closed upon its completion. Which is very expensive in terms of resources.
+2. If such a query is executed for a long time, then the application will not be able to execute other coroutines until the query is completed
+
+Synchronous queries should be used in tests or single-threaded tasks.

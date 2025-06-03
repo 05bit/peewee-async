@@ -44,7 +44,6 @@ async def db(request: pytest.FixtureRequest) -> AsyncGenerator[AioDatabase, None
     params = DB_DEFAULTS[db]
     database = DB_CLASSES[db](**params)
 
-    database._allow_sync = False
     with database.allow_sync():
         for model in ALL_MODELS:
             model._meta.database = database
