@@ -39,7 +39,7 @@ class AioDatabase(peewee.Database):
     https://peewee.readthedocs.io/en/latest/peewee/api.html#Database
     """
 
-    _allow_sync = True  # whether sync queries are allowed
+    _allow_sync = False  # whether sync queries are allowed
 
     pool_backend_cls: Type[PoolBackend]
     pool_backend: PoolBackend
@@ -147,12 +147,6 @@ class AioDatabase(peewee.Database):
         assert self._allow_sync, (
             "Error, sync query is not allowed! Call the `.set_allow_sync()` "
             "or use the `.allow_sync()` context manager.")
-        if self._allow_sync in (logging.ERROR, logging.WARNING):
-            logging.log(
-                self._allow_sync,
-                "Error, sync query is not allowed: %s %s" %
-                (str(args), str(kwargs))
-            )
         return super().execute_sql(*args, **kwargs)
 
     def aio_connection(self) -> ConnectionContextManager:
