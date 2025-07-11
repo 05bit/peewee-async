@@ -1,7 +1,7 @@
 import contextlib
 import logging
 import warnings
-from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List
+from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List, AsyncContextManager
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -97,26 +97,26 @@ class AioDatabase(peewee.Database):
 
         await self.pool_backend.close()
 
-    def aio_atomic(self) -> AsyncIterator[None]:
+    def aio_atomic(self) -> AsyncContextManager[None]:
         """Similar to peewee `Database.aio_atomic()` method, but returns
         asynchronous context manager.
         """
         return self._aio_atomic(use_savepoint=True)
     
-    def aio_transaction(self) -> AsyncIterator[None]:
+    def aio_transaction(self) -> AsyncContextManager[None]:
         """Similar to peewee `Database.aio_transaction()` method, but returns
         asynchronous context manager.
         """
         return self._aio_atomic(use_savepoint=False)
 
     @contextlib.asynccontextmanager
-    async def _aio_atomic(self, use_savepoint=False) -> AsyncIterator[None]:
+    async def _aio_atomic(self, use_savepoint: bool = False) -> AsyncIterator[None]:
 
         async with self.aio_connection() as connection:
             _connection_context = connection_context.get()
             assert _connection_context is not None
             if _connection_context.transaction_is_opened and not use_savepoint:
-                raise Exception("nested transactions are not allowed you can use savepoint instead")
+                raise peewee.OperationalError("Transaction already opened")
             try:
                 async with Transaction(connection, is_savepoint=_connection_context.transaction_is_opened):
                     _connection_context.transaction_is_opened = True
