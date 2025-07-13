@@ -1,10 +1,11 @@
 Transactions
 =========================
 
-Peewee-async provides similiar to peewee interface for working with transactions. The interface is the :py:meth:`~peewee_async.databases.AioDatabase.aio_atomic` method, 
-which also supports nested transactions and works as context manager. **aio_atomic()** blocks will be run in a transaction or savepoint, depending on the level of nesting.
+Peewee-async provides several interfaces similiar to peewee for working with transactions. 
 
 
+The most general interface are :py:meth:`~peewee_async.databases.AioDatabase.aio_atomic` and :py:meth:`~peewee_async.databases.AioDatabase.aio_transaction` methods which work as context managers.
+The :py:meth:`~peewee_async.databases.AioDatabase.aio_atomic` method supports nested transactions and run the block of code in a transaction or savepoint, depending on the level of nesting.
 If an exception occurs in a wrapped block, the current transaction/savepoint will be rolled back. Otherwise the statements will be committed at the end of the wrapped block.
 
 .. code-block:: python
@@ -16,6 +17,16 @@ If an exception occurs in a wrapped block, the current transaction/savepoint wil
             await TestModel.update(text="BAR").aio_execute() # UPDATE "testmodel" SET "text" = 'BAR'
         # RELEASE SAVEPOINT PWASYNC__e83bf5fc118f4e28b0fbdac90ab857ca
     # COMMIT
+
+The :py:meth:`~peewee_async.databases.AioDatabase.aio_transcation` method does not allow nested transactions and run the block of code in a transaction.
+
+.. code-block:: python
+
+    async with db.aio_atomic(): # BEGIN
+        await TestModel.aio_create(text='FOO') # INSERT INTO "testmodel" ("text", "data") VALUES ('FOO', '') RETURNING "testmodel"."id"
+    # COMMIT
+
+Using nested :py:meth:`~peewee_async.databases.AioDatabase.aio_transcation` will lead to **OperationalError**.
 
 Manual management
 +++++++++++++++++

@@ -98,14 +98,15 @@ class AioDatabase(peewee.Database):
         await self.pool_backend.close()
 
     def aio_atomic(self) -> AsyncContextManager[None]:
-        """Similar to peewee `Database.aio_atomic()` method, but returns
-        asynchronous context manager.
+        """Create an async context-manager which runs any queries in the wrapped block in a transaction (or save-point if blocks are nested).
+        Calls to :meth:`.aio_atomic()` can be nested.
         """
         return self._aio_atomic(use_savepoint=True)
     
     def aio_transaction(self) -> AsyncContextManager[None]:
-        """Similar to peewee `Database.aio_transaction()` method, but returns
-        asynchronous context manager.
+        """Create an async context-manager that runs all queries in the wrapped block in a transaction.
+        
+        Calls to :meth:`.aio_transaction()` cannot be nested. If so OperationalError will be raised.
         """
         return self._aio_atomic(use_savepoint=False)
 
