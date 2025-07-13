@@ -2,17 +2,18 @@
 Provide django-style hooks for model events.
 """
 from peewee_async import AioModel as _Model
+from typing import Union, Literal, Any
 
 
 class Signal(object):
-    def __init__(self):
+    def __init__(self) -> None:
         self._flush()
 
-    def _flush(self):
+    def _flush(self)-> None:
         self._receivers = set()
         self._receiver_list = []
 
-    def connect(self, receiver, name=None, sender=None):
+    def connect(self, receiver, name=None, sender=None) -> None:
         name = name or receiver.__name__
         key = (name, sender)
         if key not in self._receivers:
@@ -22,7 +23,7 @@ class Signal(object):
             raise ValueError('receiver named %s (for sender=%s) already '
                              'connected' % (name, sender or 'any'))
 
-    def disconnect(self, receiver=None, name=None, sender=None):
+    def disconnect(self, receiver=None, name=None, sender=None) -> None:
         if receiver:
             name = name or receiver.__name__
         if not name:
@@ -61,20 +62,20 @@ pre_init = Signal() # can't be async !
 
 class AioModel(_Model):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super(AioModel, self).__init__(*args, **kwargs)
         pre_init.send(self)
 
-    async def aio_save(self, *args, **kwargs):
+    async def aio_save(self, force_insert: bool = False, only: Any = None) -> Union[int, Literal[False]]:
         pk_value = self._pk if self._meta.primary_key else True
-        created = kwargs.get('force_insert', False) or not bool(pk_value)
+        created = force_insert or not bool(pk_value)
         await aio_pre_save.send(self, created=created)
-        ret = await super(AioModel, self).aio_save(*args, **kwargs)
+        ret = await super(AioModel, self).aio_save(force_insert, only)
         await aio_post_save.send(self, created=created)
         return ret
 
-    async def aio_delete_instance(self, *args, **kwargs):
+    async def aio_delete_instance(self, recursive: bool = False, delete_nullable: bool = False) -> int:
         await aio_pre_delete.send(self)
-        ret = await super(AioModel, self).aio_delete_instance(*args, **kwargs)
+        ret = await super(AioModel, self).aio_delete_instance(recursive, delete_nullable)
         await aio_post_delete.send(self)
         return ret

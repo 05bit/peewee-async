@@ -5,7 +5,7 @@ from .databases import AioDatabase
 from .result_wrappers import fetch_models
 from .utils import CursorProtocol
 from typing_extensions import Self
-from typing import Tuple, List, Any, cast, Optional, Dict, Union
+from typing import Literal, Tuple, List, Any, cast, Optional, Dict, Union
 
 
 async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
@@ -281,7 +281,7 @@ class AioModel(peewee.Model):
                     await model.delete().where(query).aio_execute()
         return cast(int, await type(self).delete().where(self._pk_expr()).aio_execute())
 
-    async def aio_save(self, force_insert: bool = False, only: Any =None) -> int:
+    async def aio_save(self, force_insert: bool = False, only: Any =None) -> Union[int, Literal[False]]:
         """
         Async version of **peewee.Model.save**
 
