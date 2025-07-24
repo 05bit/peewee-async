@@ -2,6 +2,7 @@ import uuid
 
 import peewee
 import peewee_async
+import peewee_async.signals
 
 
 class TestModel(peewee_async.AioModel):
@@ -61,7 +62,15 @@ class IntegerTestModel(peewee_async.AioModel):
     num = peewee.IntegerField()
 
 
+class TestSignalModel(peewee_async.signals.AioModel):
+    __test__ = False  # disable pytest warnings
+    text = peewee.CharField(max_length=100)
+
+    def __str__(self) -> str:
+        return '<%s id=%s> %s' % (self.__class__.__name__, self.id, self.text)
+
+
 ALL_MODELS = (
     TestModel, UUIDTestModel, TestModelAlpha, TestModelBeta, TestModelGamma,
-    CompositeTestModel, IntegerTestModel
+    CompositeTestModel, IntegerTestModel, TestSignalModel
 )

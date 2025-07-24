@@ -1,49 +1,8 @@
-"""
-Provide django-style hooks for model events.
-"""
 from peewee_async import AioModel as _Model
 from typing import Union, Literal, Any
+from playhouse.signals import Signal
 
-
-class Signal(object):
-    def __init__(self) -> None:
-        self._flush()
-
-    def _flush(self)-> None:
-        self._receivers = set()
-        self._receiver_list = []
-
-    def connect(self, receiver, name=None, sender=None) -> None:
-        name = name or receiver.__name__
-        key = (name, sender)
-        if key not in self._receivers:
-            self._receivers.add(key)
-            self._receiver_list.append((name, receiver, sender))
-        else:
-            raise ValueError('receiver named %s (for sender=%s) already '
-                             'connected' % (name, sender or 'any'))
-
-    def disconnect(self, receiver=None, name=None, sender=None) -> None:
-        if receiver:
-            name = name or receiver.__name__
-        if not name:
-            raise ValueError('a receiver or a name must be provided')
-
-        key = (name, sender)
-        if key not in self._receivers:
-            raise ValueError('receiver named %s for sender=%s not found.' %
-                             (name, sender or 'any'))
-
-        self._receivers.remove(key)
-        self._receiver_list = [(n, r, s) for n, r, s in self._receiver_list
-                               if (n, s) != key]
-
-    def __call__(self, name=None, sender=None):
-        def decorator(fn):
-            self.connect(fn, name, sender)
-            return fn
-        return decorator
-
+class AioSignal(Signal):
     async def send(self, instance, *args, **kwargs):
         sender = type(instance)
         responses = []
@@ -53,10 +12,10 @@ class Signal(object):
         return responses
 
 
-aio_pre_save = Signal()
-aio_post_save = Signal()
-aio_pre_delete = Signal()
-aio_post_delete = Signal()
+aio_pre_save = AioSignal()
+aio_post_save = AioSignal()
+aio_pre_delete = AioSignal()
+aio_post_delete = AioSignal()
 pre_init = Signal() # can't be async !
 
 
