@@ -1,7 +1,7 @@
 import contextlib
 import logging
 import warnings
-from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List
+from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List, AsyncContextManager
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -97,22 +97,33 @@ class AioDatabase(peewee.Database):
 
         await self.pool_backend.close()
 
-    @contextlib.asynccontextmanager
-    async def aio_atomic(self) -> AsyncIterator[None]:
-        """Similar to peewee `Database.atomic()` method, but returns
-        asynchronous context manager.
+    def aio_atomic(self) -> AsyncContextManager[None]:
+        """Create an async context-manager which runs any queries in the wrapped block in a transaction (or save-point if blocks are nested).
+        Calls to :meth:`.aio_atomic()` can be nested.
         """
+        return self._aio_atomic(use_savepoint=True)
+    
+    def aio_transaction(self) -> AsyncContextManager[None]:
+        """Create an async context-manager that runs all queries in the wrapped block in a transaction.
+        
+        Calls to :meth:`.aio_transaction()` cannot be nested. If so OperationalError will be raised.
+        """
+        return self._aio_atomic(use_savepoint=False)
+
+    @contextlib.asynccontextmanager
+    async def _aio_atomic(self, use_savepoint: bool = False) -> AsyncIterator[None]:
+
         async with self.aio_connection() as connection:
             _connection_context = connection_context.get()
             assert _connection_context is not None
-            begin_transaction = _connection_context.transaction_is_opened is False
+            if _connection_context.transaction_is_opened and not use_savepoint:
+                raise peewee.OperationalError("Transaction already opened")
             try:
-                async with Transaction(connection, is_savepoint=begin_transaction is False):
+                async with Transaction(connection, is_savepoint=_connection_context.transaction_is_opened):
                     _connection_context.transaction_is_opened = True
                     yield
             finally:
-                if begin_transaction is True:
-                    _connection_context.transaction_is_opened = False
+                _connection_context.transaction_is_opened = False
 
     def set_allow_sync(self, value: bool) -> None:
         """Allow or forbid sync queries for the database. See also

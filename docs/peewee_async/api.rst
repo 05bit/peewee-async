@@ -21,6 +21,8 @@ Databases
 
 .. automethod:: peewee_async.databases.AioDatabase.aio_atomic
 
+.. automethod:: peewee_async.databases.AioDatabase.aio_transaction
+
 .. autoclass:: peewee_async.PsycopgDatabase
     :members: init
 
