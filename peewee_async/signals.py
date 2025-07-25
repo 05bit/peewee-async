@@ -3,7 +3,7 @@ from typing import Union, Literal, Any
 from playhouse.signals import Signal
 
 class AioSignal(Signal):
-    async def send(self, instance, *args, **kwargs):
+    async def send(self, instance: "AioModel", *args: Any, **kwargs: Any) -> list[tuple[Any, Any]]:
         sender = type(instance)
         responses = []
         for n, r, s in self._receiver_list:
