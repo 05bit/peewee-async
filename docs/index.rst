@@ -36,6 +36,7 @@ Contents
    peewee_async/api
    peewee_async/connection
    peewee_async/transaction
+   peewee_async/signals
    peewee_async/examples
 
 Indices and tables
