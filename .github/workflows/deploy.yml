@@ -2,7 +2,7 @@ name: Deploy to PyPI
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   deploy:
@@ -19,7 +19,6 @@ jobs:
 
       - name: Build
         run: |
-          poetry version ${{ github.ref_name }}
           poetry build
 
       - name: Publish
