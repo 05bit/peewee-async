@@ -116,6 +116,7 @@ class AioDatabase(peewee.Database):
         async with self.aio_connection() as connection:
             _connection_context = connection_context.get()
             assert _connection_context is not None
+            begin_transaction = _connection_context.transaction_is_opened is False
             if _connection_context.transaction_is_opened and not use_savepoint:
                 raise peewee.OperationalError("Transaction already opened")
             try:
@@ -123,7 +124,8 @@ class AioDatabase(peewee.Database):
                     _connection_context.transaction_is_opened = True
                     yield
             finally:
-                _connection_context.transaction_is_opened = False
+                if begin_transaction:
+                    _connection_context.transaction_is_opened = False
 
     def set_allow_sync(self, value: bool) -> None:
         """Allow or forbid sync queries for the database. See also
