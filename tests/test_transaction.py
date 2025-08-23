@@ -151,14 +151,20 @@ async def test_nested_transaction__error(method1: str, method2: str, db: AioData
 
 
 @dbs_all
-async def test_savepoint_success(db: AioDatabase) -> None:
+async def test_savepoints_success(db: AioDatabase) -> None:
     async with db.aio_atomic():
         await TestModel.aio_create(text='FOO')
 
         async with db.aio_atomic():
             await TestModel.update(text="BAR").aio_execute()
 
-    assert await TestModel.aio_get_or_none(text="BAR") is not None
+            async with db.aio_atomic():
+                await TestModel.update(text="BAZ").aio_execute()
+                
+            async with db.aio_atomic():
+                await TestModel.update(text="QUX").aio_execute()
+
+    assert await TestModel.aio_get_or_none(text="QUX") is not None
     assert db.pool_backend.has_acquired_connections() is False
 
 
@@ -196,24 +202,6 @@ async def test_savepoint_manual_work(db: AioDatabase) -> None:
         await tr.commit()
 
     assert await TestModel.aio_get_or_none(text="FOO") is not None
-    assert db.pool_backend.has_acquired_connections() is False
-
-
-@dbs_all
-async def test_nested_savepoints_success(db: AioDatabase) -> None:
-    async with db.aio_atomic():
-        await TestModel.aio_create(text='FOO')
-
-        async with db.aio_atomic():
-            await TestModel.update(text="BAR").aio_execute()
-
-            async with db.aio_atomic():
-                await TestModel.update(text="BAZ").aio_execute()
-                
-            async with db.aio_atomic():
-                await TestModel.update(text="QUX").aio_execute()
-
-    assert await TestModel.aio_get_or_none(text="QUX") is not None
     assert db.pool_backend.has_acquired_connections() is False
 
 
