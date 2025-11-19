@@ -8,8 +8,7 @@ peewee-async
 
 **peewee-async** is a library providing asynchronous interface powered by `asyncio`_ for `peewee`_ ORM.
 
-.. _peewee: https://github.com/coleifer/peewee
-.. _asyncio: https://docs.python.org/3/library/asyncio.html
+
 
 
 * Works on Python 3.9+
@@ -24,6 +23,13 @@ The source code is hosted on `GitHub`_.
 
 .. _GitHub: https://github.com/05bit/peewee-async
 
+
+Related projects
+----------------
+
+* `asyncio <https://docs.python.org/3/library/asyncio.html>`_ - is a library to write concurrent code using the async/await syntax.
+* `peewee <https://github.com/coleifer/peewee/>`_ - the Peewee ORM.
+* `miggy <https://github.com/kalombos/miggy/>`_ - is a migration engine for Peewee.
 
 Contents
 --------
