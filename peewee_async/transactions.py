@@ -6,7 +6,6 @@ from .utils import ConnectionProtocol
 
 
 class Transaction:
-
     def __init__(self, connection: ConnectionProtocol, is_savepoint: bool = False):
         self.connection = connection
         self.savepoint: Optional[str] = None
@@ -27,7 +26,7 @@ class Transaction:
             sql = f"SAVEPOINT {self.savepoint}"
         await self.execute(sql)
 
-    async def __aenter__(self) -> 'Transaction':
+    async def __aenter__(self) -> "Transaction":
         await self.begin()
         return self
 
@@ -35,7 +34,7 @@ class Transaction:
         self,
         exc_type: Optional[Type[BaseException]],
         exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType]
+        traceback: Optional[TracebackType],
     ) -> None:
         if exc_type is not None:
             await self.rollback()

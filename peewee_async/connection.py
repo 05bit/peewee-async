@@ -35,7 +35,7 @@ class ConnectionContextManager:
         self,
         exc_type: Optional[Type[BaseException]],
         exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType]
+        traceback: Optional[TracebackType],
     ) -> None:
         if self.resuing_connection is False:
             if self.connection_context is not None:

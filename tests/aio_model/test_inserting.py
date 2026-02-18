@@ -8,10 +8,12 @@ from tests.utils import model_has_fields
 
 @dbs_all
 async def test_insert_many(db: AioDatabase) -> None:
-    last_id = await TestModel.insert_many([
-        {'text': "Test %s" % uuid.uuid4()},
-        {'text': "Test %s" % uuid.uuid4()},
-    ]).aio_execute()
+    last_id = await TestModel.insert_many(
+        [
+            {"text": "Test %s" % uuid.uuid4()},
+            {"text": "Test %s" % uuid.uuid4()},
+        ]
+    ).aio_execute()
 
     res = await TestModel.select().aio_execute()
 
@@ -48,11 +50,7 @@ async def test_insert_on_conflict_ignore__return_model(db: AioDatabase) -> None:
     res = await TestModel.select().aio_execute()
     expected = res[0]
 
-    assert model_has_fields(inserted, {
-        "id": expected.id,
-        "text": expected.text,
-        "data": expected.data
-    }) is True
+    assert model_has_fields(inserted, {"id": expected.id, "text": expected.text, "data": expected.data}) is True
 
 
 @dbs_postgres
@@ -83,17 +81,13 @@ async def test_insert__return_model(db: AioDatabase) -> None:
     res = await query.aio_execute()
 
     inserted = res[0]
-    assert model_has_fields(
-        inserted, {"id": inserted.id, "text": text, "data": data}
-    ) is True
+    assert model_has_fields(inserted, {"id": inserted.id, "text": text, "data": data}) is True
 
 
 @dbs_postgres
 async def test_insert_many__return_model(db: AioDatabase) -> None:
     texts = [f"text{n}" for n in range(2)]
-    query = TestModel.insert_many([
-        {"text": text} for text in texts
-    ]).returning(TestModel)
+    query = TestModel.insert_many([{"text": text} for text in texts]).returning(TestModel)
 
     res = await query.aio_execute()
 

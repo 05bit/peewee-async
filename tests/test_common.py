@@ -9,7 +9,7 @@ from pytest import LogCaptureFixture
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
-from tests.models import TestModel, CompositeTestModel
+from tests.models import CompositeTestModel, TestModel
 
 
 @dbs_all
@@ -41,12 +41,7 @@ async def test_indexing_result(db: AioDatabase) -> None:
     assert obj == result[1]
 
 
-@pytest.mark.parametrize(
-    "params, db_cls",
-    [
-        (DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()
-    ]
-)
+@pytest.mark.parametrize("params, db_cls", [(DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()])
 async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase]) -> None:
     database = peewee.Proxy()
     TestModel._meta.database = database
@@ -67,13 +62,11 @@ async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase])
 @dbs_all
 async def test_many_requests(db: AioDatabase) -> None:
 
-    max_connections = getattr(dbs_all, 'max_connections', 1)
+    max_connections = getattr(dbs_all, "max_connections", 1)
     text = "Test %s" % uuid.uuid4()
     obj = await TestModel.aio_create(text=text)
     n = 2 * max_connections  # number of requests
-    done, not_done = await asyncio.wait(
-        {asyncio.create_task(TestModel.aio_get(id=obj.id)) for _ in range(n)}
-    )
+    done, not_done = await asyncio.wait({asyncio.create_task(TestModel.aio_get(id=obj.id)) for _ in range(n)})
     assert len(done) == n
 
 
@@ -102,6 +95,6 @@ async def test_logging(db: AioDatabase, caplog: LogCaptureFixture, enable_debug_
 
     await TestModel.aio_create(text="Test 1")
 
-    assert 'INSERT INTO' in caplog.text
-    assert 'testmodel' in caplog.text
-    assert 'VALUES' in caplog.text
+    assert "INSERT INTO" in caplog.text
+    assert "testmodel" in caplog.text
+    assert "VALUES" in caplog.text

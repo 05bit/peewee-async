@@ -1,17 +1,14 @@
 import logging
+import random
 from contextlib import asynccontextmanager
 
 import peewee
 import uvicorn
-from fastapi import FastAPI
-import asyncio
 from aiopg.connection import Connection
 from aiopg.pool import Pool
-import random
-
+from fastapi import FastAPI
 
 import peewee_async
-
 
 aiopg_database = peewee_async.PooledPostgresqlDatabase(
     database='postgres',

@@ -1,19 +1,19 @@
 import asyncio
 import logging
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from peewee import sort_models
 
 from peewee_async.databases import AioDatabase
-from peewee_async.utils import aiopg, aiomysql, psycopg
+from peewee_async.utils import aiomysql, aiopg, psycopg
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import ALL_MODELS
 
 
 @pytest.fixture
 def enable_debug_log_level() -> Generator[None, None, None]:
-    logger = logging.getLogger('peewee.async')
+    logger = logging.getLogger("peewee.async")
     handler = logging.StreamHandler()
     logger.addHandler(handler)
     logger.setLevel(logging.DEBUG)
@@ -34,11 +34,11 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 @pytest.fixture
 async def db(request: pytest.FixtureRequest) -> AsyncGenerator[AioDatabase, None]:
     db = request.param
-    if db.startswith('postgres') and aiopg is None:
+    if db.startswith("postgres") and aiopg is None:
         pytest.skip("aiopg is not installed")
-    if db.startswith('mysql') and aiomysql is None:
+    if db.startswith("mysql") and aiomysql is None:
         pytest.skip("aiomysql is not installed")
-    if db.startswith('psycopg') and psycopg is None:
+    if db.startswith("psycopg") and psycopg is None:
         pytest.skip("psycopg is not installed")
 
     params = DB_DEFAULTS[db]
@@ -67,16 +67,10 @@ PG_DBS = [
 MYSQL_DBS = ["mysql-pool"]
 
 
-dbs_mysql = pytest.mark.parametrize(
-    "db", MYSQL_DBS, indirect=["db"]
-)
+dbs_mysql = pytest.mark.parametrize("db", MYSQL_DBS, indirect=["db"])
 
 
-dbs_postgres = pytest.mark.parametrize(
-    "db", PG_DBS, indirect=["db"]
-)
+dbs_postgres = pytest.mark.parametrize("db", PG_DBS, indirect=["db"])
 
 
-dbs_all = pytest.mark.parametrize(
-    "db", PG_DBS + MYSQL_DBS, indirect=["db"]
-)
+dbs_all = pytest.mark.parametrize("db", PG_DBS + MYSQL_DBS, indirect=["db"])

@@ -1,12 +1,15 @@
-from peewee_async import AioModel as _Model
-from typing import Union, Literal, Any
+from typing import Any, Literal, Union
+
 from playhouse.signals import Signal
+
+from peewee_async import AioModel as _Model
+
 
 class AioSignal(Signal):
     async def send(self, instance: "AioModel", *args: Any, **kwargs: Any) -> list[tuple[Any, Any]]:
         sender = type(instance)
         responses = []
-        for n, r, s in self._receiver_list:
+        for _n, r, s in self._receiver_list:
             if s is None or isinstance(instance, s):
                 responses.append((r, await r(sender, instance, *args, **kwargs)))
         return responses
@@ -16,11 +19,10 @@ aio_pre_save = AioSignal()
 aio_post_save = AioSignal()
 aio_pre_delete = AioSignal()
 aio_post_delete = AioSignal()
-pre_init = Signal() # can't be async !
+pre_init = Signal()  # can't be async !
 
 
 class AioModel(_Model):
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super(AioModel, self).__init__(*args, **kwargs)
         pre_init.send(self)

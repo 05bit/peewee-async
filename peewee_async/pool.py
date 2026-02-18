@@ -2,7 +2,7 @@ import abc
 import asyncio
 from typing import Any, Optional, cast
 
-from .utils import aiopg, aiomysql, ConnectionProtocol, format_dsn, psycopg, psycopg_pool
+from .utils import ConnectionProtocol, aiomysql, aiopg, format_dsn, psycopg, psycopg_pool
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
@@ -56,17 +56,14 @@ class PostgresqlPoolBackend(PoolBackend):
 
     async def create(self) -> None:
         if "connect_timeout" in self.connect_params:
-            self.connect_params['timeout'] = self.connect_params.pop("connect_timeout")
-        self.pool = await aiopg.create_pool(
-            database=self.database,
-            **self.connect_params
-        )
+            self.connect_params["timeout"] = self.connect_params.pop("connect_timeout")
+        self.pool = await aiopg.create_pool(database=self.database, **self.connect_params)
 
     async def acquire(self) -> ConnectionProtocol:
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast(ConnectionProtocol, await self.pool.acquire())
+        return cast("ConnectionProtocol", await self.pool.acquire())
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"
@@ -82,6 +79,7 @@ class PostgresqlPoolBackend(PoolBackend):
             return len(self.pool._used) > 0
         return False
 
+
 class PsycopgPoolBackend(PoolBackend):
     """Asynchronous database connection pool based on psycopg + psycopg_pool."""
 
@@ -89,16 +87,16 @@ class PsycopgPoolBackend(PoolBackend):
         params = self.connect_params.copy()
         pool = psycopg_pool.AsyncConnectionPool(
             format_dsn(
-                'postgresql',
-                host=params.pop('host'),
-                port=params.pop('port'),
-                user=params.pop('user'),
-                password=params.pop('password'),
+                "postgresql",
+                host=params.pop("host"),
+                port=params.pop("port"),
+                user=params.pop("user"),
+                password=params.pop("password"),
                 path=self.database,
             ),
             kwargs={
-                'cursor_factory': psycopg.AsyncClientCursor,
-                'autocommit': True,
+                "cursor_factory": psycopg.AsyncClientCursor,
+                "autocommit": True,
             },
             open=False,
             **params,
@@ -110,14 +108,14 @@ class PsycopgPoolBackend(PoolBackend):
     def has_acquired_connections(self) -> bool:
         if self.pool is not None:
             stats = self.pool.get_stats()
-            return stats['pool_size'] > stats['pool_available'] # type: ignore
-        return False    
+            return stats["pool_size"] > stats["pool_available"]  # type: ignore
+        return False
 
     async def acquire(self) -> ConnectionProtocol:
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast(ConnectionProtocol, await self.pool.getconn())
+        return cast("ConnectionProtocol", await self.pool.getconn())
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"
@@ -133,15 +131,13 @@ class MysqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool based on aiomysql."""
 
     async def create(self) -> None:
-        self.pool = await aiomysql.create_pool(
-            db=self.database, **self.connect_params
-        )
+        self.pool = await aiomysql.create_pool(db=self.database, **self.connect_params)
 
     async def acquire(self) -> ConnectionProtocol:
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast(ConnectionProtocol, await self.pool.acquire())
+        return cast("ConnectionProtocol", await self.pool.acquire())
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"

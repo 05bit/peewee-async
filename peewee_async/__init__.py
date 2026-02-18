@@ -13,36 +13,38 @@ Licensed under The MIT License (MIT)
 Copyright (c) 2014, Alexey Kinëv <rudy@05bit.com>
 
 """
+
 from importlib.metadata import version
 
 from playhouse.db_url import register_database
-from .aio_model import aio_prefetch, AioModel
+
+from .aio_model import AioModel, aio_prefetch
 from .connection import connection_context
 from .databases import (
+    PooledMySQLDatabase,
     PooledPostgresqlDatabase,
     PooledPostgresqlExtDatabase,
-    PooledMySQLDatabase,
     PsycopgDatabase,
 )
-from .pool import PostgresqlPoolBackend, MysqlPoolBackend
+from .pool import MysqlPoolBackend, PostgresqlPoolBackend
 from .transactions import Transaction
 
-__version__ = version('peewee-async')
+__version__ = version("peewee-async")
 
 
 __all__ = [
-    'PooledPostgresqlDatabase',
-    'PooledPostgresqlExtDatabase',
-    'PooledMySQLDatabase',
-    'Transaction',
-    'AioModel',
-    'aio_prefetch',
-    'connection_context',
-    'PostgresqlPoolBackend',
-    'MysqlPoolBackend',
+    "PooledPostgresqlDatabase",
+    "PooledPostgresqlExtDatabase",
+    "PooledMySQLDatabase",
+    "Transaction",
+    "AioModel",
+    "aio_prefetch",
+    "connection_context",
+    "PostgresqlPoolBackend",
+    "MysqlPoolBackend",
 ]
 
-register_database(PooledPostgresqlDatabase, 'postgres+pool+async', 'postgresql+pool+async')
-register_database(PooledPostgresqlExtDatabase, 'postgresext+pool+async', 'postgresqlext+pool+async')
-register_database(PsycopgDatabase, 'psycopg+pool+async', 'psycopg+pool+async')
-register_database(PooledMySQLDatabase, 'mysql+pool+async')
+register_database(PooledPostgresqlDatabase, "postgres+pool+async", "postgresql+pool+async")
+register_database(PooledPostgresqlExtDatabase, "postgresext+pool+async", "postgresqlext+pool+async")
+register_database(PsycopgDatabase, "psycopg+pool+async", "psycopg+pool+async")
+register_database(PooledMySQLDatabase, "mysql+pool+async")
