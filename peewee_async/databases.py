@@ -29,8 +29,8 @@ class AioDatabase(peewee.Database):
             'user': 'postgres',
             'pool_params': {
                 "minsize": 0,
-                "maxsize": 5,    
-                "timeout": 30, 
+                "maxsize": 5,
+                "timeout": 30,
                 'pool_recycle': 1.5
             }
         )
@@ -57,7 +57,7 @@ class AioDatabase(peewee.Database):
             warnings.warn(
                 "`min_connections` and `max_connections` are deprecated, use `pool_params` instead.",
                 DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             self.pool_params.update(
                 {
@@ -65,49 +65,44 @@ class AioDatabase(peewee.Database):
                     "maxsize": self.connect_params.pop("max_connections", 20),
                 }
             )
-        pool_params = self.connect_params.pop('pool_params', {})
+        pool_params = self.connect_params.pop("pool_params", {})
         self.pool_params.update(pool_params)
         self.pool_params.update(self.connect_params)
 
     def init(self, database: Optional[str], **kwargs: Any) -> None:
         super().init(database, **kwargs)
         self.init_pool_params()
-        self.pool_backend = self.pool_backend_cls(
-            database=self.database,
-            **self.pool_params
-        )
+        self.pool_backend = self.pool_backend_cls(database=self.database, **self.pool_params)
 
     async def aio_connect(self) -> None:
-        """Creates a connection pool
-        """
+        """Creates a connection pool"""
         if self.deferred:
-            raise Exception('Error, database must be initialized before creating a connection pool')
+            raise Exception("Error, database must be initialized before creating a connection pool")
         await self.pool_backend.connect()
 
     @property
     def is_connected(self) -> bool:
-        """Checks if pool is connected
-        """
+        """Checks if pool is connected"""
         return self.pool_backend.is_connected
 
     async def aio_close(self) -> None:
         """Close pool backend. The pool is closed until you run aio_connect manually."""
-        
+
         if self.deferred:
-            raise Exception('Error, database must be initialized before creating a connection pool')
+            raise Exception("Error, database must be initialized before creating a connection pool")
 
         await self.pool_backend.close()
 
     def aio_atomic(self) -> AsyncContextManager[None]:
-        """Create an async context-manager which runs any queries in the wrapped block 
+        """Create an async context-manager which runs any queries in the wrapped block
         in a transaction (or save-point if blocks are nested).
         Calls to :meth:`.aio_atomic()` can be nested.
         """
         return self._aio_atomic(use_savepoint=True)
-    
+
     def aio_transaction(self) -> AsyncContextManager[None]:
         """Create an async context-manager that runs all queries in the wrapped block in a transaction.
-        
+
         Calls to :meth:`.aio_transaction()` cannot be nested. If so OperationalError will be raised.
         """
         return self._aio_atomic(use_savepoint=False)
@@ -118,10 +113,10 @@ class AioDatabase(peewee.Database):
         async with self.aio_connection() as connection:
             _connection_context = connection_context.get()
             assert _connection_context is not None
-            
+
             _is_root = not _connection_context.transaction_is_opened
             _is_nested = _connection_context.transaction_is_opened
-            
+
             if _is_nested and not use_savepoint:
                 raise peewee.OperationalError("Transaction already opened")
             try:
@@ -161,24 +156,20 @@ class AioDatabase(peewee.Database):
             self.close()
 
     def execute_sql(self, *args: Any, **kwargs: Any) -> Any:
-        """Sync execute SQL query, `allow_sync` must be set to True.
-        """
+        """Sync execute SQL query, `allow_sync` must be set to True."""
         assert self._allow_sync, (
-            "Error, sync query is not allowed! Call the `.set_allow_sync()` "
-            "or use the `.allow_sync()` context manager.")
+            "Error, sync query is not allowed! Call the `.set_allow_sync()` or use the `.allow_sync()` context manager."
+        )
         return super().execute_sql(*args, **kwargs)
 
     def aio_connection(self) -> ConnectionContextManager:
         if self.deferred:
-            raise Exception('Error, database must be initialized before creating a connection pool')
+            raise Exception("Error, database must be initialized before creating a connection pool")
 
         return ConnectionContextManager(self.pool_backend)
 
     async def aio_execute_sql(
-        self,
-        sql: str,
-        params: Optional[List[Any]] = None,
-        fetch_results: Optional[FetchResults] = None
+        self, sql: str, params: Optional[List[Any]] = None, fetch_results: Optional[FetchResults] = None
     ) -> Any:
         __log__.debug((sql, params))
         with peewee.__exception_wrapper__:
@@ -199,7 +190,7 @@ class AioDatabase(peewee.Database):
         """
         ctx = self.get_sql_context()
         sql, params = ctx.sql(query).query()
-        fetch_results = fetch_results or getattr(query, 'fetch_results', None)
+        fetch_results = fetch_results or getattr(query, "fetch_results", None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 
@@ -216,8 +207,8 @@ class PsycopgDatabase(AioDatabase, Psycopg3Database):
             'password': 'postgres',
             'user': 'postgres',
             'pool_params': {
-                "min_size": 0, 
-                "max_size": 5, 
+                "min_size": 0,
+                "max_size": 5,
                 'max_lifetime': 15
             }
         )
@@ -249,8 +240,8 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
             'user': 'postgres',
             'pool_params': {
                 "minsize": 0,
-                "maxsize": 5,    
-                "timeout": 30, 
+                "maxsize": 5,
+                "timeout": 30,
                 'pool_recycle': 1.5
             }
         )
@@ -270,10 +261,7 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
         super().init(database, **kwargs)
 
 
-class PooledPostgresqlExtDatabase(
-    PooledPostgresqlDatabase,
-    ext.PostgresqlExtDatabase
-):
+class PooledPostgresqlExtDatabase(PooledPostgresqlDatabase, ext.PostgresqlExtDatabase):
     """PosgtreSQL database extended driver providing **single drop-in sync**
     connection and **async connections pool** interface based on aiopg pool backend.
 
@@ -283,11 +271,9 @@ class PooledPostgresqlExtDatabase(
     See also:
     https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
     """
+
     def init_pool_params_defaults(self) -> None:
-        self.pool_params.update({
-            "enable_json": True,
-            "enable_hstore": self._register_hstore
-        })
+        self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
 
 
 class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
@@ -305,7 +291,7 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
             'connect_timeout': 30,
             "pool_params": {
                 "minsize": 0,
-                "maxsize": 5,    
+                "maxsize": 5,
                 "pool_recycle": 2
             }
         )
@@ -313,6 +299,7 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     See also:
     http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
     """
+
     pool_backend_cls = MysqlPoolBackend
 
     def init_pool_params_defaults(self) -> None:

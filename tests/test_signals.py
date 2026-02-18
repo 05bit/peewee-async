@@ -18,9 +18,7 @@ from tests.models import TestSignalModel
 
 @contextmanager
 def _connect(
-    signal: AioSignal , 
-    receiver: Callable[..., Coroutine[Any, Any, Any]], 
-    sender: type[AioModel]
+    signal: AioSignal, receiver: Callable[..., Coroutine[Any, Any, Any]], sender: type[AioModel]
 ) -> Iterator[None]:
     signal.connect(receiver=receiver, sender=sender)
     yield
@@ -29,8 +27,7 @@ def _connect(
 
 @dbs_all
 async def test_aio_pre_save(db: AioDatabase) -> None:
-    
-    
+
     async def on_save_handler(model_class: type[TestSignalModel], instance: TestSignalModel, created: bool) -> None:
         assert await TestSignalModel.select().aio_exists() is False
         assert model_class is TestSignalModel
@@ -43,8 +40,7 @@ async def test_aio_pre_save(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_aio_post_save(db: AioDatabase) -> None:
-    
-    
+
     async def on_save_handler(model_class: type[TestSignalModel], instance: TestSignalModel, created: bool) -> None:
         assert await TestSignalModel.select().aio_exists() is True
         assert model_class is TestSignalModel
@@ -57,9 +53,9 @@ async def test_aio_post_save(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_aio_pre_delete(db: AioDatabase) -> None:
-    
+
     t = await TestSignalModel.aio_create(text="aio_create")
-    
+
     async def on_delete_handler(model_class: type[TestSignalModel], instance: TestSignalModel) -> None:
         assert await TestSignalModel.select().aio_exists() is True
         assert model_class is TestSignalModel
@@ -71,9 +67,9 @@ async def test_aio_pre_delete(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_aio_post_delete(db: AioDatabase) -> None:
-    
+
     t = await TestSignalModel.aio_create(text="aio_create")
-    
+
     async def on_delete_handler(model_class: type[TestSignalModel], instance: TestSignalModel) -> None:
         assert await TestSignalModel.select().aio_exists() is False
         assert model_class is TestSignalModel
@@ -85,7 +81,7 @@ async def test_aio_post_delete(db: AioDatabase) -> None:
 
 @dbs_all
 def test_pre_init(db: AioDatabase) -> None:
-    
+
     def on_init_handler(model_class: type[TestSignalModel], instance: TestSignalModel) -> None:
         assert model_class is TestSignalModel
         assert instance.text == "text"

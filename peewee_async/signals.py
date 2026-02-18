@@ -19,11 +19,10 @@ aio_pre_save = AioSignal()
 aio_post_save = AioSignal()
 aio_pre_delete = AioSignal()
 aio_post_delete = AioSignal()
-pre_init = Signal() # can't be async !
+pre_init = Signal()  # can't be async !
 
 
 class AioModel(_Model):
-
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super(AioModel, self).__init__(*args, **kwargs)
         pre_init.send(self)

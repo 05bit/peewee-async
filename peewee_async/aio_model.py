@@ -62,7 +62,6 @@ class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
 
 
 class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
-
     async def fetch_results(self, cursor: CursorProtocol) -> Union[List[Any], int]:
         if self._returning:
             return await fetch_models(cursor, self)
@@ -86,12 +85,10 @@ class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
 
 
 class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
-
-
     @peewee.database_required
     async def aio_peek(self, database: AioDatabase, n: int = 1) -> Any:
         """
-        Asynchronous version of 
+        Asynchronous version of
         `peewee.SelectBase.peek <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.peek>`_
         """
 
@@ -103,14 +100,9 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
             return rows[0] if n == 1 else rows
 
     @peewee.database_required
-    async def aio_scalar(
-        self, 
-        database: AioDatabase, 
-        as_tuple: bool = False,
-        as_dict: bool = False
-    ) -> Any:
-        """        
-        Asynchronous version of `peewee.SelectBase.scalar 
+    async def aio_scalar(self, database: AioDatabase, as_tuple: bool = False, as_dict: bool = False) -> Any:
+        """
+        Asynchronous version of `peewee.SelectBase.scalar
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.scalar>`_
         """
         if as_dict:
@@ -118,21 +110,21 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         row = await self.tuples().aio_peek(database)
 
         return row[0] if row and not as_tuple else row
-    
+
     @peewee.database_required
     async def aio_first(self, database: AioDatabase, n: int = 1) -> Any:
         """
-        Asynchronous version of `peewee.SelectBase.first 
+        Asynchronous version of `peewee.SelectBase.first
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.first>`_
         """
 
-        if self._limit != n: # type: ignore
+        if self._limit != n:  # type: ignore
             self._limit = n
         return await self.aio_peek(database, n=n)
 
     async def aio_get(self, database: Optional[AioDatabase] = None) -> Any:
         """
-        Asynchronous version of `peewee.SelectBase.get 
+        Asynchronous version of `peewee.SelectBase.get
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.get>`_
         """
         clone = self.paginate(1, 1)
@@ -140,61 +132,66 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
             return (await clone.aio_execute(database))[0]
         except IndexError:
             sql, params = clone.sql()
-            raise self.model.DoesNotExist('%s instance matching query does '  # noqa: B904
-                                          'not exist:\nSQL: %s\nParams: %s' %
-                                          (clone.model, sql, params))
+            raise self.model.DoesNotExist(  # noqa: B904
+                "%s instance matching query does not exist:\nSQL: %s\nParams: %s" % (clone.model, sql, params)
+            )
 
     @peewee.database_required
     async def aio_count(self, database: AioDatabase, clear_limit: bool = False) -> int:
         """
-        Asynchronous version of `peewee.SelectBase.count 
+        Asynchronous version of `peewee.SelectBase.count
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.count>`_
         """
-        clone = self.order_by().alias('_wrapped')
+        clone = self.order_by().alias("_wrapped")
         if clear_limit:
             clone._limit = clone._offset = None
         try:
-            if clone._having is None and clone._group_by is None and \
-               clone._windows is None and clone._distinct is None and \
-               clone._simple_distinct is not True:
-                clone = clone.select(peewee.SQL('1'))
+            if (
+                clone._having is None
+                and clone._group_by is None
+                and clone._windows is None
+                and clone._distinct is None
+                and clone._simple_distinct is not True
+            ):
+                clone = clone.select(peewee.SQL("1"))
         except AttributeError:
             pass
-        return cast(
-            'int',
-            await AioSelect([clone], [peewee.fn.COUNT(peewee.SQL('1'))]).aio_scalar(database)
-        )
+        return cast("int", await AioSelect([clone], [peewee.fn.COUNT(peewee.SQL("1"))]).aio_scalar(database))
 
     @peewee.database_required
     async def aio_exists(self, database: AioDatabase) -> bool:
         """
-        Asynchronous version of `peewee.SelectBase.exists 
+        Asynchronous version of `peewee.SelectBase.exists
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.exists>`_
         """
-        clone = self.columns(peewee.SQL('1'))
+        clone = self.columns(peewee.SQL("1"))
         clone._limit = 1
         clone._offset = None
         return bool(await clone.aio_scalar())
 
     def union_all(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'UNION ALL', rhs)
+        return AioModelCompoundSelectQuery(self.model, self, "UNION ALL", rhs)
+
     __add__ = union_all
 
     def union(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'UNION', rhs)
+        return AioModelCompoundSelectQuery(self.model, self, "UNION", rhs)
+
     __or__ = union
 
     def intersect(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'INTERSECT', rhs)
+        return AioModelCompoundSelectQuery(self.model, self, "INTERSECT", rhs)
+
     __and__ = intersect
 
     def except_(self, rhs: Any) -> "AioModelCompoundSelectQuery":
-        return AioModelCompoundSelectQuery(self.model, self, 'EXCEPT', rhs)
+        return AioModelCompoundSelectQuery(self.model, self, "EXCEPT", rhs)
+
     __sub__ = except_
 
     def aio_prefetch(self, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
         """
-        Asynchronous version of `peewee.ModelSelect.prefetch 
+        Asynchronous version of `peewee.ModelSelect.prefetch
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#ModelSelect.prefetch>`_
         """
         return aio_prefetch(self, *subqueries, prefetch_type=prefetch_type)
@@ -205,8 +202,8 @@ class AioSelect(AioSelectMixin, peewee.Select):
 
 
 class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
-    """Asynchronous version of **peewee.ModelSelect** that provides async versions of ModelSelect methods
-    """
+    """Asynchronous version of **peewee.ModelSelect** that provides async versions of ModelSelect methods"""
+
     pass
 
 
@@ -253,8 +250,7 @@ class AioModel(peewee.Model):
 
     @classmethod
     def insert_from(cls, query: Any, fields: Any) -> AioModelInsert:
-        columns = [getattr(cls, field) if isinstance(field, str)
-                   else field for field in fields]
+        columns = [getattr(cls, field) if isinstance(field, str) else field for field in fields]
         return AioModelInsert(cls, insert=query, columns=columns)
 
     @classmethod
@@ -280,7 +276,7 @@ class AioModel(peewee.Model):
                     await model.update(**{fk.name: None}).where(query).aio_execute()
                 else:
                     await model.delete().where(query).aio_execute()
-        return cast('int', await type(self).delete().where(self._pk_expr()).aio_execute())
+        return cast("int", await type(self).delete().where(self._pk_expr()).aio_execute())
 
     async def aio_save(self, force_insert: bool = False, only: Any = None) -> Union[int, Literal[False]]:  # noqa: C901
         """
@@ -316,12 +312,11 @@ class AioModel(peewee.Model):
             else:
                 field_dict.pop(pk_field.name, None)
             if not field_dict:
-                raise ValueError('no data to save!')
+                raise ValueError("no data to save!")
             rows = await self.update(**field_dict).where(self._pk_expr()).aio_execute()
         elif pk_field is not None:
             pk = await self.insert(**field_dict).aio_execute()
-            if pk is not None and (self._meta.auto_increment or
-                                   pk_value is None):
+            if pk is not None and (self._meta.auto_increment or pk_value is None):
                 self._pk = pk
                 # Although we set the primary-key, do not mark it as dirty.
                 self._dirty.discard(pk_field.name)
@@ -346,7 +341,7 @@ class AioModel(peewee.Model):
                 sq = sq.where(*query)
         if filters:
             sq = sq.filter(**filters)
-        return cast('Self', await sq.aio_get())
+        return cast("Self", await sq.aio_get())
 
     @classmethod
     async def aio_get_or_none(cls, *query: Any, **filters: Any) -> Optional[Self]:
@@ -381,7 +376,7 @@ class AioModel(peewee.Model):
         See also:
         http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get_or_create
         """
-        defaults = kwargs.pop('defaults', {})
+        defaults = kwargs.pop("defaults", {})
         query = cls.select()
         for field, value in kwargs.items():
             query = query.where(getattr(cls, field) == value)

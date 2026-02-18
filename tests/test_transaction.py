@@ -14,25 +14,23 @@ from tests.models import TestModel
 class FakeConnectionError(Exception):
     pass
 
-transaction_methods = pytest.mark.parametrize(
-    "transaction_method", ["aio_transaction", "aio_atomic"]
-)
+
+transaction_methods = pytest.mark.parametrize("transaction_method", ["aio_transaction", "aio_atomic"])
+
 
 def _transaction_method(db: AioDatabase, transaction_method: str) -> AsyncContextManager[None]:
     return cast("AsyncContextManager[None]", getattr(db, transaction_method)())
 
+
 @transaction_methods
 @dbs_all
-async def test_transaction_error_on_begin(
-    db: AioDatabase,
-    transaction_method: str,
-    mocker: MockerFixture
-) -> None:
+async def test_transaction_error_on_begin(db: AioDatabase, transaction_method: str, mocker: MockerFixture) -> None:
     mocker.patch.object(Transaction, "begin", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
         async with _transaction_method(db, transaction_method):
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
     assert db.pool_backend.has_acquired_connections() is False
+
 
 @transaction_methods
 @dbs_all
@@ -40,43 +38,44 @@ async def test_transaction_error_on_commit(transaction_method: str, db: AioDatab
     mocker.patch.object(Transaction, "commit", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
         async with _transaction_method(db, transaction_method):
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
     assert db.pool_backend.has_acquired_connections() is False
 
 
 @transaction_methods
 @dbs_all
 async def test_transaction_error_on_rollback(transaction_method: str, db: AioDatabase, mocker: MockerFixture) -> None:
-    await TestModel.aio_create(text='FOO', data="")
+    await TestModel.aio_create(text="FOO", data="")
     mocker.patch.object(Transaction, "rollback", side_effect=FakeConnectionError)
     with pytest.raises(FakeConnectionError):
         async with _transaction_method(db, transaction_method):
             await TestModel.update(data="BAR").aio_execute()
             assert await TestModel.aio_get_or_none(data="BAR") is not None
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
 
     assert db.pool_backend.has_acquired_connections() is False
 
 
 @transaction_methods
 @dbs_all
-async def test_transaction_success(transaction_method: str,db: AioDatabase) -> None:
+async def test_transaction_success(transaction_method: str, db: AioDatabase) -> None:
     async with _transaction_method(db, transaction_method):
-        await TestModel.aio_create(text='FOO')
+        await TestModel.aio_create(text="FOO")
 
     assert await TestModel.aio_get_or_none(text="FOO") is not None
     assert db.pool_backend.has_acquired_connections() is False
 
+
 @transaction_methods
 @dbs_all
 async def test_transaction_rollback(transaction_method: str, db: AioDatabase) -> None:
-    await TestModel.aio_create(text='FOO', data="")
+    await TestModel.aio_create(text="FOO", data="")
 
     with pytest.raises(IntegrityError):
         async with _transaction_method(db, transaction_method):
             await TestModel.update(data="BAR").aio_execute()
             assert await TestModel.aio_get_or_none(data="BAR") is not None
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
 
     assert await TestModel.aio_get_or_none(data="BAR") is None
     assert db.pool_backend.has_acquired_connections() is False
@@ -84,25 +83,24 @@ async def test_transaction_rollback(transaction_method: str, db: AioDatabase) ->
 
 @dbs_all
 async def test_several_transactions(db: AioDatabase) -> None:
-    """Run several transactions in parallel tasks.
-    """
+    """Run several transactions in parallel tasks."""
 
     async def t1() -> None:
         async with db.aio_atomic():
-            await TestModel.aio_create(text='FOO1', data="")
+            await TestModel.aio_create(text="FOO1", data="")
 
     async def t2() -> None:
         async with db.aio_atomic():
-            await TestModel.aio_create(text='FOO2', data="")
+            await TestModel.aio_create(text="FOO2", data="")
             with pytest.raises(IntegrityError):
                 async with db.aio_atomic():
-                    await TestModel.aio_create(text='FOO2', data="not_created")
+                    await TestModel.aio_create(text="FOO2", data="not_created")
 
     async def t3() -> None:
         async with db.aio_atomic():
-            await TestModel.aio_create(text='FOO3', data="")
+            await TestModel.aio_create(text="FOO3", data="")
             async with db.aio_atomic():
-                await TestModel.update(data="BAR").where(TestModel.text == 'FOO3').aio_execute()
+                await TestModel.update(data="BAR").where(TestModel.text == "FOO3").aio_execute()
 
     await asyncio.gather(t1(), t2(), t3())
 
@@ -117,10 +115,10 @@ async def test_transaction_manual_work(db: AioDatabase) -> None:
     async with db.aio_connection() as connection:
         tr = Transaction(connection)
         await tr.begin()
-        await TestModel.aio_create(text='FOO')
+        await TestModel.aio_create(text="FOO")
         assert await TestModel.aio_get_or_none(text="FOO") is not None
         try:
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
         except:  # noqa: E722
             await tr.rollback()
         else:
@@ -142,25 +140,25 @@ async def test_nested_transaction__error(method1: str, method2: str, db: AioData
 
     with pytest.raises(OperationalError):
         async with _transaction_method(db, method1):
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
             async with _transaction_method(db, method2):
                 await TestModel.update(text="BAR").aio_execute()
 
-    assert await TestModel.aio_get_or_none(text='FOO') is None
+    assert await TestModel.aio_get_or_none(text="FOO") is None
     assert db.pool_backend.has_acquired_connections() is False
 
 
 @dbs_all
 async def test_savepoints_success(db: AioDatabase) -> None:
     async with db.aio_atomic():
-        await TestModel.aio_create(text='FOO')
+        await TestModel.aio_create(text="FOO")
 
         async with db.aio_atomic():
             await TestModel.update(text="BAR").aio_execute()
 
             async with db.aio_atomic():
                 await TestModel.update(text="BAZ").aio_execute()
-                
+
             async with db.aio_atomic():
                 await TestModel.update(text="QUX").aio_execute()
 
@@ -170,14 +168,14 @@ async def test_savepoints_success(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_savepoint_rollback(db: AioDatabase) -> None:
-    await TestModel.aio_create(text='FOO', data="")
+    await TestModel.aio_create(text="FOO", data="")
 
     async with db.aio_atomic():
         await TestModel.update(data="BAR").aio_execute()
 
         with pytest.raises(IntegrityError):
             async with db.aio_atomic():
-                await TestModel.aio_create(text='FOO')
+                await TestModel.aio_create(text="FOO")
 
     assert await TestModel.aio_get_or_none(data="BAR") is not None
     assert db.pool_backend.has_acquired_connections() is False
@@ -188,13 +186,13 @@ async def test_savepoint_manual_work(db: AioDatabase) -> None:
     async with db.aio_connection() as connection:
         tr = Transaction(connection)
         await tr.begin()
-        await TestModel.aio_create(text='FOO')
+        await TestModel.aio_create(text="FOO")
         assert await TestModel.aio_get_or_none(text="FOO") is not None
 
         savepoint = Transaction(connection, is_savepoint=True)
         await savepoint.begin()
         try:
-            await TestModel.aio_create(text='FOO')
+            await TestModel.aio_create(text="FOO")
         except:  # noqa: E722
             await savepoint.rollback()
         else:
@@ -207,7 +205,7 @@ async def test_savepoint_manual_work(db: AioDatabase) -> None:
 
 @transaction_methods
 @dbs_all
-async def test_acid_when_connetion_has_been_broken(transaction_method:str, db: AioDatabase) -> None:
+async def test_acid_when_connetion_has_been_broken(transaction_method: str, db: AioDatabase) -> None:
     async def restart_connections(event_for_lock: asyncio.Event) -> None:
         event_for_lock.set()
         await asyncio.sleep(0.05)
@@ -252,4 +250,3 @@ async def test_acid_when_connetion_has_been_broken(transaction_method:str, db: A
     # The transaction has not been committed
     assert len(list(await TestModel.select().aio_execute())) in (0, 2)
     assert db.pool_backend.has_acquired_connections() is False
-

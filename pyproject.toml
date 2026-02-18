@@ -39,7 +39,8 @@ dev = [
     "peewee-async[psycopg]",
     "mypy>=1.19.0",
     "ruff==0.15.1",
-    "types-PyMySQL>=1.1.0"
+    "types-PyMySQL>=1.1.0",
+    "poethepoet==0.41.0"
 ]
 
 [tool.ruff]
@@ -88,3 +89,41 @@ exclude = "(venv|load-testing|examples|docs)"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+
+
+[tool.poe.executor]
+type = "simple"
+
+
+[tool.poe.tasks.lint]
+help = "Run the type checker"
+cmd  = "ruff check"
+
+[tool.poe.tasks.types]
+help = "Run the type checker"
+cmd  = "mypy ."
+
+[tool.poe.tasks.check_format]
+help = "Run the format checker"
+cmd  = "ruff format --check"
+
+[tool.poe.tasks.format_by_checker]
+help = "Run the check formater"
+cmd  = "ruff check --fix-only -e"
+
+[tool.poe.tasks.format_by_formatter]
+help = "Run the ruff formatter"
+cmd  = "ruff format"
+
+[tool.poe.tasks.format]
+help = "Run ruff check and ruff format formatters"
+sequence  = ["format_by_checker", "format_by_formatter"]
+
+[tool.poe.tasks.test]
+help = "Run tests"
+cmd  = "pytest -vv -x"
+
+[tool.poe.tasks.check]
+help = "Run all checks on the code base"
+sequence = ["lint", "check_format", "types", "test"]
