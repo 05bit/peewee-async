@@ -6,22 +6,19 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-22.04
-    env:
-      POETRY_VIRTUALENVS_CREATE: "false"
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install poetry
+      - name: Install uv
         run: |
           python -m pip install --upgrade pip
-          pip install poetry
+          pip install uv
 
       - name: Build
         run: |
-          poetry build
+          uv build
 
       - name: Publish
         run: |
-          poetry config pypi-token.pypi ${{ secrets.PYPI_API_TOKEN }}
-          poetry publish
+          uv publish --token ${{ secrets.PYPI_API_TOKEN }}
