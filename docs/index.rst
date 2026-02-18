@@ -11,7 +11,7 @@ peewee-async
 
 
 
-* Works on Python 3.9+
+* Works on Python 3.10+
 * Has support for PostgreSQL via `aiopg`
 * Has support for MySQL via `aiomysql`
 * Asynchronous analogues of peewee sync methods with prefix **aio_**
