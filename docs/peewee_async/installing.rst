@@ -35,16 +35,7 @@ Install dependencies using pip:
 
 .. code-block:: console
 
-    pip install -e .[develop]
-
-
-Or using `poetry`_:
-
-.. _poetry: https://python-poetry.org/docs/
-
-.. code-block:: console
-
-    poetry install -E develop
+    pip install -e .[dev]
 
 
 Running tests

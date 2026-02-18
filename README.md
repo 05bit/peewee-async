@@ -123,7 +123,7 @@ Developing
 Install dependencies using pip:
 
 ```bash
-pip install -e .[develop]
+pip install -e .[dev]
 ```
 
 Run databases:
