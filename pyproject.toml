@@ -38,7 +38,28 @@ dev = [
     "peewee-async[mysql]",
     "peewee-async[psycopg]",
     "mypy>=1.19.0",
+    "ruff==0.15.1",
     "types-PyMySQL>=1.1.0"
+]
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    "docs",
+    "load-testing"
+]
+
+[tool.ruff.lint]
+select = [
+    'A',
+    'B',
+    'C',
+    'E',
+    'F',
+    'G',
+    'I',
+    'DTZ',
+    'TC',
 ]
 
 [build-system]

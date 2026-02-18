@@ -5,8 +5,8 @@ from peewee import OperationalError
 
 from peewee_async import connection_context
 from peewee_async.databases import AioDatabase
-from tests.conftest import dbs_all, MYSQL_DBS, PG_DBS, dbs_mysql
-from tests.db_config import DB_DEFAULTS, DB_CLASSES
+from tests.conftest import MYSQL_DBS, PG_DBS, dbs_all, dbs_mysql
+from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import TestModel
 
 

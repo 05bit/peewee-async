@@ -1,14 +1,27 @@
+from collections.abc import Callable, Coroutine, Iterator
 from contextlib import contextmanager
-from typing import Any, Callable, Coroutine, Iterator
+from typing import Any
 
 from peewee_async.databases import AioDatabase
+from peewee_async.signals import (
+    AioModel,
+    AioSignal,
+    aio_post_delete,
+    aio_post_save,
+    aio_pre_delete,
+    aio_pre_save,
+    pre_init,
+)
 from tests.conftest import dbs_all
 from tests.models import TestSignalModel
-from peewee_async.signals import AioModel, aio_pre_save, aio_post_save, aio_post_delete, aio_pre_delete, AioSignal, pre_init
 
 
 @contextmanager
-def _connect(signal: AioSignal , receiver: Callable[..., Coroutine[Any, Any, Any]], sender: type[AioModel]) -> Iterator[None]:
+def _connect(
+    signal: AioSignal , 
+    receiver: Callable[..., Coroutine[Any, Any, Any]], 
+    sender: type[AioModel]
+) -> Iterator[None]:
     signal.connect(receiver=receiver, sender=sender)
     yield
     signal.disconnect(receiver=receiver, sender=sender)

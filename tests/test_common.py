@@ -9,7 +9,7 @@ from pytest import LogCaptureFixture
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
-from tests.models import TestModel, CompositeTestModel
+from tests.models import CompositeTestModel, TestModel
 
 
 @dbs_all

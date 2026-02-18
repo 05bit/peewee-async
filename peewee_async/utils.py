@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Protocol, Optional, Sequence, Set, AsyncContextManager, List, Callable, Awaitable, Union
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Any, AsyncContextManager, List, Optional, Protocol, Union
 
 try:
     import aiopg

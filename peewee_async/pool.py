@@ -2,7 +2,7 @@ import abc
 import asyncio
 from typing import Any, Optional, cast
 
-from .utils import aiopg, aiomysql, ConnectionProtocol, format_dsn, psycopg, psycopg_pool
+from .utils import ConnectionProtocol, aiomysql, aiopg, format_dsn, psycopg, psycopg_pool
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
@@ -66,7 +66,7 @@ class PostgresqlPoolBackend(PoolBackend):
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast(ConnectionProtocol, await self.pool.acquire())
+        return cast("ConnectionProtocol", await self.pool.acquire())
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"
@@ -117,7 +117,7 @@ class PsycopgPoolBackend(PoolBackend):
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast(ConnectionProtocol, await self.pool.getconn())
+        return cast("ConnectionProtocol", await self.pool.getconn())
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"
@@ -141,7 +141,7 @@ class MysqlPoolBackend(PoolBackend):
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast(ConnectionProtocol, await self.pool.acquire())
+        return cast("ConnectionProtocol", await self.pool.acquire())
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"

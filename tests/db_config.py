@@ -1,4 +1,5 @@
 import os
+
 import peewee_async
 
 PG_DEFAULTS = {

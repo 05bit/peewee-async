@@ -1,9 +1,9 @@
 import uuid
 
 import peewee as pw
+
 import peewee_async
 import peewee_async.signals
-import datetime as dt
 
 
 class TestModel(peewee_async.AioModel):

@@ -1,12 +1,12 @@
 import asyncio
 import logging
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from peewee import sort_models
 
 from peewee_async.databases import AioDatabase
-from peewee_async.utils import aiopg, aiomysql, psycopg
+from peewee_async.utils import aiomysql, aiopg, psycopg
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import ALL_MODELS
 

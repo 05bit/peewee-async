@@ -1,5 +1,5 @@
-from typing import List, Union
 import uuid
+from typing import List, Union
 
 import peewee
 import pytest
@@ -7,7 +7,7 @@ from peewee import fn
 
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
-from tests.models import TestModel, IntegerTestModel, TestModelAlpha, TestModelBeta, TestModelGamma
+from tests.models import IntegerTestModel, TestModel, TestModelAlpha, TestModelBeta, TestModelGamma
 
 
 @dbs_all

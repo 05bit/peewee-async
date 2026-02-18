@@ -1,11 +1,13 @@
 import json
 import logging
 import os
-from secrets import token_hex
 from datetime import datetime
+from secrets import token_hex
+
 from aiohttp import web
-from peewee import CharField, TextField, DateTimeField
-from peewee_async import PooledPostgresqlDatabase, AioModel
+from peewee import CharField, DateTimeField, TextField
+
+from peewee_async import AioModel, PooledPostgresqlDatabase
 
 logger = logging.getLogger(__name__)
 

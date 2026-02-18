@@ -1,16 +1,16 @@
 import contextlib
-import logging
 import warnings
-from typing import Type, Optional, Any, AsyncIterator, Iterator, Dict, List, AsyncContextManager
+from collections.abc import AsyncIterator, Iterator
+from typing import Any, AsyncContextManager, Dict, List, Optional, Type
 
 import peewee
 from playhouse import postgres_ext as ext
 from playhouse.psycopg3_ext import Psycopg3Database
 
-from .connection import connection_context, ConnectionContextManager
-from .pool import PoolBackend, PostgresqlPoolBackend, MysqlPoolBackend, PsycopgPoolBackend
+from .connection import ConnectionContextManager, connection_context
+from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
-from .utils import aiopg, aiomysql, psycopg, __log__, FetchResults
+from .utils import FetchResults, __log__, aiomysql, aiopg, psycopg
 
 
 class AioDatabase(peewee.Database):
@@ -56,7 +56,8 @@ class AioDatabase(peewee.Database):
         if "min_connections" in self.connect_params or "max_connections" in self.connect_params:
             warnings.warn(
                 "`min_connections` and `max_connections` are deprecated, use `pool_params` instead.",
-                DeprecationWarning
+                DeprecationWarning,
+                stacklevel=2
             )
             self.pool_params.update(
                 {
@@ -98,7 +99,8 @@ class AioDatabase(peewee.Database):
         await self.pool_backend.close()
 
     def aio_atomic(self) -> AsyncContextManager[None]:
-        """Create an async context-manager which runs any queries in the wrapped block in a transaction (or save-point if blocks are nested).
+        """Create an async context-manager which runs any queries in the wrapped block 
+        in a transaction (or save-point if blocks are nested).
         Calls to :meth:`.aio_atomic()` can be nested.
         """
         return self._aio_atomic(use_savepoint=True)

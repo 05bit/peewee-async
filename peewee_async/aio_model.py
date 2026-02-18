@@ -1,11 +1,12 @@
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
+
 import peewee
 from peewee import PREFETCH_TYPE
+from typing_extensions import Self
 
 from .databases import AioDatabase
 from .result_wrappers import fetch_models
 from .utils import CursorProtocol
-from typing_extensions import Self
-from typing import Literal, Tuple, List, Any, cast, Optional, Dict, Union
 
 
 async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
@@ -139,7 +140,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
             return (await clone.aio_execute(database))[0]
         except IndexError:
             sql, params = clone.sql()
-            raise self.model.DoesNotExist('%s instance matching query does '
+            raise self.model.DoesNotExist('%s instance matching query does '  # noqa: B904
                                           'not exist:\nSQL: %s\nParams: %s' %
                                           (clone.model, sql, params))
 
@@ -160,7 +161,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         except AttributeError:
             pass
         return cast(
-            int,
+            'int',
             await AioSelect([clone], [peewee.fn.COUNT(peewee.SQL('1'))]).aio_scalar(database)
         )
 
@@ -279,9 +280,9 @@ class AioModel(peewee.Model):
                     await model.update(**{fk.name: None}).where(query).aio_execute()
                 else:
                     await model.delete().where(query).aio_execute()
-        return cast(int, await type(self).delete().where(self._pk_expr()).aio_execute())
+        return cast('int', await type(self).delete().where(self._pk_expr()).aio_execute())
 
-    async def aio_save(self, force_insert: bool = False, only: Any =None) -> Union[int, Literal[False]]:
+    async def aio_save(self, force_insert: bool = False, only: Any = None) -> Union[int, Literal[False]]:  # noqa: C901
         """
         Async version of **peewee.Model.save**
 
@@ -345,7 +346,7 @@ class AioModel(peewee.Model):
                 sq = sq.where(*query)
         if filters:
             sq = sq.filter(**filters)
-        return cast(Self, await sq.aio_get())
+        return cast('Self', await sq.aio_get())
 
     @classmethod
     async def aio_get_or_none(cls, *query: Any, **filters: Any) -> Optional[Self]:
@@ -397,4 +398,4 @@ class AioModel(peewee.Model):
                 try:
                     return await query.aio_get(), False
                 except cls.DoesNotExist:
-                    raise exc
+                    raise exc  # noqa: B904

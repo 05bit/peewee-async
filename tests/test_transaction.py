@@ -1,9 +1,9 @@
 import asyncio
+from typing import AsyncContextManager, cast
 
 import pytest
 from peewee import IntegrityError, OperationalError
 from pytest_mock import MockerFixture
-from typing import AsyncContextManager, cast
 
 from peewee_async import Transaction
 from peewee_async.databases import AioDatabase
@@ -19,7 +19,7 @@ transaction_methods = pytest.mark.parametrize(
 )
 
 def _transaction_method(db: AioDatabase, transaction_method: str) -> AsyncContextManager[None]:
-    return cast(AsyncContextManager[None], getattr(db, transaction_method)())
+    return cast("AsyncContextManager[None]", getattr(db, transaction_method)())
 
 @transaction_methods
 @dbs_all
@@ -121,7 +121,7 @@ async def test_transaction_manual_work(db: AioDatabase) -> None:
         assert await TestModel.aio_get_or_none(text="FOO") is not None
         try:
             await TestModel.aio_create(text='FOO')
-        except:
+        except:  # noqa: E722
             await tr.rollback()
         else:
             await tr.commit()
@@ -195,7 +195,7 @@ async def test_savepoint_manual_work(db: AioDatabase) -> None:
         await savepoint.begin()
         try:
             await TestModel.aio_create(text='FOO')
-        except:
+        except:  # noqa: E722
             await savepoint.rollback()
         else:
             await savepoint.commit()
