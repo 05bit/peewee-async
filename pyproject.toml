@@ -1,6 +1,6 @@
 [project]
 name = "peewee-async"
-version = "1.2.2"
+version = "1.2.1"
 description = "Asynchronous interface for peewee ORM powered by asyncio."
 authors = [
     {name = "Alexey Kinev", email="rudy@05bit.com"},
