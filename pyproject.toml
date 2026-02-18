@@ -20,7 +20,7 @@ postgresql = [
 ]
 mysql = [
     "aiomysql>=0.2.0",
-    "cryptography>=43.0.1"
+    "cryptography>=46.0.5"
 ]
 psycopg = [
     "psycopg>=3.2.0",
