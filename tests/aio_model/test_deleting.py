@@ -1,9 +1,13 @@
 import uuid
 
+import pytest
+
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all, dbs_postgres
 from tests.models import TestModel
 from tests.utils import model_has_fields
+
+pytestmark = pytest.mark.use_transaction
 
 
 @dbs_all

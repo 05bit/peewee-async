@@ -43,6 +43,7 @@ Contents
    peewee_async/connection
    peewee_async/transaction
    peewee_async/signals
+   peewee_async/testing
    peewee_async/examples
 
 Indices and tables

@@ -7,15 +7,12 @@ from pytest_mock import MockerFixture
 
 from peewee_async import Transaction
 from peewee_async.databases import AioDatabase
-from tests.conftest import dbs_all
+from tests.conftest import dbs_all, transaction_methods
 from tests.models import TestModel
 
 
 class FakeConnectionError(Exception):
     pass
-
-
-transaction_methods = pytest.mark.parametrize("transaction_method", ["aio_transaction", "aio_atomic"])
 
 
 def _transaction_method(db: AioDatabase, transaction_method: str) -> AsyncContextManager[None]:
@@ -137,7 +134,6 @@ async def test_transaction_manual_work(db: AioDatabase) -> None:
 )
 @dbs_all
 async def test_nested_transaction__error(method1: str, method2: str, db: AioDatabase) -> None:
-
     with pytest.raises(OperationalError):
         async with _transaction_method(db, method1):
             await TestModel.aio_create(text="FOO")

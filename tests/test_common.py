@@ -22,7 +22,6 @@ async def test_composite_key(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_multiple_iterate_over_result(db: AioDatabase) -> None:
-
     obj1 = await TestModel.aio_create(text="Test 1")
     obj2 = await TestModel.aio_create(text="Test 2")
 
@@ -33,7 +32,6 @@ async def test_multiple_iterate_over_result(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_indexing_result(db: AioDatabase) -> None:
-
     await TestModel.aio_create(text="Test 1")
     obj = await TestModel.aio_create(text="Test 2")
 
@@ -47,21 +45,14 @@ async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase])
     TestModel._meta.database = database
 
     database.initialize(db_cls(**params))
-
-    with database.allow_sync():
-        TestModel.create_table(True)
-
     text = "Test %s" % uuid.uuid4()
     await TestModel.aio_create(text=text)
     await TestModel.aio_get(text=text)
-    with database.allow_sync():
-        TestModel.drop_table(True)
     await database.aio_close()
 
 
 @dbs_all
 async def test_many_requests(db: AioDatabase) -> None:
-
     max_connections = getattr(dbs_all, "max_connections", 1)
     text = "Test %s" % uuid.uuid4()
     obj = await TestModel.aio_create(text=text)
@@ -92,7 +83,6 @@ async def test_allow_sync_is_reverted_for_exc(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_logging(db: AioDatabase, caplog: LogCaptureFixture, enable_debug_log_level: None) -> None:
-
     await TestModel.aio_create(text="Test 1")
 
     assert "INSERT INTO" in caplog.text

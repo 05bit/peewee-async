@@ -18,16 +18,16 @@ from importlib.metadata import version
 
 from playhouse.db_url import register_database
 
-from .aio_model import AioModel, aio_prefetch
-from .connection import connection_context
-from .databases import (
+from peewee_async.aio_model import AioModel, aio_prefetch
+from peewee_async.connection import connection_context
+from peewee_async.databases import (
     PooledMySQLDatabase,
     PooledPostgresqlDatabase,
     PooledPostgresqlExtDatabase,
     PsycopgDatabase,
 )
-from .pool import MysqlPoolBackend, PostgresqlPoolBackend
-from .transactions import Transaction
+from peewee_async.pool import MysqlPoolBackend, PostgresqlPoolBackend
+from peewee_async.transactions import Transaction
 
 __version__ = version("peewee-async")
 

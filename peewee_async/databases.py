@@ -109,7 +109,6 @@ class AioDatabase(peewee.Database):
 
     @contextlib.asynccontextmanager
     async def _aio_atomic(self, use_savepoint: bool = False) -> AsyncIterator[None]:
-
         async with self.aio_connection() as connection:
             _connection_context = connection_context.get()
             assert _connection_context is not None
