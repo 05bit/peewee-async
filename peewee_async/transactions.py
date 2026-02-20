@@ -42,7 +42,6 @@ class Transaction:
             await self.commit()
 
     async def commit(self) -> None:
-
         sql = "COMMIT"
         if self.savepoint:
             sql = f"RELEASE SAVEPOINT {self.savepoint}"

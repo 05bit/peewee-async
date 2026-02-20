@@ -72,3 +72,8 @@ AioModelSelect
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_exists
 
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_prefetch
+
+TransactionTestCase
++++++++++++++++++++
+
+.. autoclass:: peewee_async.testing.TransactionTestCase

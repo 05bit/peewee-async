@@ -102,7 +102,6 @@ async def test_aio_scalar(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_count_query(db: AioDatabase) -> None:
-
     for num in range(5):
         await IntegerTestModel.aio_create(num=num)
     count = await IntegerTestModel.select().limit(3).aio_count()
@@ -111,7 +110,6 @@ async def test_count_query(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_count_query_clear_limit(db: AioDatabase) -> None:
-
     for num in range(5):
         await IntegerTestModel.aio_create(num=num)
     count = await IntegerTestModel.select().limit(3).aio_count(clear_limit=True)

@@ -1,7 +1,11 @@
+import pytest
+
 from peewee_async.aio_model import AioModelCompoundSelectQuery, AioModelRaw
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
 from tests.models import TestModel, TestModelAlpha, TestModelBeta
+
+pytestmark = pytest.mark.use_transaction
 
 
 @dbs_all
