@@ -71,7 +71,7 @@ tag_format = "v$version"
 version_scheme = "semver"
 version_provider = "pep621"
 [build-system]
-requires = ["uv_build>=0.9.6,<0.10.0"]
+requires = ["uv_build>=0.9.6,<0.11.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
