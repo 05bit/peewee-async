@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
@@ -24,13 +23,6 @@ def enable_debug_log_level() -> Generator[None, None, None]:
 
     logger.removeHandler(handler)
     logger.setLevel(logging.INFO)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 def _get_db(name: str) -> AioDatabase:
