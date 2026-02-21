@@ -31,7 +31,7 @@ Example usage:
         if "clear_tables" in request.fixturenames:
             yield
         else:
-            async with TestDatabase(database):
+            async with TransactionTestCase(database):
                 yield
 
 
