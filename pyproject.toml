@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
-    "peewee>=3.15.4",
+    "peewee>=3.15.4,<4",
     "typing-extensions>=4.12.2"
 ]
 
@@ -40,7 +40,8 @@ dev = [
     "mypy>=1.19.0",
     "ruff==0.15.1",
     "types-PyMySQL>=1.1.0",
-    "poethepoet==0.41.0"
+    "poethepoet==0.41.0",
+    "commitizen>=4.13.8,<5"
 ]
 
 [tool.ruff]
@@ -63,6 +64,12 @@ select = [
     'TC',
 ]
 
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "semver"
+version_provider = "pep621"
 [build-system]
 requires = ["uv_build>=0.9.6,<0.10.0"]
 build-backend = "uv_build"
