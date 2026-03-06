@@ -62,6 +62,12 @@ select = [
     'I',
     'DTZ',
     'TC',
+    'UP'
+]
+ignore = [
+    # not fixed yet
+    'UP031',
+    'UP035'
 ]
 
 

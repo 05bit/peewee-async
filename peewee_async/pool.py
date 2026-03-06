@@ -1,6 +1,6 @@
 import abc
 import asyncio
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from .utils import ConnectionProtocol, aiomysql, aiopg, format_dsn, psycopg, psycopg_pool
 
@@ -9,7 +9,7 @@ class PoolBackend(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool."""
 
     def __init__(self, *, database: str, **kwargs: Any) -> None:
-        self.pool: Optional[Any] = None
+        self.pool: Any | None = None
         self.database = database
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()

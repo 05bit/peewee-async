@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
+from typing import Any, Literal, cast
 
 import peewee
 from peewee import PREFETCH_TYPE
@@ -19,8 +19,8 @@ async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE =
         return sq
 
     fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
-    deps: Dict[Any, Any] = {}
-    rel_map: Dict[Any, Any] = {}
+    deps: dict[Any, Any] = {}
+    rel_map: dict[Any, Any] = {}
 
     for pq in reversed(fixed_queries):
         query_model = pq.model
@@ -55,21 +55,21 @@ class AioQueryMixin:
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol) -> Union[List[Any], int]:
+    async def fetch_results(self, cursor: CursorProtocol) -> list[Any] | int:
         if self._returning:
             return await fetch_models(cursor, self)
         return cursor.rowcount
 
 
 class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol) -> Union[List[Any], int]:
+    async def fetch_results(self, cursor: CursorProtocol) -> list[Any] | int:
         if self._returning:
             return await fetch_models(cursor, self)
         return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol) -> Union[List[Any], Any, int]:
+    async def fetch_results(self, cursor: CursorProtocol) -> list[Any] | Any | int:
         if self._returning is not None and len(self._returning) > 1:
             return await fetch_models(cursor, self)
 
@@ -122,7 +122,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
             self._limit = n
         return await self.aio_peek(database, n=n)
 
-    async def aio_get(self, database: Optional[AioDatabase] = None) -> Any:
+    async def aio_get(self, database: AioDatabase | None = None) -> Any:
         """
         Asynchronous version of `peewee.SelectBase.get
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.get>`_
@@ -254,7 +254,7 @@ class AioModel(peewee.Model):
         return AioModelInsert(cls, insert=query, columns=columns)
 
     @classmethod
-    def raw(cls, sql: Optional[str], *params: Optional[List[Any]]) -> AioModelRaw:
+    def raw(cls, sql: str | None, *params: list[Any] | None) -> AioModelRaw:
         return AioModelRaw(cls, sql, params)
 
     @classmethod
@@ -278,7 +278,7 @@ class AioModel(peewee.Model):
                     await model.delete().where(query).aio_execute()
         return cast("int", await type(self).delete().where(self._pk_expr()).aio_execute())
 
-    async def aio_save(self, force_insert: bool = False, only: Any = None) -> Union[int, Literal[False]]:  # noqa: C901
+    async def aio_save(self, force_insert: bool = False, only: Any = None) -> int | Literal[False]:  # noqa: C901
         """
         Async version of **peewee.Model.save**
 
@@ -344,7 +344,7 @@ class AioModel(peewee.Model):
         return cast("Self", await sq.aio_get())
 
     @classmethod
-    async def aio_get_or_none(cls, *query: Any, **filters: Any) -> Optional[Self]:
+    async def aio_get_or_none(cls, *query: Any, **filters: Any) -> Self | None:
         """
         Async version of **peewee.Model.get_or_none**
 
@@ -369,7 +369,7 @@ class AioModel(peewee.Model):
         return inst
 
     @classmethod
-    async def aio_get_or_create(cls, **kwargs: Any) -> Tuple[Self, bool]:
+    async def aio_get_or_create(cls, **kwargs: Any) -> tuple[Self, bool]:
         """
         Async version of **peewee.Model.get_or_create**
 

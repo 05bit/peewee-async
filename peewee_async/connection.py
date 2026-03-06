@@ -1,6 +1,5 @@
 from contextvars import ContextVar
 from types import TracebackType
-from typing import Optional, Type
 
 from .pool import PoolBackend
 from .utils import ConnectionProtocol
@@ -13,7 +12,7 @@ class ConnectionContext:
         self.transaction_is_opened = False
 
 
-connection_context: ContextVar[Optional[ConnectionContext]] = ContextVar("connection_context", default=None)
+connection_context: ContextVar[ConnectionContext | None] = ContextVar("connection_context", default=None)
 
 
 class ConnectionContextManager:
@@ -33,9 +32,9 @@ class ConnectionContextManager:
 
     async def __aexit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         if self.resuing_connection is False:
             if self.connection_context is not None:

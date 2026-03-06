@@ -1,6 +1,5 @@
 import uuid
 from types import TracebackType
-from typing import Optional, Type
 
 from .utils import ConnectionProtocol
 
@@ -8,7 +7,7 @@ from .utils import ConnectionProtocol
 class Transaction:
     def __init__(self, connection: ConnectionProtocol, is_savepoint: bool = False):
         self.connection = connection
-        self.savepoint: Optional[str] = None
+        self.savepoint: str | None = None
         if is_savepoint:
             self.savepoint = f"PWASYNC__{uuid.uuid4().hex}"
 
@@ -32,9 +31,9 @@ class Transaction:
 
     async def __aexit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         if exc_type is not None:
             await self.rollback()

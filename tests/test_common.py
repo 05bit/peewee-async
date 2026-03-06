@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Any, Dict, Type
+from typing import Any
 
 import peewee
 import pytest
@@ -40,7 +40,7 @@ async def test_indexing_result(db: AioDatabase) -> None:
 
 
 @pytest.mark.parametrize("params, db_cls", [(DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()])
-async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase]) -> None:
+async def test_proxy_database(params: dict[str, Any], db_cls: type[AioDatabase]) -> None:
     database = peewee.Proxy()
     TestModel._meta.database = database
 

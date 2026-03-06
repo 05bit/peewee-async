@@ -1,5 +1,4 @@
 import uuid
-from typing import List, Union
 
 import peewee
 import pytest
@@ -45,7 +44,7 @@ async def test_aio_get_or_none(db: AioDatabase) -> None:
         (5, [1, 2, 3]),
     ),
 )
-async def test_aio_peek(db: AioDatabase, peek_num: int, expected: Union[int, List[int]]) -> None:
+async def test_aio_peek(db: AioDatabase, peek_num: int, expected: int | list[int]) -> None:
     await IntegerTestModel.aio_create(num=1)
     await IntegerTestModel.aio_create(num=2)
     await IntegerTestModel.aio_create(num=3)
@@ -68,7 +67,7 @@ async def test_aio_peek(db: AioDatabase, peek_num: int, expected: Union[int, Lis
         (5, [1, 2, 3]),
     ),
 )
-async def test_aio_first(db: AioDatabase, first_num: int, expected: Union[int, List[int]]) -> None:
+async def test_aio_first(db: AioDatabase, first_num: int, expected: int | list[int]) -> None:
     await IntegerTestModel.aio_create(num=1)
     await IntegerTestModel.aio_create(num=2)
     await IntegerTestModel.aio_create(num=3)

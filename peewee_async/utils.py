@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, AsyncContextManager, List, Optional, Protocol, Union
+from typing import Any, AsyncContextManager, Protocol
 
 try:
     import aiopg
@@ -30,15 +30,15 @@ __log__.addHandler(logging.NullHandler())
 class CursorProtocol(Protocol):
     async def fetchone(self) -> Any: ...
 
-    async def fetchall(self) -> List[Any]: ...
+    async def fetchall(self) -> list[Any]: ...
 
-    async def fetchmany(self, size: int) -> List[Any]: ...
+    async def fetchmany(self, size: int) -> list[Any]: ...
 
     @property
     def lastrowid(self) -> int: ...
 
     @property
-    def description(self) -> Optional[Sequence[Any]]: ...
+    def description(self) -> Sequence[Any] | None: ...
 
     @property
     def rowcount(self) -> int: ...
@@ -53,5 +53,5 @@ class ConnectionProtocol(Protocol):
 FetchResults = Callable[[CursorProtocol], Awaitable[Any]]
 
 
-def format_dsn(protocol: str, host: str, port: Union[str, int], user: str, password: str, path: str = "") -> str:
+def format_dsn(protocol: str, host: str, port: str | int, user: str, password: str, path: str = "") -> str:
     return f"{protocol}://{user}:{password}@{host}:{port}/{path}"
