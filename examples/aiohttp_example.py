@@ -92,7 +92,7 @@ if __name__ == "__main__":
             database.create_tables([Post], safe=True)
             print("Tables are created.")
     except Exception as exc:
-        print("Error creating tables: {}".format(exc))
+        print(f"Error creating tables: {exc}")
 
     try:
         add_post("Hello, world", "This is a first post")
@@ -101,4 +101,4 @@ if __name__ == "__main__":
         add_post("Let it be!", "Let it be, let it be, let it be, let it be")
         print("Done.")
     except Exception as exc:
-        print("Error adding posts: {}".format(exc))
+        print(f"Error adding posts: {exc}")

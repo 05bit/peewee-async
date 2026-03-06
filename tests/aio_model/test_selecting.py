@@ -98,6 +98,6 @@ async def test_except(db: AioDatabase) -> None:
     await TestModel.aio_create(text="3")
     query = TestModel.select().where(
         (TestModel.text == "1") | (TestModel.text == "2") | (TestModel.text == "3")
-    ) - TestModel.select().where((TestModel.text == "2"))
+    ) - TestModel.select().where(TestModel.text == "2")
     result = await query.aio_execute()
     assert sorted(r.text for r in result) == ["1", "3"]

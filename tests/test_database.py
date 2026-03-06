@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from peewee import OperationalError
@@ -69,7 +69,7 @@ async def test_deferred_init(db_name: str) -> None:
     with pytest.raises(Exception, match="Error, database must be initialized before creating a connection pool"):
         await database.aio_execute_sql(sql="SELECT 1;")
 
-    db_params: Dict[str, Any] = DB_DEFAULTS[db_name]
+    db_params: dict[str, Any] = DB_DEFAULTS[db_name]
     database.init(**db_params)
 
     await database.aio_execute_sql(sql="SELECT 1;")

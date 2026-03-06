@@ -62,8 +62,8 @@ select = [
     'I',
     'DTZ',
     'TC',
+    'UP'
 ]
-
 
 [tool.commitizen]
 name = "cz_conventional_commits"

@@ -1,13 +1,13 @@
 from collections.abc import Sequence
-from typing import Any, List, Optional
+from typing import Any
 
 from peewee import BaseQuery
 
 from .utils import CursorProtocol
 
 
-class SyncCursorAdapter(object):
-    def __init__(self, rows: List[Any], description: Optional[Sequence[Any]]) -> None:
+class SyncCursorAdapter:
+    def __init__(self, rows: list[Any], description: Sequence[Any] | None) -> None:
         self._rows = rows
         self.description = description
         self._idx = 0
@@ -23,7 +23,7 @@ class SyncCursorAdapter(object):
         pass
 
 
-async def fetch_models(cursor: CursorProtocol, query: BaseQuery, count: Optional[int] = None) -> List[Any]:
+async def fetch_models(cursor: CursorProtocol, query: BaseQuery, count: int | None = None) -> list[Any]:
     if count is None:
         rows = await cursor.fetchall()
     else:

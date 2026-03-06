@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from typing import Any, Dict, Type
+from typing import Any
 
 import peewee
 import pytest
@@ -40,12 +40,12 @@ async def test_indexing_result(db: AioDatabase) -> None:
 
 
 @pytest.mark.parametrize("params, db_cls", [(DB_DEFAULTS[name], db_cls) for name, db_cls in DB_CLASSES.items()])
-async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase]) -> None:
+async def test_proxy_database(params: dict[str, Any], db_cls: type[AioDatabase]) -> None:
     database = peewee.Proxy()
     TestModel._meta.database = database
 
     database.initialize(db_cls(**params))
-    text = "Test %s" % uuid.uuid4()
+    text = f"Test {uuid.uuid4()}"
     await TestModel.aio_create(text=text)
     await TestModel.aio_get(text=text)
     await database.aio_close()
@@ -54,7 +54,7 @@ async def test_proxy_database(params: Dict[str, Any], db_cls: Type[AioDatabase])
 @dbs_all
 async def test_many_requests(db: AioDatabase) -> None:
     max_connections = getattr(dbs_all, "max_connections", 1)
-    text = "Test %s" % uuid.uuid4()
+    text = f"Test {uuid.uuid4()}"
     obj = await TestModel.aio_create(text=text)
     n = 2 * max_connections  # number of requests
     done, not_done = await asyncio.wait({asyncio.create_task(TestModel.aio_get(id=obj.id)) for _ in range(n)})

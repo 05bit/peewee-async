@@ -14,8 +14,8 @@ pytestmark = pytest.mark.use_transaction
 async def test_delete__count(db: AioDatabase) -> None:
     query = TestModel.insert_many(
         [
-            {"text": "Test %s" % uuid.uuid4()},
-            {"text": "Test %s" % uuid.uuid4()},
+            {"text": f"Test {uuid.uuid4()}"},
+            {"text": f"Test {uuid.uuid4()}"},
         ]
     )
     await query.aio_execute()

@@ -1,7 +1,8 @@
 import contextlib
 import warnings
 from collections.abc import AsyncIterator, Iterator
-from typing import Any, AsyncContextManager, Dict, List, Optional, Type
+from contextlib import AbstractAsyncContextManager
+from typing import Any
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -41,11 +42,11 @@ class AioDatabase(peewee.Database):
 
     _allow_sync = False  # whether sync queries are allowed
 
-    pool_backend_cls: Type[PoolBackend]
+    pool_backend_cls: type[PoolBackend]
     pool_backend: PoolBackend
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.pool_params: Dict[str, Any] = {}
+        self.pool_params: dict[str, Any] = {}
         super().__init__(*args, **kwargs)
 
     def init_pool_params_defaults(self) -> None:
@@ -69,7 +70,7 @@ class AioDatabase(peewee.Database):
         self.pool_params.update(pool_params)
         self.pool_params.update(self.connect_params)
 
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
+    def init(self, database: str | None, **kwargs: Any) -> None:
         super().init(database, **kwargs)
         self.init_pool_params()
         self.pool_backend = self.pool_backend_cls(database=self.database, **self.pool_params)
@@ -93,14 +94,14 @@ class AioDatabase(peewee.Database):
 
         await self.pool_backend.close()
 
-    def aio_atomic(self) -> AsyncContextManager[None]:
+    def aio_atomic(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager which runs any queries in the wrapped block
         in a transaction (or save-point if blocks are nested).
         Calls to :meth:`.aio_atomic()` can be nested.
         """
         return self._aio_atomic(use_savepoint=True)
 
-    def aio_transaction(self) -> AsyncContextManager[None]:
+    def aio_transaction(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager that runs all queries in the wrapped block in a transaction.
 
         Calls to :meth:`.aio_transaction()` cannot be nested. If so OperationalError will be raised.
@@ -168,7 +169,7 @@ class AioDatabase(peewee.Database):
         return ConnectionContextManager(self.pool_backend)
 
     async def aio_execute_sql(
-        self, sql: str, params: Optional[List[Any]] = None, fetch_results: Optional[FetchResults] = None
+        self, sql: str, params: list[Any] | None = None, fetch_results: FetchResults | None = None
     ) -> Any:
         __log__.debug((sql, params))
         with peewee.__exception_wrapper__:
@@ -178,7 +179,7 @@ class AioDatabase(peewee.Database):
                     if fetch_results is not None:
                         return await fetch_results(cursor)
 
-    async def aio_execute(self, query: Any, fetch_results: Optional[FetchResults] = None) -> Any:
+    async def aio_execute(self, query: Any, fetch_results: FetchResults | None = None) -> Any:
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
 
         :param query: peewee query instance created with ``Model.select()``,
@@ -218,7 +219,7 @@ class PsycopgDatabase(AioDatabase, Psycopg3Database):
 
     pool_backend_cls = PsycopgPoolBackend
 
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
+    def init(self, database: str | None, **kwargs: Any) -> None:
         if not psycopg:
             raise Exception("Error, psycopg is not installed!")
         super().init(database, **kwargs)
@@ -254,7 +255,7 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"enable_json": False, "enable_hstore": False})
 
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
+    def init(self, database: str | None, **kwargs: Any) -> None:
         if not aiopg:
             raise Exception("Error, aiopg is not installed!")
         super().init(database, **kwargs)
@@ -304,7 +305,7 @@ class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})
 
-    def init(self, database: Optional[str], **kwargs: Any) -> None:
+    def init(self, database: str | None, **kwargs: Any) -> None:
         if not aiomysql:
             raise Exception("Error, aiomysql is not installed!")
         super().init(database, **kwargs)
