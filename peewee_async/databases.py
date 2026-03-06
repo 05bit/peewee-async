@@ -1,7 +1,8 @@
 import contextlib
 import warnings
 from collections.abc import AsyncIterator, Iterator
-from typing import Any, AsyncContextManager
+from contextlib import AbstractAsyncContextManager
+from typing import Any
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -93,14 +94,14 @@ class AioDatabase(peewee.Database):
 
         await self.pool_backend.close()
 
-    def aio_atomic(self) -> AsyncContextManager[None]:
+    def aio_atomic(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager which runs any queries in the wrapped block
         in a transaction (or save-point if blocks are nested).
         Calls to :meth:`.aio_atomic()` can be nested.
         """
         return self._aio_atomic(use_savepoint=True)
 
-    def aio_transaction(self) -> AsyncContextManager[None]:
+    def aio_transaction(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager that runs all queries in the wrapped block in a transaction.
 
         Calls to :meth:`.aio_transaction()` cannot be nested. If so OperationalError will be raised.

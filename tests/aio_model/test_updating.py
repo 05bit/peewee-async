@@ -20,7 +20,7 @@ async def test_update__count(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_update__field_updated(db: AioDatabase) -> None:
-    text = "Test %s" % uuid.uuid4()
+    text = f"Test {uuid.uuid4()}"
     obj1 = await TestModel.aio_create(text=text)
     await TestModel.update(text="Test update query").where(TestModel.id == obj1.id).aio_execute()
 

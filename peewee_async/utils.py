@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, AsyncContextManager, Protocol
+from contextlib import AbstractAsyncContextManager
+from typing import Any, Protocol
 
 try:
     import aiopg
@@ -47,7 +48,7 @@ class CursorProtocol(Protocol):
 
 
 class ConnectionProtocol(Protocol):
-    def cursor(self, **kwargs: Any) -> AsyncContextManager[CursorProtocol]: ...
+    def cursor(self, **kwargs: Any) -> AbstractAsyncContextManager[CursorProtocol]: ...
 
 
 FetchResults = Callable[[CursorProtocol], Awaitable[Any]]

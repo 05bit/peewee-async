@@ -117,7 +117,7 @@ async def test_count_query_clear_limit(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_aio_delete_instance(db: AioDatabase) -> None:
-    text = "Test %s" % uuid.uuid4()
+    text = f"Test {uuid.uuid4()}"
     obj1 = await TestModel.aio_create(text=text)
     obj2 = await TestModel.aio_get(id=obj1.id)
 

@@ -12,7 +12,7 @@ class TestModel(peewee_async.AioModel):
     data = pw.TextField(default="")
 
     def __str__(self) -> str:
-        return "<%s id=%s> %s" % (self.__class__.__name__, self.id, self.text)
+        return f"<{self.__class__.__name__} id={self.id}> {self.text}"
 
 
 class TestModelAlpha(peewee_async.AioModel):
@@ -20,7 +20,7 @@ class TestModelAlpha(peewee_async.AioModel):
     text = pw.CharField()
 
     def __str__(self) -> str:
-        return "<%s id=%s> %s" % (self.__class__.__name__, self.id, self.text)
+        return f"<{self.__class__.__name__} id={self.id}> {self.text}"
 
 
 class TestModelBeta(peewee_async.AioModel):
@@ -29,7 +29,7 @@ class TestModelBeta(peewee_async.AioModel):
     text = pw.CharField()
 
     def __str__(self) -> str:
-        return "<%s id=%s> %s" % (self.__class__.__name__, self.id, self.text)
+        return f"<{self.__class__.__name__} id={self.id}> {self.text}"
 
 
 class TestModelGamma(peewee_async.AioModel):
@@ -38,7 +38,7 @@ class TestModelGamma(peewee_async.AioModel):
     beta = pw.ForeignKeyField(TestModelBeta, backref="gammas")
 
     def __str__(self) -> str:
-        return "<%s id=%s> %s" % (self.__class__.__name__, self.id, self.text)
+        return f"<{self.__class__.__name__} id={self.id}> {self.text}"
 
 
 class UUIDTestModel(peewee_async.AioModel):
@@ -46,7 +46,7 @@ class UUIDTestModel(peewee_async.AioModel):
     text = pw.CharField()
 
     def __str__(self) -> str:
-        return "<%s id=%s> %s" % (self.__class__.__name__, self.id, self.text)
+        return f"<{self.__class__.__name__} id={self.id}> {self.text}"
 
 
 class CompositeTestModel(peewee_async.AioModel):

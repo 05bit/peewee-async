@@ -1,5 +1,6 @@
 import asyncio
-from typing import AsyncContextManager, cast
+from contextlib import AbstractAsyncContextManager
+from typing import cast
 
 import pytest
 from peewee import IntegrityError, OperationalError
@@ -15,8 +16,8 @@ class FakeConnectionError(Exception):
     pass
 
 
-def _transaction_method(db: AioDatabase, transaction_method: str) -> AsyncContextManager[None]:
-    return cast("AsyncContextManager[None]", getattr(db, transaction_method)())
+def _transaction_method(db: AioDatabase, transaction_method: str) -> AbstractAsyncContextManager[None]:
+    return cast("AbstractAsyncContextManager[None]", getattr(db, transaction_method)())
 
 
 @transaction_methods

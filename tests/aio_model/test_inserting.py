@@ -14,8 +14,8 @@ pytestmark = pytest.mark.use_transaction
 async def test_insert_many(db: AioDatabase) -> None:
     last_id = await TestModel.insert_many(
         [
-            {"text": "Test %s" % uuid.uuid4()},
-            {"text": "Test %s" % uuid.uuid4()},
+            {"text": f"Test {uuid.uuid4()}"},
+            {"text": f"Test {uuid.uuid4()}"},
         ]
     ).aio_execute()
 
@@ -27,7 +27,7 @@ async def test_insert_many(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_insert__return_id(db: AioDatabase) -> None:
-    last_id = await TestModel.insert(text="Test %s" % uuid.uuid4()).aio_execute()
+    last_id = await TestModel.insert(text=f"Test {uuid.uuid4()}").aio_execute()
 
     res = await TestModel.select().aio_execute()
     obj = res[0]
@@ -71,14 +71,14 @@ async def test_insert_on_conflict_ignore__inserted_once(db: AioDatabase) -> None
 
 @dbs_postgres
 async def test_insert__uuid_pk(db: AioDatabase) -> None:
-    query = UUIDTestModel.insert(text="Test %s" % uuid.uuid4())
+    query = UUIDTestModel.insert(text=f"Test {uuid.uuid4()}")
     last_id = await query.aio_execute()
     assert len(str(last_id)) == 36
 
 
 @dbs_postgres
 async def test_insert__return_model(db: AioDatabase) -> None:
-    text = "Test %s" % uuid.uuid4()
+    text = f"Test {uuid.uuid4()}"
     data = "data"
     query = TestModel.insert(text=text, data=data).returning(TestModel)
 

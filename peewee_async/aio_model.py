@@ -133,7 +133,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         except IndexError:
             sql, params = clone.sql()
             raise self.model.DoesNotExist(  # noqa: B904
-                "%s instance matching query does not exist:\nSQL: %s\nParams: %s" % (clone.model, sql, params)
+                f"{clone.model} instance matching query does not exist:\nSQL: {sql}\nParams: {params}"
             )
 
     @peewee.database_required

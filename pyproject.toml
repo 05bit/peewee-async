@@ -64,12 +64,6 @@ select = [
     'TC',
     'UP'
 ]
-ignore = [
-    # not fixed yet
-    'UP031',
-    'UP035'
-]
-
 
 [tool.commitizen]
 name = "cz_conventional_commits"
