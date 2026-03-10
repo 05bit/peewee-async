@@ -31,15 +31,13 @@ MYSQL_DEFAULTS = {
 }
 
 DB_DEFAULTS = {
-    "postgres-pool": PG_DEFAULTS,
-    "postgres-pool-ext": PG_DEFAULTS,
+    "aiopg-pool": PG_DEFAULTS,
     "psycopg-pool": PSYCOPG_DEFAULTS,
     "mysql-pool": MYSQL_DEFAULTS,
 }
 
 DB_CLASSES = {
-    "postgres-pool": peewee_async.PooledPostgresqlDatabase,
-    "postgres-pool-ext": peewee_async.PooledPostgresqlExtDatabase,
-    "psycopg-pool": peewee_async.PsycopgDatabase,
-    "mysql-pool": peewee_async.PooledMySQLDatabase,
+    "aiopg-pool": peewee_async.PostgresqlDatabase,
+    "psycopg-pool": peewee_async.Psycopg3Database,
+    "mysql-pool": peewee_async.MySQLDatabase,
 }

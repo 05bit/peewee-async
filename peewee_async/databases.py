@@ -1,12 +1,10 @@
 import contextlib
-import warnings
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AbstractAsyncContextManager
 from typing import Any
 
 import peewee
 from playhouse import postgres_ext as ext
-from playhouse.psycopg3_ext import Psycopg3Database
 
 from .connection import ConnectionContextManager, connection_context
 from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
@@ -22,17 +20,16 @@ class AioDatabase(peewee.Database):
 
     Example::
 
-        database = PooledPostgresqlExtDatabase(
+        database = Psycopg3Database(
             'database': 'postgres',
             'host': '127.0.0.1',
-            'port':5432,
+            'port': 5432,
             'password': 'postgres',
             'user': 'postgres',
             'pool_params': {
-                "minsize": 0,
-                "maxsize": 5,
-                "timeout": 30,
-                'pool_recycle': 1.5
+                "min_size": 0,
+                "max_size": 5,
+                'max_lifetime': 15
             }
         )
 
@@ -54,18 +51,6 @@ class AioDatabase(peewee.Database):
 
     def init_pool_params(self) -> None:
         self.init_pool_params_defaults()
-        if "min_connections" in self.connect_params or "max_connections" in self.connect_params:
-            warnings.warn(
-                "`min_connections` and `max_connections` are deprecated, use `pool_params` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            self.pool_params.update(
-                {
-                    "minsize": self.connect_params.pop("min_connections", 1),
-                    "maxsize": self.connect_params.pop("max_connections", 20),
-                }
-            )
         pool_params = self.connect_params.pop("pool_params", {})
         self.pool_params.update(pool_params)
         self.pool_params.update(self.connect_params)
@@ -194,13 +179,13 @@ class AioDatabase(peewee.Database):
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
 
-class PsycopgDatabase(AioDatabase, Psycopg3Database):
-    """Extension for `peewee.PostgresqlDatabase` providing extra methods
+class Psycopg3Database(AioDatabase, ext.Psycopg3Database):
+    """Extension for `playhouse.Psycopg3Database` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
     Example::
 
-        database = PsycopgDatabase(
+        database = Psycopg3Database(
             'database': 'postgres',
             'host': '127.0.0.1',
             'port': 5432,
@@ -225,14 +210,14 @@ class PsycopgDatabase(AioDatabase, Psycopg3Database):
         super().init(database, **kwargs)
 
 
-class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
-    """Extension for `peewee.PostgresqlDatabase` providing extra methods
+class PostgresqlDatabase(AioDatabase, ext.PostgresqlExtDatabase):
+    """Extension for `playhouse.PostgresqlDatabase` providing extra methods
     for managing async connection based on aiopg pool backend.
 
 
     Example::
 
-        database = PooledPostgresqlExtDatabase(
+        database = PostgresqlDatabase(
             'database': 'postgres',
             'host': '127.0.0.1',
             'port':5432,
@@ -253,7 +238,7 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
     pool_backend_cls = PostgresqlPoolBackend
 
     def init_pool_params_defaults(self) -> None:
-        self.pool_params.update({"enable_json": False, "enable_hstore": False})
+        self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
 
     def init(self, database: str | None, **kwargs: Any) -> None:
         if not aiopg:
@@ -261,28 +246,13 @@ class PooledPostgresqlDatabase(AioDatabase, peewee.PostgresqlDatabase):
         super().init(database, **kwargs)
 
 
-class PooledPostgresqlExtDatabase(PooledPostgresqlDatabase, ext.PostgresqlExtDatabase):
-    """PosgtreSQL database extended driver providing **single drop-in sync**
-    connection and **async connections pool** interface based on aiopg pool backend.
-
-    JSON fields support is enabled by default, HStore supports is disabled by
-    default, but can be enabled through pool_params or with ``register_hstore=False`` argument.
-
-    See also:
-    https://peewee.readthedocs.io/en/latest/peewee/playhouse.html#PostgresqlExtDatabase
-    """
-
-    def init_pool_params_defaults(self) -> None:
-        self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
-
-
-class PooledMySQLDatabase(AioDatabase, peewee.MySQLDatabase):
+class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     """MySQL database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
     Example::
 
-        database = PooledMySQLDatabase(
+        database = MySQLDatabase(
             'database': 'mysql',
             'host': '127.0.0.1',
             'port': 3306,

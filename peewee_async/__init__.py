@@ -21,10 +21,9 @@ from playhouse.db_url import register_database
 from peewee_async.aio_model import AioModel, aio_prefetch
 from peewee_async.connection import connection_context
 from peewee_async.databases import (
-    PooledMySQLDatabase,
-    PooledPostgresqlDatabase,
-    PooledPostgresqlExtDatabase,
-    PsycopgDatabase,
+    MySQLDatabase,
+    PostgresqlDatabase,
+    Psycopg3Database,
 )
 from peewee_async.pool import MysqlPoolBackend, PostgresqlPoolBackend
 from peewee_async.transactions import Transaction
@@ -34,8 +33,8 @@ __version__ = version("peewee-async")
 
 __all__ = [
     "PooledPostgresqlDatabase",
-    "PooledPostgresqlExtDatabase",
-    "PooledMySQLDatabase",
+    "PostgresqlDatabase",
+    "MySQLDatabase",
     "Transaction",
     "AioModel",
     "aio_prefetch",
@@ -44,7 +43,6 @@ __all__ = [
     "MysqlPoolBackend",
 ]
 
-register_database(PooledPostgresqlDatabase, "postgres+pool+async", "postgresql+pool+async")
-register_database(PooledPostgresqlExtDatabase, "postgresext+pool+async", "postgresqlext+pool+async")
-register_database(PsycopgDatabase, "psycopg+pool+async", "psycopg+pool+async")
-register_database(PooledMySQLDatabase, "mysql+pool+async")
+register_database(PostgresqlDatabase, "postgres+pool+async", "postgresql+pool+async")
+register_database(Psycopg3Database, "psycopg+pool+async", "psycopg+pool+async")
+register_database(MySQLDatabase, "mysql+pool+async")
