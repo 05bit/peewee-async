@@ -90,8 +90,7 @@ async def db(request: pytest.FixtureRequest) -> AsyncGenerator[AioDatabase, None
 
 
 PG_DBS = [
-    "postgres-pool",
-    "postgres-pool-ext",
+    "aiopg-pool",
     "psycopg-pool",
 ]
 

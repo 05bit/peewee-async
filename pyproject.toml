@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
-    "peewee>=3.15.4,<4",
+    "peewee>=4,<5",
     "typing-extensions>=4.12.2"
 ]
 
@@ -19,12 +19,12 @@ postgresql = [
     "aiopg>=1.4.0",
 ]
 mysql = [
-    "aiomysql>=0.2.0",
+    "aiomysql>=0.3.2",
     "cryptography>=46.0.5"
 ]
 psycopg = [
-    "psycopg>=3.2.0",
-    "psycopg-pool>=3.2.0"
+    "psycopg>=3.3.0",
+    "psycopg-pool>=3.3.0"
 ]
 docs = [
     "Sphinx>=8.1.3",
