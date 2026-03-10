@@ -1,5 +1,5 @@
 import contextlib
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import AbstractAsyncContextManager
 from typing import Any
 
@@ -9,7 +9,9 @@ from playhouse import postgres_ext as ext
 from .connection import ConnectionContextManager, connection_context
 from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
-from .utils import FetchResults, __log__, aiomysql, aiopg, psycopg
+from .utils import CursorProtocol, __log__, aiomysql, aiopg, psycopg
+
+FetchResults = Callable[["AioDatabase", CursorProtocol], Awaitable[Any]]
 
 
 class AioDatabase(peewee.Database):
@@ -162,7 +164,7 @@ class AioDatabase(peewee.Database):
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
                     if fetch_results is not None:
-                        return await fetch_results(cursor)
+                        return await fetch_results(self, cursor)
 
     async def aio_execute(self, query: Any, fetch_results: FetchResults | None = None) -> Any:
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.

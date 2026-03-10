@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Protocol
 
@@ -49,9 +49,6 @@ class CursorProtocol(Protocol):
 
 class ConnectionProtocol(Protocol):
     def cursor(self, **kwargs: Any) -> AbstractAsyncContextManager[CursorProtocol]: ...
-
-
-FetchResults = Callable[[CursorProtocol], Awaitable[Any]]
 
 
 def format_dsn(protocol: str, host: str, port: str | int, user: str, password: str, path: str = "") -> str:

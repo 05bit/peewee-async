@@ -50,26 +50,26 @@ class AioQueryMixin:
     async def aio_execute(self, database: AioDatabase) -> Any:
         return await database.aio_execute(self)
 
-    async def fetch_results(self, cursor: CursorProtocol) -> Any:
+    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> Any:
         return await fetch_models(cursor, self)
 
 
 class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol) -> list[Any] | int:
+    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | int:
         if self._returning:
             return await fetch_models(cursor, self)
         return cursor.rowcount
 
 
 class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol) -> list[Any] | int:
+    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | int:
         if self._returning:
             return await fetch_models(cursor, self)
         return cursor.rowcount
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
-    async def fetch_results(self, cursor: CursorProtocol) -> list[Any] | Any | int:
+    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | Any | int:
         if self._returning is not None and len(self._returning) > 1:
             return await fetch_models(cursor, self)
 
@@ -92,7 +92,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         `peewee.SelectBase.peek <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.peek>`_
         """
 
-        async def fetch_results(cursor: CursorProtocol) -> Any:
+        async def fetch_results(database: AioDatabase, cursor: CursorProtocol) -> Any:
             return await fetch_models(cursor, self, n)
 
         rows = await database.aio_execute(self, fetch_results=fetch_results)
