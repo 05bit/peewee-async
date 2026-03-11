@@ -6,6 +6,8 @@ from typing import Any
 import peewee
 from playhouse import postgres_ext as ext
 
+from peewee_async.result_wrappers import fetch_models
+
 from .connection import ConnectionContextManager, connection_context
 from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
@@ -180,8 +182,24 @@ class AioDatabase(peewee.Database):
         fetch_results = fetch_results or getattr(query, "fetch_results", None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
+    async def aio_last_insert_id(self, cursor: CursorProtocol, query: peewee.Insert) -> int:
+        return cursor.lastrowid
 
-class Psycopg3Database(AioDatabase, ext.Psycopg3Database):
+    async def aio_rows_affected(self, cursor: CursorProtocol) -> int:
+        return cursor.rowcount
+
+
+class AioPgDatabase(AioDatabase):
+    async def aio_last_insert_id(self, cursor: CursorProtocol, query: peewee.Insert) -> Any:
+        if query._query_type == peewee.Insert.SIMPLE:
+            try:
+                return (await cursor.fetchmany(1))[0][0]
+            except (IndexError, KeyError, TypeError):
+                return None
+        return await fetch_models(cursor, query)
+
+
+class Psycopg3Database(AioPgDatabase, ext.Psycopg3Database):
     """Extension for `playhouse.Psycopg3Database` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
@@ -212,7 +230,7 @@ class Psycopg3Database(AioDatabase, ext.Psycopg3Database):
         super().init(database, **kwargs)
 
 
-class PostgresqlDatabase(AioDatabase, ext.PostgresqlExtDatabase):
+class PostgresqlDatabase(AioPgDatabase, ext.PostgresqlExtDatabase):
     """Extension for `playhouse.PostgresqlDatabase` providing extra methods
     for managing async connection based on aiopg pool backend.
 

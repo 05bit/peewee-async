@@ -30,14 +30,19 @@ MYSQL_DEFAULTS = {
     "pool_params": {"minsize": 0, "maxsize": 5, "pool_recycle": 2},
 }
 
+AIOPG_POOL = "aiopg-pool"
+PSYCOPG_POOL = "psycopg-pool"
+MYSQL_POOL = "mysql-pool"
+
+
 DB_DEFAULTS = {
-    "aiopg-pool": PG_DEFAULTS,
-    "psycopg-pool": PSYCOPG_DEFAULTS,
-    "mysql-pool": MYSQL_DEFAULTS,
+    AIOPG_POOL: PG_DEFAULTS,
+    PSYCOPG_POOL: PSYCOPG_DEFAULTS,
+    MYSQL_POOL: MYSQL_DEFAULTS,
 }
 
 DB_CLASSES = {
-    "aiopg-pool": peewee_async.PostgresqlDatabase,
-    "psycopg-pool": peewee_async.Psycopg3Database,
-    "mysql-pool": peewee_async.MySQLDatabase,
+    AIOPG_POOL: peewee_async.PostgresqlDatabase,
+    PSYCOPG_POOL: peewee_async.Psycopg3Database,
+    MYSQL_POOL: peewee_async.MySQLDatabase,
 }

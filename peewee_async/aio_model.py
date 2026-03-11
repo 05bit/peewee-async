@@ -54,30 +54,29 @@ class AioQueryMixin:
         return await fetch_models(cursor, self)
 
 
-class AioModelDelete(peewee.ModelDelete, AioQueryMixin):
-    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | int:
-        if self._returning:
+class _AioWriteQueryMixin(AioQueryMixin):
+    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> Any:
+        if self._return_cursor:  # type: ignore
             return await fetch_models(cursor, self)
-        return cursor.rowcount
+        return await database.aio_rows_affected(cursor)
 
 
-class AioModelUpdate(peewee.ModelUpdate, AioQueryMixin):
-    async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | int:
-        if self._returning:
-            return await fetch_models(cursor, self)
-        return cursor.rowcount
+class AioModelDelete(peewee.ModelDelete, _AioWriteQueryMixin): ...
+
+
+class AioModelUpdate(peewee.ModelUpdate, _AioWriteQueryMixin): ...
 
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
     async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | Any | int:
-        if self._returning is not None and len(self._returning) > 1:
+        if self._returning is None and database.returning_clause and self.table._primary_key:  # type: ignore
+            self._returning = (self.table._primary_key,)
+            return await database.aio_last_insert_id(cursor, self)
+        if self._return_cursor:
             return await fetch_models(cursor, self)
-
-        if self._returning:
-            row = await cursor.fetchone()
-            return row[0] if row else None
-        else:
-            return cursor.lastrowid
+        if self._as_rowcount:
+            return await database.aio_rows_affected(cursor)
+        return await database.aio_last_insert_id(cursor, self)
 
 
 class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
