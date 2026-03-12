@@ -1,7 +1,7 @@
 import contextlib
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Any
+from typing import Any, cast
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -14,6 +14,20 @@ from .transactions import Transaction
 from .utils import CursorProtocol, __log__
 
 FetchResults = Callable[["AioDatabase", CursorProtocol], Awaitable[Any]]
+
+
+
+def fetchmany(count: int | None) -> FetchResults:
+
+    async def _fetch_results(db: "AioDatabase", cursor: CursorProtocol) -> list[Any]:
+        if count is not None:
+            return await cursor.fetchmany(count)
+        return await cursor.fetchall()
+    return _fetch_results
+
+fetchone = fetchmany(1)
+fetchall = fetchmany(None)
+
 
 
 class AioDatabase(peewee.Database):
@@ -158,7 +172,7 @@ class AioDatabase(peewee.Database):
         return ConnectionContextManager(self.pool_backend)
 
     async def aio_execute_sql(
-        self, sql: str, params: list[Any] | None = None, fetch_results: FetchResults | None = None
+        self, sql: str, params: Sequence[Any] | None = None, fetch_results: FetchResults | None = None
     ) -> Any:
         __log__.debug((sql, params))
         with peewee.__exception_wrapper__:
@@ -187,6 +201,19 @@ class AioDatabase(peewee.Database):
 
     async def aio_rows_affected(self, cursor: CursorProtocol) -> int:
         return cursor.rowcount
+    
+    async def aio_sequence_exists(self, seq: str) -> bool:
+        raise NotImplementedError
+    
+    async def aio_get_tables(self, schema: str | None = None) -> list[str]:
+        raise NotImplementedError
+
+    async def aio_table_exists(self, table_name: Any, schema: str | None = None) -> bool:
+        if peewee.is_model(table_name):
+            model = table_name
+            table_name = model._meta.table_name
+            schema = model._meta.schema
+        return table_name in await self.aio_get_tables(schema=schema)
 
 
 class AioPostgresDatabase(AioDatabase):
@@ -197,6 +224,21 @@ class AioPostgresDatabase(AioDatabase):
             except (IndexError, KeyError, TypeError):
                 return None
         return await fetch_models(cursor, query)
+    
+    async def aio_sequence_exists(self, sequence: str) -> bool:
+        res = await self.aio_execute_sql("""
+            SELECT COUNT(*) FROM pg_class, pg_namespace
+            WHERE relkind='S'
+                AND pg_class.relnamespace = pg_namespace.oid
+                AND relname=%s""", [sequence,],
+                fetch_results=fetchone
+            )
+        return bool(res[0])
+    
+    async def aio_get_tables(self, schema: str | None = None) -> list[str]:
+        query = ('SELECT tablename FROM pg_catalog.pg_tables '
+                 'WHERE schemaname = %s ORDER BY tablename')
+        return cast("list[str]", await self.aio_execute_sql(query, (schema or 'public',), fetch_results=fetchall))
 
 
 class Psycopg3Database(AioPostgresDatabase, ext.Psycopg3Database):
@@ -219,6 +261,7 @@ class Psycopg3Database(AioPostgresDatabase, ext.Psycopg3Database):
         )
 
     See also:
+    https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#PostgresqlDatabase
     https://www.psycopg.org/psycopg3/docs/advanced/pool.html
     """
 
@@ -247,7 +290,8 @@ class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
         )
 
     See also:
-    https://peewee.readthedocs.io/en/latest/peewee/api.html#PostgresqlDatabase
+    https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#PostgresqlDatabase
+    https://aiopg.readthedocs.io/en/stable/
     """
 
     pool_backend_cls = PostgresqlPoolBackend
@@ -277,10 +321,17 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
         )
 
     See also:
-    http://peewee.readthedocs.io/en/latest/peewee/api.html#MySQLDatabase
+    https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#MySQLDatabase
+    https://aiomysql.readthedocs.io/en/stable/
     """
 
     pool_backend_cls = MysqlPoolBackend
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})
+
+    async def aio_get_tables(self, schema: str | None =None) -> list[str]:
+        query = ('SELECT table_name FROM information_schema.tables '
+                 'WHERE table_schema = DATABASE() AND table_type != %s '
+                 'ORDER BY table_name')
+        return cast("list[str]", await self.aio_execute_sql(query, ('VIEW',), fetch_results=fetchall))

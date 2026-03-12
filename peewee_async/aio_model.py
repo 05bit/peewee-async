@@ -9,6 +9,53 @@ from .result_wrappers import fetch_models
 from .utils import CursorProtocol
 
 
+class AioSchemaManager(peewee.SchemaManager):
+    async def aio_create_table(self, safe: bool = True, **options: Any) -> None:
+        await self.database.aio_execute(self._create_table(safe=safe, **options))
+
+    async def aio_drop_table(self, safe: bool = True, **options: Any) -> None:
+        await self.database.aio_execute(self._drop_table(safe=safe, **options))
+
+    async def aio_truncate_table(self, restart_identity: bool = False, cascade: bool = False) -> None:
+        await self.database.aio_execute(self._truncate_table(restart_identity, cascade))
+
+    async def aio_create_indexes(self, safe: bool = True) -> None:
+        for query in self._create_indexes(safe=safe):
+            await self.database.aio_execute(query)
+
+    async def aio_drop_indexes(self, safe: bool = True) -> None:
+        for query in self._drop_indexes(safe=safe):
+            await self.database.aio_execute(query)
+
+    async def _aio_create_sequence(self, field: peewee.Field) -> Any:
+        self._check_sequences(field)
+        if not await self.database.aio_sequence_exists(field.sequence):
+            return (self
+                    ._create_context()
+                    .literal('CREATE SEQUENCE ')
+                    .sql(self._sequence_for_field(field)))
+
+    async def aio_create_sequence(self, field: peewee.Field) -> None:
+        seq_ctx = await self._aio_create_sequence(field)
+        if seq_ctx is not None:
+            await self.database.aio_execute(seq_ctx)
+
+    async def aio_create_sequences(self) -> None:
+        if self.database.sequences:
+            for field in self.model._meta.sorted_fields:
+                if field.sequence:
+                    await self.aio_create_sequence(field)
+
+    async def aio_create_all(
+            self, 
+            safe: bool = True, 
+            **table_options: Any
+        ) -> None:
+        await self.aio_create_sequences()
+        await self.aio_create_table(safe, **table_options)
+        await self.aio_create_indexes(safe=safe)
+
+
 async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
     """Asynchronous version of `prefetch()`.
 
@@ -227,6 +274,29 @@ class AioModel(peewee.Model):
 
         user = await User.aio_get(User.username == 'user')
     """
+
+    class Meta:
+        schema_manager_class = AioSchemaManager
+
+    @classmethod
+    async def aio_table_exists(cls) -> bool:
+        M = cls._meta
+        return cast(
+            "bool",
+            await cls._schema.database.aio_table_exists(
+                M.table.__name__, M.schema
+                )
+        )
+
+    @classmethod
+    async def aio_create_table(cls, safe: bool = True, **options: Any) -> None:
+
+        if safe and not cls._schema.database.safe_create_index \
+           and await cls.aio_table_exists():
+            return
+        if cls._meta.temporary:
+            options.setdefault('temporary', cls._meta.temporary)
+        await cls._schema.aio_create_all(safe, **options)
 
     @classmethod
     def select(cls, *fields: Any) -> AioModelSelect:
