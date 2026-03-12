@@ -1,15 +1,19 @@
 import contextlib
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import AbstractAsyncContextManager
 from typing import Any
 
 import peewee
 from playhouse import postgres_ext as ext
 
+from peewee_async.result_wrappers import fetch_models
+
 from .connection import ConnectionContextManager, connection_context
 from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
-from .utils import FetchResults, __log__, aiomysql, aiopg, psycopg
+from .utils import CursorProtocol, __log__
+
+FetchResults = Callable[["AioDatabase", CursorProtocol], Awaitable[Any]]
 
 
 class AioDatabase(peewee.Database):
@@ -162,7 +166,7 @@ class AioDatabase(peewee.Database):
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
                     if fetch_results is not None:
-                        return await fetch_results(cursor)
+                        return await fetch_results(self, cursor)
 
     async def aio_execute(self, query: Any, fetch_results: FetchResults | None = None) -> Any:
         """Execute *SELECT*, *INSERT*, *UPDATE* or *DELETE* query asyncronously.
@@ -178,8 +182,24 @@ class AioDatabase(peewee.Database):
         fetch_results = fetch_results or getattr(query, "fetch_results", None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
+    async def aio_last_insert_id(self, cursor: CursorProtocol, query: peewee.Insert) -> int:
+        return cursor.lastrowid
 
-class Psycopg3Database(AioDatabase, ext.Psycopg3Database):
+    async def aio_rows_affected(self, cursor: CursorProtocol) -> int:
+        return cursor.rowcount
+
+
+class AioPostgresDatabase(AioDatabase):
+    async def aio_last_insert_id(self, cursor: CursorProtocol, query: peewee.Insert) -> Any:
+        if query._query_type == peewee.Insert.SIMPLE:
+            try:
+                return (await cursor.fetchmany(1))[0][0]
+            except (IndexError, KeyError, TypeError):
+                return None
+        return await fetch_models(cursor, query)
+
+
+class Psycopg3Database(AioPostgresDatabase, ext.Psycopg3Database):
     """Extension for `playhouse.Psycopg3Database` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
@@ -204,13 +224,8 @@ class Psycopg3Database(AioDatabase, ext.Psycopg3Database):
 
     pool_backend_cls = PsycopgPoolBackend
 
-    def init(self, database: str | None, **kwargs: Any) -> None:
-        if not psycopg:
-            raise Exception("Error, psycopg is not installed!")
-        super().init(database, **kwargs)
 
-
-class PostgresqlDatabase(AioDatabase, ext.PostgresqlExtDatabase):
+class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
     """Extension for `playhouse.PostgresqlDatabase` providing extra methods
     for managing async connection based on aiopg pool backend.
 
@@ -239,11 +254,6 @@ class PostgresqlDatabase(AioDatabase, ext.PostgresqlExtDatabase):
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
-
-    def init(self, database: str | None, **kwargs: Any) -> None:
-        if not aiopg:
-            raise Exception("Error, aiopg is not installed!")
-        super().init(database, **kwargs)
 
 
 class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
@@ -274,8 +284,3 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})
-
-    def init(self, database: str | None, **kwargs: Any) -> None:
-        if not aiomysql:
-            raise Exception("Error, aiomysql is not installed!")
-        super().init(database, **kwargs)

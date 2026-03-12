@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from playhouse.shortcuts import model_to_dict
 
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all, dbs_postgres
@@ -50,3 +51,27 @@ async def test_delete__return_model(db: AioDatabase) -> None:
 
     res = await TestModel.delete().returning(TestModel).aio_execute()
     assert model_has_fields(res[0], {"id": m.id, "text": m.text, "data": m.data}) is True
+
+
+@dbs_postgres
+async def test_delete__return_dicts(db: AioDatabase) -> None:
+    m = await TestModel.aio_create(text="text", data="data")
+
+    res = await TestModel.delete().returning(TestModel).dicts().aio_execute()
+    assert res == [{"id": m.id, "text": "text", "data": "data"}]
+
+
+@dbs_postgres
+async def test_delete__return_tuples(db: AioDatabase) -> None:
+    m = await TestModel.aio_create(text="text", data="data")
+
+    res = await TestModel.delete().returning(TestModel).tuples().aio_execute()
+    assert res == [(m.id, "text", "data")]
+
+
+@dbs_postgres
+async def test_delete__return_field(db: AioDatabase) -> None:
+    await TestModel.aio_create(text="text", data="data")
+
+    res = await TestModel.delete().returning(TestModel.data).aio_execute()
+    assert model_to_dict(res[0]) == {"id": None, "text": None, "data": "data"}

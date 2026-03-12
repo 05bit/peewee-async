@@ -1,15 +1,12 @@
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Protocol
 
 try:
     import aiopg
-    import psycopg2
 except ImportError:
     aiopg = None  # type: ignore
-    psycopg2 = None
-
 try:
     import psycopg
     import psycopg_pool
@@ -19,10 +16,8 @@ except ImportError:
 
 try:
     import aiomysql
-    import pymysql
 except ImportError:
     aiomysql = None
-    pymysql = None  # type: ignore
 
 __log__ = logging.getLogger("peewee.async")
 __log__.addHandler(logging.NullHandler())
@@ -51,8 +46,12 @@ class ConnectionProtocol(Protocol):
     def cursor(self, **kwargs: Any) -> AbstractAsyncContextManager[CursorProtocol]: ...
 
 
-FetchResults = Callable[[CursorProtocol], Awaitable[Any]]
-
-
 def format_dsn(protocol: str, host: str, port: str | int, user: str, password: str, path: str = "") -> str:
     return f"{protocol}://{user}:{password}@{host}:{port}/{path}"
+
+
+class ModuleRequired(Exception):
+    def __init__(self, package: str) -> None:
+        self.package = package
+        self.message = f"{package} is not installed"
+        super().__init__(self.message)

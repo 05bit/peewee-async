@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from playhouse.shortcuts import model_to_dict
 
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all, dbs_postgres
@@ -30,10 +31,21 @@ async def test_update__field_updated(db: AioDatabase) -> None:
 
 @dbs_postgres
 async def test_update__returning_model(db: AioDatabase) -> None:
-    await TestModel.aio_create(text="text1", data="data")
-    await TestModel.aio_create(text="text2", data="data")
+    m = await TestModel.aio_create(text="text1", data="data")
     new_data = "New_data"
-    wrapper = await TestModel.update(data=new_data).where(TestModel.data == "data").returning(TestModel).aio_execute()
+    res = await TestModel.update(data=new_data).where(TestModel.data == "data").returning(TestModel).aio_execute()
 
-    result = [m.data for m in wrapper]
-    assert [new_data, new_data] == result
+    assert model_to_dict(res[0]) == {"id": m.id, "text": "text1", "data": "New_data"}
+
+
+@dbs_postgres
+async def test_update__returning_namedtuples(db: AioDatabase) -> None:
+    m = await TestModel.aio_create(text="text1", data="data")
+    new_data = "New_data"
+    res = await TestModel.update(data=new_data).returning(TestModel).namedtuples().aio_execute()
+
+    tup = res[0]
+
+    assert tup.id == m.id
+    assert tup.text == "text1"
+    assert tup.data == "New_data"
