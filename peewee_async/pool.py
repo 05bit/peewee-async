@@ -2,17 +2,27 @@ import abc
 import asyncio
 from typing import Any, cast
 
-from .utils import ConnectionProtocol, aiomysql, aiopg, format_dsn, psycopg, psycopg_pool
+from .utils import ConnectionProtocol, ModuleRequired, aiomysql, aiopg, format_dsn, psycopg, psycopg_pool
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
     """Asynchronous database connection pool."""
 
+    required_modules: list[str] = []
+
     def __init__(self, *, database: str, **kwargs: Any) -> None:
+        self.check_required_backend()
         self.pool: Any | None = None
         self.database = database
         self.connect_params = kwargs
         self._connection_lock = asyncio.Lock()
+
+    def check_required_backend(self) -> None:
+        for module in self.required_modules:
+            try:
+                __import__(module)
+            except ImportError:
+                raise ModuleRequired(module) from None
 
     @property
     def is_connected(self) -> bool:
@@ -54,6 +64,8 @@ class PoolBackend(metaclass=abc.ABCMeta):
 class PostgresqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool based on aiopg."""
 
+    required_modules = ["aiopg"]
+
     async def create(self) -> None:
         if "connect_timeout" in self.connect_params:
             self.connect_params["timeout"] = self.connect_params.pop("connect_timeout")
@@ -82,6 +94,8 @@ class PostgresqlPoolBackend(PoolBackend):
 
 class PsycopgPoolBackend(PoolBackend):
     """Asynchronous database connection pool based on psycopg + psycopg_pool."""
+
+    required_modules = ["psycopg", "psycopg_pool"]
 
     async def create(self) -> None:
         params = self.connect_params.copy()
@@ -129,6 +143,8 @@ class PsycopgPoolBackend(PoolBackend):
 
 class MysqlPoolBackend(PoolBackend):
     """Asynchronous database connection pool based on aiomysql."""
+
+    required_modules = ["aiomysql"]
 
     async def create(self) -> None:
         self.pool = await aiomysql.create_pool(db=self.database, **self.connect_params)

@@ -23,8 +23,7 @@ mysql = [
     "cryptography>=46.0.5"
 ]
 psycopg = [
-    "psycopg>=3.3.0",
-    "psycopg-pool>=3.3.0"
+    "psycopg[binary,pool]>=3.3.0",
 ]
 docs = [
     "Sphinx>=8.1.3",

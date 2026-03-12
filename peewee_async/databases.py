@@ -11,7 +11,7 @@ from peewee_async.result_wrappers import fetch_models
 from .connection import ConnectionContextManager, connection_context
 from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
-from .utils import CursorProtocol, __log__, aiomysql, aiopg, psycopg
+from .utils import CursorProtocol, __log__
 
 FetchResults = Callable[["AioDatabase", CursorProtocol], Awaitable[Any]]
 
@@ -189,7 +189,7 @@ class AioDatabase(peewee.Database):
         return cursor.rowcount
 
 
-class AioPgDatabase(AioDatabase):
+class AioPostgresDatabase(AioDatabase):
     async def aio_last_insert_id(self, cursor: CursorProtocol, query: peewee.Insert) -> Any:
         if query._query_type == peewee.Insert.SIMPLE:
             try:
@@ -199,7 +199,7 @@ class AioPgDatabase(AioDatabase):
         return await fetch_models(cursor, query)
 
 
-class Psycopg3Database(AioPgDatabase, ext.Psycopg3Database):
+class Psycopg3Database(AioPostgresDatabase, ext.Psycopg3Database):
     """Extension for `playhouse.Psycopg3Database` providing extra methods
     for managing async connection based on psycopg3 pool backend.
 
@@ -224,13 +224,8 @@ class Psycopg3Database(AioPgDatabase, ext.Psycopg3Database):
 
     pool_backend_cls = PsycopgPoolBackend
 
-    def init(self, database: str | None, **kwargs: Any) -> None:
-        if not psycopg:
-            raise Exception("Error, psycopg is not installed!")
-        super().init(database, **kwargs)
 
-
-class PostgresqlDatabase(AioPgDatabase, ext.PostgresqlExtDatabase):
+class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
     """Extension for `playhouse.PostgresqlDatabase` providing extra methods
     for managing async connection based on aiopg pool backend.
 
@@ -259,11 +254,6 @@ class PostgresqlDatabase(AioPgDatabase, ext.PostgresqlExtDatabase):
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
-
-    def init(self, database: str | None, **kwargs: Any) -> None:
-        if not aiopg:
-            raise Exception("Error, aiopg is not installed!")
-        super().init(database, **kwargs)
 
 
 class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
@@ -294,8 +284,3 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})
-
-    def init(self, database: str | None, **kwargs: Any) -> None:
-        if not aiomysql:
-            raise Exception("Error, aiomysql is not installed!")
-        super().init(database, **kwargs)
