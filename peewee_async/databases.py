@@ -1,7 +1,7 @@
 import contextlib
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Any, cast
+from typing import Any
 
 import peewee
 from playhouse import postgres_ext as ext
@@ -16,18 +16,20 @@ from .utils import CursorProtocol, __log__
 FetchResults = Callable[["AioDatabase", CursorProtocol], Awaitable[Any]]
 
 
-
 def fetchmany(count: int | None) -> FetchResults:
 
-    async def _fetch_results(db: "AioDatabase", cursor: CursorProtocol) -> list[Any]:
+    async def _fetch_results(db: "AioDatabase", cursor: CursorProtocol) -> Sequence[Any]:
+        if count == 1:
+            return await cursor.fetchone()
         if count is not None:
             return await cursor.fetchmany(count)
         return await cursor.fetchall()
+
     return _fetch_results
+
 
 fetchone = fetchmany(1)
 fetchall = fetchmany(None)
-
 
 
 class AioDatabase(peewee.Database):
@@ -201,10 +203,10 @@ class AioDatabase(peewee.Database):
 
     async def aio_rows_affected(self, cursor: CursorProtocol) -> int:
         return cursor.rowcount
-    
+
     async def aio_sequence_exists(self, seq: str) -> bool:
         raise NotImplementedError
-    
+
     async def aio_get_tables(self, schema: str | None = None) -> list[str]:
         raise NotImplementedError
 
@@ -224,21 +226,24 @@ class AioPostgresDatabase(AioDatabase):
             except (IndexError, KeyError, TypeError):
                 return None
         return await fetch_models(cursor, query)
-    
+
     async def aio_sequence_exists(self, sequence: str) -> bool:
-        res = await self.aio_execute_sql("""
+        res = await self.aio_execute_sql(
+            """
             SELECT COUNT(*) FROM pg_class, pg_namespace
             WHERE relkind='S'
                 AND pg_class.relnamespace = pg_namespace.oid
-                AND relname=%s""", [sequence,],
-                fetch_results=fetchone
-            )
+                AND relname=%s""",
+            [
+                sequence,
+            ],
+            fetch_results=fetchone,
+        )
         return bool(res[0])
-    
+
     async def aio_get_tables(self, schema: str | None = None) -> list[str]:
-        query = ('SELECT tablename FROM pg_catalog.pg_tables '
-                 'WHERE schemaname = %s ORDER BY tablename')
-        return cast("list[str]", await self.aio_execute_sql(query, (schema or 'public',), fetch_results=fetchall))
+        query = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = %s ORDER BY tablename"
+        return [row for (row,) in await self.aio_execute_sql(query, (schema or "public",), fetch_results=fetchall)]
 
 
 class Psycopg3Database(AioPostgresDatabase, ext.Psycopg3Database):
@@ -330,8 +335,10 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})
 
-    async def aio_get_tables(self, schema: str | None =None) -> list[str]:
-        query = ('SELECT table_name FROM information_schema.tables '
-                 'WHERE table_schema = DATABASE() AND table_type != %s '
-                 'ORDER BY table_name')
-        return cast("list[str]", await self.aio_execute_sql(query, ('VIEW',), fetch_results=fetchall))
+    async def aio_get_tables(self, schema: str | None = None) -> list[str]:
+        query = (
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = DATABASE() AND table_type != %s "
+            "ORDER BY table_name"
+        )
+        return [row for (row,) in await self.aio_execute_sql(query, ("VIEW",), fetch_results=fetchall)]

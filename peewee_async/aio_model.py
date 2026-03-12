@@ -30,10 +30,7 @@ class AioSchemaManager(peewee.SchemaManager):
     async def _aio_create_sequence(self, field: peewee.Field) -> Any:
         self._check_sequences(field)
         if not await self.database.aio_sequence_exists(field.sequence):
-            return (self
-                    ._create_context()
-                    .literal('CREATE SEQUENCE ')
-                    .sql(self._sequence_for_field(field)))
+            return self._create_context().literal("CREATE SEQUENCE ").sql(self._sequence_for_field(field))
 
     async def aio_create_sequence(self, field: peewee.Field) -> None:
         seq_ctx = await self._aio_create_sequence(field)
@@ -46,14 +43,31 @@ class AioSchemaManager(peewee.SchemaManager):
                 if field.sequence:
                     await self.aio_create_sequence(field)
 
-    async def aio_create_all(
-            self, 
-            safe: bool = True, 
-            **table_options: Any
-        ) -> None:
+    async def _aio_drop_sequence(self, field: peewee.Field) -> Any:
+        self._check_sequences(field)
+        if await self.database.aio_sequence_exists(field.sequence):
+            return self._create_context().literal("DROP SEQUENCE ").sql(self._sequence_for_field(field))
+
+    async def aio_drop_sequence(self, field: peewee.Field) -> None:
+        seq_ctx = await self._aio_drop_sequence(field)
+        if seq_ctx is not None:
+            self.database.aio_execute(seq_ctx)
+
+    async def aio_drop_sequences(self) -> None:
+        if self.database.sequences:
+            for field in self.model._meta.sorted_fields:
+                if field.sequence:
+                    await self.aio_drop_sequence(field)
+
+    async def aio_create_all(self, safe: bool = True, **table_options: Any) -> None:
         await self.aio_create_sequences()
         await self.aio_create_table(safe, **table_options)
         await self.aio_create_indexes(safe=safe)
+
+    async def aio_drop_all(self, safe: bool = True, drop_sequences: bool = True, **options: Any) -> None:
+        await self.aio_drop_table(safe, **options)
+        if drop_sequences:
+            await self.aio_drop_sequences()
 
 
 async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
@@ -281,22 +295,28 @@ class AioModel(peewee.Model):
     @classmethod
     async def aio_table_exists(cls) -> bool:
         M = cls._meta
-        return cast(
-            "bool",
-            await cls._schema.database.aio_table_exists(
-                M.table.__name__, M.schema
-                )
-        )
+        return cast("bool", await cls._schema.database.aio_table_exists(M.table.__name__, M.schema))
 
     @classmethod
     async def aio_create_table(cls, safe: bool = True, **options: Any) -> None:
 
-        if safe and not cls._schema.database.safe_create_index \
-           and await cls.aio_table_exists():
+        if safe and not cls._schema.database.safe_create_index and await cls.aio_table_exists():
             return
         if cls._meta.temporary:
-            options.setdefault('temporary', cls._meta.temporary)
+            options.setdefault("temporary", cls._meta.temporary)
         await cls._schema.aio_create_all(safe, **options)
+
+    @classmethod
+    async def aio_drop_table(cls, safe: bool = True, drop_sequences: bool = True, **options: Any) -> None:
+        if safe and not cls._schema.database.safe_drop_index and not await cls.aio_table_exists():
+            return
+        if cls._meta.temporary:
+            options.setdefault("temporary", cls._meta.temporary)
+        await cls._schema.aio_drop_all(safe, drop_sequences, **options)
+
+    @classmethod
+    async def aio_truncate_table(cls, **options: Any) -> None:
+        await cls._schema.aio_truncate_table(**options)
 
     @classmethod
     def select(cls, *fields: Any) -> AioModelSelect:
