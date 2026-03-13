@@ -1,13 +1,15 @@
 from typing import Any
 
+import peewee as pw
 import pytest
 from peewee import OperationalError
 
 from peewee_async import connection_context
+from peewee_async.aio_model import AioModel
 from peewee_async.databases import AioDatabase
-from tests.conftest import MYSQL_DBS, PG_DBS, dbs_all, dbs_mysql
+from tests.conftest import MYSQL_DBS, PG_DBS, dbs_all, dbs_mysql, dbs_postgres
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
-from tests.models import TestModel
+from tests.models import IntegerTestModel, TestModel
 
 
 @dbs_all
@@ -103,3 +105,48 @@ async def test_psycopg__params(db: AioDatabase) -> None:
     assert db.pool_backend.pool.min_size == 0  # type: ignore
     assert db.pool_backend.pool.max_size == 5  # type: ignore
     assert db.pool_backend.pool.max_lifetime == 15  # type: ignore
+
+
+@dbs_all
+async def test_aio_get_tables(db: AioDatabase) -> None:
+    # TODO check with scheme
+    tables = set(await db.aio_get_tables())
+    assert {"testmodelalpha", "testmodelbeta", "testmodelgamma"} <= tables
+
+
+@dbs_all
+async def test_aio_table_exists(db: AioDatabase) -> None:
+    assert await db.aio_table_exists("compositetestmodel") is True
+    assert await db.aio_table_exists(IntegerTestModel) is True
+    assert await db.aio_table_exists("unknown") is False
+
+
+@dbs_postgres
+async def test_aio_sequence_exists(db: AioDatabase) -> None:
+    assert await db.aio_sequence_exists("testmodel_id_seq") is True
+    assert await db.aio_sequence_exists("unknown") is False
+
+
+@dbs_all
+async def test_create_drop_tables(db: AioDatabase) -> None:
+    class SomeModel1(AioModel):
+        text = pw.CharField(index=True)
+
+        class Meta:
+            database = db
+
+    class SomeModel2(AioModel):
+        text = pw.CharField(index=True)
+
+        class Meta:
+            database = db
+
+    await db.aio_create_tables([SomeModel1, SomeModel2])
+
+    assert await SomeModel1.aio_table_exists() is True
+    assert await SomeModel2.aio_table_exists() is True
+
+    await db.aio_drop_tables([SomeModel1, SomeModel2])
+
+    assert await SomeModel1.aio_table_exists() is False
+    assert await SomeModel2.aio_table_exists() is False
