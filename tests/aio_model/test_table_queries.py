@@ -37,11 +37,10 @@ async def test_aio_create_table(db: AioDatabase) -> None:
     assert await SomeModel.aio_table_exists() is True
 
     with db.allow_sync():
-        assert 'somemodel_text' in [i.name for i in db.get_indexes("somemodel")]
+        assert "somemodel_text" in [i.name for i in db.get_indexes("somemodel")]
 
     await SomeModel.aio_drop_table()
     assert await SomeModel.aio_table_exists() is False
-
 
 
 @dbs_postgres
@@ -55,7 +54,6 @@ async def test_aio_create_table__sequences(db: AioDatabase) -> None:
 
     await SomeModel.aio_create_table()
     assert await db.aio_sequence_exists("somemodel_id_seq") is True
-
 
     await SomeModel.aio_drop_table()
     assert await db.aio_sequence_exists("somemodel_id_seq") is False

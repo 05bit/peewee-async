@@ -127,7 +127,6 @@ async def test_aio_sequence_exists(db: AioDatabase) -> None:
     assert await db.aio_sequence_exists("unknown") is False
 
 
-
 @dbs_all
 async def test_create_drop_tables(db: AioDatabase) -> None:
     class SomeModel1(AioModel):
@@ -140,7 +139,7 @@ async def test_create_drop_tables(db: AioDatabase) -> None:
         text = pw.CharField(index=True)
 
         class Meta:
-            database = db    
+            database = db
 
     await db.aio_create_tables([SomeModel1, SomeModel2])
 

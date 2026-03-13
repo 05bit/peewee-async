@@ -211,7 +211,7 @@ class AioDatabase(peewee.Database):
 
     async def aio_get_tables(self, schema: str | None = None) -> list[str]:
         raise NotImplementedError
-    
+
     async def aio_create_tables(self, models: list[Any], **options: Any) -> None:
         """
         Async version of **peewee.Database.create_tables**
@@ -227,7 +227,6 @@ class AioDatabase(peewee.Database):
         """
         for model in reversed(peewee.sort_models(models)):
             await model.aio_drop_table(**kwargs)
-
 
     async def aio_table_exists(self, table_name: Any, schema: str | None = None) -> bool:
         if peewee.is_model(table_name):
