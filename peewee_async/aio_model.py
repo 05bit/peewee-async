@@ -74,7 +74,7 @@ async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE =
     """Asynchronous version of `prefetch()`.
 
     See also:
-    http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#prefetch
+    http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#prefetch
     """
     if not subqueries:
         return sq
@@ -299,6 +299,10 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_create_table(cls, safe: bool = True, **options: Any) -> None:
+        """
+        Async version of **peewee.Model.create_table**
+        https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.create_table
+        """
 
         if safe and not cls._schema.database.safe_create_index and await cls.aio_table_exists():
             return
@@ -308,6 +312,10 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_drop_table(cls, safe: bool = True, drop_sequences: bool = True, **options: Any) -> None:
+        """
+        Async version of **peewee.Model.drop_table**
+        https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.drop_table
+        """
         if safe and not cls._schema.database.safe_drop_index and not await cls.aio_table_exists():
             return
         if cls._meta.temporary:
@@ -316,6 +324,10 @@ class AioModel(peewee.Model):
 
     @classmethod
     async def aio_truncate_table(cls, **options: Any) -> None:
+        """
+        Async version of **peewee.Model.truncate_table**
+        https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.truncate_table
+        """
         await cls._schema.aio_truncate_table(**options)
 
     @classmethod
@@ -355,7 +367,7 @@ class AioModel(peewee.Model):
         Async version of **peewee.Model.delete_instance**
 
         See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.delete_instance
+        http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.delete_instance
         """
         if recursive:
             dependencies = self.dependencies(delete_nullable)
@@ -372,7 +384,7 @@ class AioModel(peewee.Model):
         Async version of **peewee.Model.save**
 
         See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.save
+        http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.save
         """
         field_dict = self.__data__.copy()
         if self._meta.primary_key is not False:
@@ -420,7 +432,7 @@ class AioModel(peewee.Model):
         """Async version of **peewee.Model.get**
 
         See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get
+        http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.get
         """
         sq = cls.select()
         if query:
@@ -438,7 +450,7 @@ class AioModel(peewee.Model):
         Async version of **peewee.Model.get_or_none**
 
         See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get_or_none
+        http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.get_or_none
         """
         try:
             return await cls.aio_get(*query, **filters)
@@ -451,7 +463,7 @@ class AioModel(peewee.Model):
         Async version of **peewee.Model.create**
 
         See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.create
+        http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.create
         """
         inst = cls(**query)
         await inst.aio_save(force_insert=True)
@@ -463,7 +475,7 @@ class AioModel(peewee.Model):
         Async version of **peewee.Model.get_or_create**
 
         See also:
-        http://docs.peewee-orm.com/en/3.15.3/peewee/api.html#Model.get_or_create
+        http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.get_or_create
         """
         defaults = kwargs.pop("defaults", {})
         query = cls.select()

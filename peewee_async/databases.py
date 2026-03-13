@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
 from contextlib import AbstractAsyncContextManager
@@ -18,7 +20,7 @@ FetchResults = Callable[["AioDatabase", CursorProtocol], Awaitable[Any]]
 
 def fetchmany(count: int | None) -> FetchResults:
 
-    async def _fetch_results(db: "AioDatabase", cursor: CursorProtocol) -> Sequence[Any]:
+    async def _fetch_results(db: AioDatabase, cursor: CursorProtocol) -> Sequence[Any]:
         if count == 1:
             return await cursor.fetchone()
         if count is not None:
@@ -209,6 +211,23 @@ class AioDatabase(peewee.Database):
 
     async def aio_get_tables(self, schema: str | None = None) -> list[str]:
         raise NotImplementedError
+    
+    async def aio_create_tables(self, models: list[Any], **options: Any) -> None:
+        """
+        Async version of **peewee.Database.create_tables**
+        https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Database.create_tables
+        """
+        for model in peewee.sort_models(models):
+            await model.aio_create_table(**options)
+
+    async def aio_drop_tables(self, models: list[Any], **kwargs: Any) -> None:
+        """
+        Async version of **peewee.Database.drop_tables**
+        https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Database.drop_tables
+        """
+        for model in reversed(peewee.sort_models(models)):
+            await model.aio_drop_table(**kwargs)
+
 
     async def aio_table_exists(self, table_name: Any, schema: str | None = None) -> bool:
         if peewee.is_model(table_name):
