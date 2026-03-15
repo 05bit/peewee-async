@@ -108,13 +108,12 @@ class AioDatabase(peewee.Database):
         tr = Transaction(_connection_context.connection, is_savepoint=use_savepoint)
         await tr.begin()
         return tr
-    
+
     async def aio_begin(self) -> Transaction:
         return await self._aio_begin()
-    
+
     async def aio_savepoint(self) -> Transaction:
         return await self._aio_begin(use_savepoint=True)
-    
 
     def aio_atomic(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager which runs any queries in the wrapped block
