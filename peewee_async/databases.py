@@ -101,6 +101,21 @@ class AioDatabase(peewee.Database):
 
         await self.pool_backend.close()
 
+    async def _aio_begin(self, use_savepoint: bool = False) -> Transaction:
+        _connection_context = connection_context.get()
+        if _connection_context is None:
+            raise Exception("This method can only be called within the aio_connection context manager")
+        tr = Transaction(_connection_context.connection, is_savepoint=use_savepoint)
+        await tr.begin()
+        return tr
+    
+    async def aio_begin(self) -> Transaction:
+        return await self._aio_begin()
+    
+    async def aio_savepoint(self) -> Transaction:
+        return await self._aio_begin(use_savepoint=True)
+    
+
     def aio_atomic(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager which runs any queries in the wrapped block
         in a transaction (or save-point if blocks are nested).
