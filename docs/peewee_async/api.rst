@@ -23,16 +23,17 @@ Databases
 
 .. automethod:: peewee_async.databases.AioDatabase.aio_transaction
 
-.. autoclass:: peewee_async.PsycopgDatabase
+.. automethod:: peewee_async.databases.AioDatabase.aio_create_tables
+
+.. automethod:: peewee_async.databases.AioDatabase.aio_drop_tables
+
+.. autoclass:: peewee_async.Psycopg3Database
     :members: init
 
-.. autoclass:: peewee_async.PooledPostgresqlDatabase
+.. autoclass:: peewee_async.PostgresqlDatabase
     :members: init
 
-.. autoclass:: peewee_async.PooledPostgresqlExtDatabase
-    :members: init
-
-.. autoclass:: peewee_async.PooledMySQLDatabase
+.. autoclass:: peewee_async.MySQLDatabase
     :members: init
 
 AioModel
@@ -40,6 +41,12 @@ AioModel
 
 .. autoclass:: peewee_async.AioModel
 
+.. automethod:: peewee_async.AioModel.aio_create_table
+    
+.. automethod:: peewee_async.AioModel.aio_drop_table
+
+.. automethod:: peewee_async.AioModel.aio_truncate_table
+    
 .. automethod:: peewee_async.AioModel.aio_get
 
 .. automethod:: peewee_async.AioModel.aio_get_or_none

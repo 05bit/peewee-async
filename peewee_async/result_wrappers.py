@@ -7,7 +7,7 @@ from .utils import CursorProtocol
 
 
 class SyncCursorAdapter:
-    def __init__(self, rows: list[Any], description: Sequence[Any] | None) -> None:
+    def __init__(self, rows: Sequence[Any], description: Sequence[Any] | None) -> None:
         self._rows = rows
         self.description = description
         self._idx = 0
