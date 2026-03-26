@@ -11,7 +11,7 @@ from playhouse import postgres_ext as ext
 from peewee_async.result_wrappers import fetch_models
 
 from .connection import ConnectionContextManager, connection_context
-from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
+from .pool import AioMysqlPoolBackend, AioPgPoolBackend, AioSqlitePoolBackend, PoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
 from .utils import CursorProtocol, __log__
 
@@ -317,10 +317,14 @@ class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
     https://aiopg.readthedocs.io/en/stable/
     """
 
-    pool_backend_cls = PostgresqlPoolBackend
+    pool_backend_cls = AioPgPoolBackend
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
+
+
+class SqliteDatabase(AioDatabase, peewee.SqliteDatabase):
+    pool_backend_cls = AioSqlitePoolBackend
 
 
 class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
@@ -348,7 +352,7 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     https://aiomysql.readthedocs.io/en/stable/
     """
 
-    pool_backend_cls = MysqlPoolBackend
+    pool_backend_cls = AioMysqlPoolBackend
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})
