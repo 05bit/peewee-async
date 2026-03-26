@@ -38,10 +38,16 @@ class TransactionTestCase:
     async def _disable_transactions(self) -> AsyncIterator[None]:
         @asynccontextmanager
         async def patched__aio_atomic(use_savepoint: bool = False) -> AsyncIterator[None]:
-            raise ValueError("Using transactions 'aio_atomic' and 'aio_transcation' is disabled.")
+            raise ValueError("Using 'aio_atomic' and 'aio_transcation' is disabled.")
             yield
 
-        with mock.patch.object(self.database, "_aio_atomic", patched__aio_atomic):
+        async def patched___aio_begin(use_savepoint: bool = False) -> AsyncIterator[None]:
+            raise ValueError("Using 'aio_begin' and 'aio_savepoint' is disabled.")
+
+        with (
+            mock.patch.object(self.database, "_aio_atomic", patched__aio_atomic),
+            mock.patch.object(self.database, "_aio_begin", patched___aio_begin),
+        ):
             yield
 
     @asynccontextmanager

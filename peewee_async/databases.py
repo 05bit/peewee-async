@@ -101,6 +101,47 @@ class AioDatabase(peewee.Database):
 
         await self.pool_backend.close()
 
+    async def _aio_begin(self, use_savepoint: bool = False) -> Transaction:
+        _connection_context = connection_context.get()
+        if _connection_context is None:
+            raise peewee.OperationalError("This method can only be called within the aio_connection context manager")
+        tr = Transaction(_connection_context.connection, is_savepoint=use_savepoint)
+        await tr.begin()
+        return tr
+
+    async def aio_begin(self) -> Transaction:
+        """
+        Start a new database transaction.
+
+        This method executes the SQL `BEGIN` statement and returns a
+        `Transaction` object representing the started transaction.
+
+        Notes:
+            - This method must be called within an active :meth:`aio_connection)` context manager.
+            - The returned :meth:`Transaction` object should be used to manage commit or rollback operations.
+
+        Returns:
+            Transaction: An instance representing the active transaction.
+        """
+        return await self._aio_begin()
+
+    async def aio_savepoint(self) -> Transaction:
+        """
+        Start a new transaction savepoint.
+
+        This method executes the SQL `SAVEPOINT` statement and returns
+        a `Transaction` object representing the created savepoint.
+
+        Notes:
+            - This method must be called within an active :meth:`aio_connection` context manager.
+
+            - The returned :meth:`Transaction` object should be used to manage commit or rollback operations.
+
+        Returns:
+            Transaction: An instance representing the active savepoint.
+        """
+        return await self._aio_begin(use_savepoint=True)
+
     def aio_atomic(self) -> AbstractAsyncContextManager[None]:
         """Create an async context-manager which runs any queries in the wrapped block
         in a transaction (or save-point if blocks are nested).

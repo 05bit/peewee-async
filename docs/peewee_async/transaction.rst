@@ -35,10 +35,8 @@ If you want to manage transactions manually you have to acquire a connection by 
 
 .. code-block:: python
 
-    from peewee_async import Transaction
     async with db.aio_connection() as connection:
-        tr = Transaction(connection)
-        await tr.begin() # BEGIN
+        tr = await db.aio_begin() # BEGIN
         await TestModel.aio_create(text='FOO')
         try:
             await TestModel.aio_create(text='FOO')
