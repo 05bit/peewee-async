@@ -110,9 +110,8 @@ async def test_several_transactions(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_transaction_manual_work(db: AioDatabase) -> None:
-    async with db.aio_connection() as connection:
-        tr = Transaction(connection)
-        await tr.begin()
+    async with db.aio_connection():
+        tr = await db.aio_begin()
         await TestModel.aio_create(text="FOO")
         assert await TestModel.aio_get_or_none(text="FOO") is not None
         try:
@@ -124,6 +123,15 @@ async def test_transaction_manual_work(db: AioDatabase) -> None:
 
     assert await TestModel.aio_get_or_none(text="FOO") is None
     assert db.pool_backend.has_acquired_connections() is False
+
+
+@dbs_all
+async def test_aio_begin_savepoint_error(db: AioDatabase) -> None:
+    with pytest.raises(OperationalError):
+        await db.aio_begin()
+
+    with pytest.raises(OperationalError):
+        await db.aio_savepoint()
 
 
 @pytest.mark.parametrize(
@@ -180,14 +188,12 @@ async def test_savepoint_rollback(db: AioDatabase) -> None:
 
 @dbs_all
 async def test_savepoint_manual_work(db: AioDatabase) -> None:
-    async with db.aio_connection() as connection:
-        tr = Transaction(connection)
-        await tr.begin()
+    async with db.aio_connection():
+        tr = await db.aio_begin()
         await TestModel.aio_create(text="FOO")
         assert await TestModel.aio_get_or_none(text="FOO") is not None
 
-        savepoint = Transaction(connection, is_savepoint=True)
-        await savepoint.begin()
+        savepoint = await db.aio_savepoint()
         try:
             await TestModel.aio_create(text="FOO")
         except:  # noqa: E722

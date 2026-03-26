@@ -19,6 +19,16 @@ async def test_transcations_disabled(db: AioDatabase, transaction_method: str) -
 
 
 @dbs_all
+async def test_aio_begin_savepoint_disabled(db: AioDatabase) -> None:
+    async with TransactionTestCase(db):
+        async with db.aio_connection():
+            with pytest.raises(ValueError):
+                await db.aio_begin()
+            with pytest.raises(ValueError):
+                await db.aio_savepoint()
+
+
+@dbs_all
 async def test_integration(db: AioDatabase) -> None:
 
     async with TransactionTestCase(db):

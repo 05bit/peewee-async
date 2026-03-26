@@ -19,6 +19,10 @@ Databases
 
 .. automethod:: peewee_async.databases.AioDatabase.allow_sync
 
+.. automethod:: peewee_async.databases.AioDatabase.aio_begin
+
+.. automethod:: peewee_async.databases.AioDatabase.aio_savepoint
+
 .. automethod:: peewee_async.databases.AioDatabase.aio_atomic
 
 .. automethod:: peewee_async.databases.AioDatabase.aio_transaction
