@@ -45,8 +45,8 @@ class TransactionTestCase:
             raise ValueError("Using 'aio_begin' and 'aio_savepoint' is disabled.")
 
         with (
-            mock.patch.object(self.database, "_aio_atomic", patched__aio_atomic), 
-            mock.patch.object(self.database, "_aio_begin", patched___aio_begin)
+            mock.patch.object(self.database, "_aio_atomic", patched__aio_atomic),
+            mock.patch.object(self.database, "_aio_begin", patched___aio_begin),
         ):
             yield
 

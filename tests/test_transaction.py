@@ -125,7 +125,6 @@ async def test_transaction_manual_work(db: AioDatabase) -> None:
     assert db.pool_backend.has_acquired_connections() is False
 
 
-
 @dbs_all
 async def test_aio_begin_savepoint_error(db: AioDatabase) -> None:
     with pytest.raises(OperationalError):

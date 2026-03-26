@@ -129,12 +129,12 @@ class AioDatabase(peewee.Database):
         """
         Start a new transaction savepoint.
 
-        This method executes the SQL `SAVEPOINT` statement and returns 
+        This method executes the SQL `SAVEPOINT` statement and returns
         a `Transaction` object representing the created savepoint.
 
         Notes:
             - This method must be called within an active :meth:`aio_connection` context manager.
-            
+
             - The returned :meth:`Transaction` object should be used to manage commit or rollback operations.
 
         Returns:
