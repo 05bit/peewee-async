@@ -39,7 +39,7 @@ __all__ = [
     "AioMysqlPoolBackend",
     "PsycopgPoolBackend",
     "AioSqlitePoolBackend",
-    "SqliteDatabase"
+    "SqliteDatabase",
 ]
 
 register_database(PostgresqlDatabase, "postgres+pool+async", "postgresql+pool+async")

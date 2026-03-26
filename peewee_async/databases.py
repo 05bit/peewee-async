@@ -367,6 +367,11 @@ class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
 class SqliteDatabase(AioDatabase, peewee.SqliteDatabase):
     pool_backend_cls = AioSqlitePoolBackend
 
+    async def aio_get_tables(self, schema: str | None = None) -> list[str]:
+        schema = schema or "main"
+        query = f'SELECT name FROM "{schema}".sqlite_master WHERE type=? ORDER BY name'
+        return [row for (row,) in await self.aio_execute_sql(query, ("table",), fetch_results=fetchall)]
+
 
 class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     """MySQL database driver providing **single drop-in sync**

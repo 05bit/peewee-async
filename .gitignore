@@ -27,6 +27,7 @@ lib64/
 parts/
 sdist/
 var/
+test.sqlite
 *.egg-info/
 *.egg*
 *.ini

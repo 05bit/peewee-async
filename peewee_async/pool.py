@@ -172,15 +172,16 @@ class AioMysqlPoolBackend(PoolBackend):
             await self.pool.wait_closed()
 
 
-
 class AioSqlitePool:
-
     def __init__(self, database: str, **connect_params: Any) -> None:
         self._opened_connections: set[aiosqlite.Connection] = set()
         self.database = database
         self.connect_params = connect_params
+        self._closed = False
 
     async def acquire(self) -> aiosqlite.Connection:
+        if self._closed:
+            raise RuntimeError("Cannot acquire connection after closing pool")
         return await aiosqlite.connect(database=self.database, isolation_level=None, **self.connect_params)
 
     async def release(self, conn: aiosqlite.Connection) -> None:
@@ -188,10 +189,15 @@ class AioSqlitePool:
 
     def has_acquired_connections(self) -> bool:
         return len(self._opened_connections) > 0
-    
+
     async def close(self) -> None:
         for c in self._opened_connections:
             await self.release(c)
+        self._closed = True
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
 
 
 class AioSqlitePoolBackend(PoolBackend):
