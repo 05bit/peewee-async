@@ -377,6 +377,7 @@ class SqliteDatabase(AioDatabase, peewee.SqliteDatabase):
     See also:
     https://github.com/omnilib/aiosqlite
     """
+
     pool_backend_cls = AioSqlitePoolBackend
 
     async def aio_get_tables(self, schema: str | None = None) -> list[str]:
