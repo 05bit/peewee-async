@@ -365,6 +365,18 @@ class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
 
 
 class SqliteDatabase(AioDatabase, peewee.SqliteDatabase):
+    """Sqlite database driver providing **single drop-in sync**
+    connection and **async connections pool** interface.
+
+    Example::
+
+        database = SqliteDatabase(
+            'database': 'db.sqlite'
+        )
+
+    See also:
+    https://github.com/omnilib/aiosqlite
+    """
     pool_backend_cls = AioSqlitePoolBackend
 
     async def aio_get_tables(self, schema: str | None = None) -> list[str]:
