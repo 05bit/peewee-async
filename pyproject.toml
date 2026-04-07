@@ -39,7 +39,7 @@ dev = [
     "mypy>=1.19.0",
     "ruff==0.15.8",
     "types-PyMySQL>=1.1.0",
-    "poethepoet==0.42.1",
+    "poethepoet==0.44.0",
     "commitizen>=4.13.8,<5"
 ]
 
