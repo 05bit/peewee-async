@@ -2,9 +2,7 @@ import abc
 import asyncio
 from typing import Any, cast
 
-import aiosqlite
-
-from .utils import ConnectionProtocol, ModuleRequired, aiomysql, aiopg, format_dsn, psycopg, psycopg_pool
+from .utils import ConnectionProtocol, ModuleRequired, aiomysql, aiopg, aiosqlite, format_dsn, psycopg, psycopg_pool
 
 
 class PoolBackend(metaclass=abc.ABCMeta):
@@ -174,17 +172,20 @@ class AioMysqlPoolBackend(PoolBackend):
 
 class AioSqlitePool:
     def __init__(self, database: str, **connect_params: Any) -> None:
-        self._opened_connections: set[aiosqlite.Connection] = set()
+        self._opened_connections: set[ConnectionProtocol] = set()
         self.database = database
         self.connect_params = connect_params
         self._closed = False
 
-    async def acquire(self) -> aiosqlite.Connection:
+    async def acquire(self) -> ConnectionProtocol:
         if self._closed:
             raise RuntimeError("Cannot acquire connection after closing pool")
-        return await aiosqlite.connect(database=self.database, isolation_level=None, **self.connect_params)
+        return cast(
+            "ConnectionProtocol",
+            await aiosqlite.connect(database=self.database, isolation_level=None, **self.connect_params),
+        )
 
-    async def release(self, conn: aiosqlite.Connection) -> None:
+    async def release(self, conn: ConnectionProtocol) -> None:
         await conn.close()
 
     def has_acquired_connections(self) -> bool:
@@ -212,11 +213,11 @@ class AioSqlitePoolBackend(PoolBackend):
         if self.pool is None:
             await self.connect()
         assert self.pool is not None, "Pool is not connected"
-        return cast("ConnectionProtocol", await self.pool.acquire())
+        return await self.pool.acquire()
 
     async def release(self, conn: ConnectionProtocol) -> None:
         assert self.pool is not None, "Pool is not connected"
-        await self.pool.release(cast("aiosqlite.Connection", conn))
+        await self.pool.release(conn)
 
     def has_acquired_connections(self) -> bool:
         if self.pool is not None:
