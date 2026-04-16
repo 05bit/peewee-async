@@ -21,6 +21,12 @@ For MySQL:
 
     pip install peewee-async[mysql]
 
+For Sqlite:
+
+.. code-block:: console
+
+    pip install peewee-async[sqlite]
+
 Installing and developing
 +++++++++++++++++++++++++
 
