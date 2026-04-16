@@ -14,7 +14,7 @@ Overview
 * Requires Python 3.10+
 * Has support for PostgreSQL via [aiopg](https://github.com/aio-libs/aiopg) and [psycopg3](https://github.com/psycopg/psycopg)
 * Has support for MySQL via [aiomysql](https://github.com/aio-libs/aiomysql)
-* Has support for Sqlite via [aiosqlite](github.com/omnilib/aiosqlite)
+* Has support for Sqlite via [aiosqlite](https://github.com/omnilib/aiosqlite)
 * Asynchronous analogues of peewee sync methods with prefix aio_
 * Drop-in replacement for sync code, sync will remain sync
 * Most basic operations are supported

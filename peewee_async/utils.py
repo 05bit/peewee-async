@@ -51,6 +51,8 @@ class CursorProtocol(Protocol):
 class ConnectionProtocol(Protocol):
     def cursor(self, **kwargs: Any) -> AbstractAsyncContextManager[CursorProtocol]: ...
 
+    async def close(self) -> None: ...
+
 
 def format_dsn(protocol: str, host: str, port: str | int, user: str, password: str, path: str = "") -> str:
     return f"{protocol}://{user}:{password}@{host}:{port}/{path}"
