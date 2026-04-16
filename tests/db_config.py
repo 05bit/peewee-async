@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import peewee_async
 
@@ -30,19 +31,26 @@ MYSQL_DEFAULTS = {
     "pool_params": {"minsize": 0, "maxsize": 5, "pool_recycle": 2},
 }
 
+SQLITE_DEFAULTS: dict[str, Any] = {
+    "database": "test.sqlite",
+}
+
 AIOPG_POOL = "aiopg-pool"
 PSYCOPG_POOL = "psycopg-pool"
 MYSQL_POOL = "mysql-pool"
+SQLITE_POOL = "sqlite-pool"
 
 
 DB_DEFAULTS = {
     AIOPG_POOL: PG_DEFAULTS,
     PSYCOPG_POOL: PSYCOPG_DEFAULTS,
     MYSQL_POOL: MYSQL_DEFAULTS,
+    SQLITE_POOL: SQLITE_DEFAULTS,
 }
 
 DB_CLASSES = {
     AIOPG_POOL: peewee_async.PostgresqlDatabase,
     PSYCOPG_POOL: peewee_async.Psycopg3Database,
     MYSQL_POOL: peewee_async.MySQLDatabase,
+    SQLITE_POOL: peewee_async.SqliteDatabase,
 }

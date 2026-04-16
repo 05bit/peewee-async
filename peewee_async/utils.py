@@ -19,6 +19,12 @@ try:
 except ImportError:
     aiomysql = None
 
+
+try:
+    import aiosqlite
+except ImportError:
+    aiosqlite = None  # type: ignore
+
 __log__ = logging.getLogger("peewee.async")
 __log__.addHandler(logging.NullHandler())
 

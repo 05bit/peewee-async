@@ -11,7 +11,7 @@ from playhouse import postgres_ext as ext
 from peewee_async.result_wrappers import fetch_models
 
 from .connection import ConnectionContextManager, connection_context
-from .pool import MysqlPoolBackend, PoolBackend, PostgresqlPoolBackend, PsycopgPoolBackend
+from .pool import AioMysqlPoolBackend, AioPgPoolBackend, AioSqlitePoolBackend, PoolBackend, PsycopgPoolBackend
 from .transactions import Transaction
 from .utils import CursorProtocol, __log__
 
@@ -358,10 +358,32 @@ class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
     https://aiopg.readthedocs.io/en/stable/
     """
 
-    pool_backend_cls = PostgresqlPoolBackend
+    pool_backend_cls = AioPgPoolBackend
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
+
+
+class SqliteDatabase(AioDatabase, peewee.SqliteDatabase):
+    """Sqlite database driver providing **single drop-in sync**
+    connection and **async connections pool** interface.
+
+    Example::
+
+        database = SqliteDatabase(
+            'database': 'db.sqlite'
+        )
+
+    See also:
+    https://github.com/omnilib/aiosqlite
+    """
+
+    pool_backend_cls = AioSqlitePoolBackend
+
+    async def aio_get_tables(self, schema: str | None = None) -> list[str]:
+        schema = schema or "main"
+        query = f'SELECT name FROM "{schema}".sqlite_master WHERE type=? ORDER BY name'
+        return [row for (row,) in await self.aio_execute_sql(query, ("table",), fetch_results=fetchall)]
 
 
 class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
@@ -389,7 +411,7 @@ class MySQLDatabase(AioDatabase, peewee.MySQLDatabase):
     https://aiomysql.readthedocs.io/en/stable/
     """
 
-    pool_backend_cls = MysqlPoolBackend
+    pool_backend_cls = AioMysqlPoolBackend
 
     def init_pool_params_defaults(self) -> None:
         self.pool_params.update({"autocommit": True})

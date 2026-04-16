@@ -50,7 +50,7 @@ def bound_models(database: AioDatabase) -> Generator[None]:
 @pytest.fixture(scope="session", autouse=True)
 async def create_tables() -> AsyncGenerator[None, None]:
 
-    databases = [_get_db(name) for name in ("psycopg-pool", "mysql-pool")]
+    databases = [_get_db(name) for name in ("psycopg-pool", "mysql-pool", "sqlite-pool")]
     for database in databases:
         with bound_models(database), database.allow_sync():
             for model in ALL_MODELS:
@@ -95,6 +95,7 @@ PG_DBS = [
 ]
 
 MYSQL_DBS = ["mysql-pool"]
+SQLITE_DBS = ["sqlite-pool"]
 
 
 dbs_mysql = pytest.mark.parametrize("db", MYSQL_DBS, indirect=["db"])
@@ -103,5 +104,5 @@ dbs_mysql = pytest.mark.parametrize("db", MYSQL_DBS, indirect=["db"])
 dbs_postgres = pytest.mark.parametrize("db", PG_DBS, indirect=["db"])
 
 
-dbs_all = pytest.mark.parametrize("db", PG_DBS + MYSQL_DBS, indirect=["db"])
+dbs_all = pytest.mark.parametrize("db", PG_DBS + MYSQL_DBS + SQLITE_DBS, indirect=["db"])
 transaction_methods = pytest.mark.parametrize("transaction_method", ["aio_transaction", "aio_atomic"])

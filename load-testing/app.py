@@ -10,7 +10,7 @@ from fastapi import FastAPI
 
 import peewee_async
 
-aiopg_database = peewee_async.PooledPostgresqlDatabase(
+aiopg_database = peewee_async.PostgresqlDatabase(
     database='postgres',
     user='postgres',
     password='postgres',
@@ -22,7 +22,7 @@ aiopg_database = peewee_async.PooledPostgresqlDatabase(
     }
 )
 
-psycopg_database = peewee_async.PsycopgDatabase(
+psycopg_database = peewee_async.Psycopg3Database(
     database='postgres',
     user='postgres',
     password='postgres',
@@ -33,8 +33,10 @@ psycopg_database = peewee_async.PsycopgDatabase(
         "max_size": 3,
     }
 )
+sqlite_database = peewee_async.SqliteDatabase("app.sqlite")
 
-database = psycopg_database
+database = sqlite_database
+database.set_allow_sync(True)
 
 
 def patch_aiopg():
@@ -70,12 +72,11 @@ def setup_logging():
 class AppTestModel(peewee_async.AioModel):
     text = peewee.CharField(max_length=100)
 
-    class Meta:
-        database = database
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    AppTestModel._meta.database = database
+
     AppTestModel.drop_table()
     AppTestModel.create_table()
     await AppTestModel.aio_create(id=1, text="1")
@@ -83,6 +84,7 @@ async def lifespan(app: FastAPI):
     setup_logging()
     yield
     await database.aio_close()
+    AppTestModel._meta.database = None
 
 app = FastAPI(lifespan=lifespan)
 errors = set()

@@ -32,13 +32,9 @@ Databases
 .. automethod:: peewee_async.databases.AioDatabase.aio_drop_tables
 
 .. autoclass:: peewee_async.Psycopg3Database
-    :members: init
-
 .. autoclass:: peewee_async.PostgresqlDatabase
-    :members: init
-
 .. autoclass:: peewee_async.MySQLDatabase
-    :members: init
+.. autoclass:: peewee_async.SqliteDatabase
 
 AioModel
 ++++++++++
