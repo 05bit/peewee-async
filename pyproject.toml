@@ -34,7 +34,7 @@ docs = [
 ]
 dev = [
     "pytest==9.0.3",
-    "pytest-asyncio==1.3.0",
+    "pytest-asyncio==1.4.0",
     "pytest-mock>=3.14.0",
     "peewee-async[postgresql]",
     "peewee-async[mysql]",
