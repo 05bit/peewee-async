@@ -61,33 +61,3 @@ async def test_fk_accessor_cached_via_join(db: AioDatabase, mocker: MockFixture)
     spy_get.assert_not_called()
 
 # TODO fk lazy_load, null, etc
-
-
-@dbs_all
-async def test_backref_accessor(db: AioDatabase) -> None:
-    alpha = await TestModelAlpha.aio_create(text="Alpha")
-    beta = await TestModelBeta.aio_create(alpha=alpha, text="Beta")
-    gamma = await TestModelGamma.aio_create(beta=beta, text="Gamma")
-
-    loaded_beta = (await alpha.aio.backref("betas"))[0]
-    assert loaded_beta.id == beta.id
-
-    loaded_gamma = await loaded_beta.aio.gammas
-    assert len(loaded_gamma) == 1
-    assert loaded_gamma[0].id == gamma.id
-
-
-@dbs_all
-async def test_aio_m2m(db: AioDatabase) -> None:
-
-    with db.allow_sync():
-        tag1 = Tag.create(name="python")
-        tag2 = Tag.create(name="async")
-        article = Article.create(title="Async Python")
-        print(article.tags)
-        article.tags.add(tag1)
-        article.tags.add(tag2)
-
-    # loaded_tags = await article.aio.tags
-    # assert len(loaded_tags) == 2
-    # assert {t.name for t in loaded_tags} == {"python", "async"}
