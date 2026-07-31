@@ -69,6 +69,17 @@ class TestSignalModel(peewee_async.signals.AioModel):
     text = pw.CharField(max_length=100)
 
 
+class Tag(peewee_async.AioModel):
+    name = pw.CharField()
+
+class Article(peewee_async.AioModel):
+    title = pw.CharField()
+    tags = pw.ManyToManyField(Tag, backref="articles")
+
+
+ArticleTag = Article.tags.get_through_model()
+
+
 ALL_MODELS = (
     TestModel,
     UUIDTestModel,
@@ -78,4 +89,7 @@ ALL_MODELS = (
     CompositeTestModel,
     IntegerTestModel,
     TestSignalModel,
+    Tag,
+    Article,
+    ArticleTag
 )
