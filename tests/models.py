@@ -25,7 +25,7 @@ class TestModelAlpha(peewee_async.AioModel):
 
 class TestModelBeta(peewee_async.AioModel):
     __test__ = False
-    alpha = pw.ForeignKeyField(TestModelAlpha, backref="betas")
+    alpha = pw.ForeignKeyField(TestModelAlpha, backref="betas", null=True)
     text = pw.CharField()
 
     def __str__(self) -> str:

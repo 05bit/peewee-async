@@ -32,6 +32,14 @@ async def test_fk_accessor_not_cached(db: AioDatabase, mocker: MockFixture) -> N
     assert beta.alpha.id == alpha.id
     spy_get.assert_not_called()
 
+@dbs_all
+async def test_fk_accessor_null(db: AioDatabase, mocker: MockFixture) -> None:
+    beta = await TestModelBeta.aio_create(text="Beta")
+
+    loaded = await beta.aio_fk("alpha")
+    assert loaded is None
+    assert beta.alpha is None
+
 
 @dbs_all
 async def test_fk_accessor_cached(db: AioDatabase, mocker: MockFixture) -> None:
