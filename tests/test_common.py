@@ -17,7 +17,7 @@ async def test_composite_key(db: AioDatabase) -> None:
     task_id = 5
     product_type = "boots"
     comp = await CompositeTestModel.aio_create(task_id=task_id, product_type=product_type)
-    assert comp.get_id() == (task_id, product_type)
+    assert comp.get_id() == (task_id, product_type)  # type: ignore
 
 
 @dbs_all

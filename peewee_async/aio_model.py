@@ -3,38 +3,43 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import peewee
+import peewee as pw
 from peewee import PREFETCH_TYPE
 from typing_extensions import Self
+
+from peewee_async.utils import database_required, ensure_tuple
 
 from .result_wrappers import fetch_models
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from .databases import AioDatabase
     from .utils import CursorProtocol
 
 
 class AioSchemaManager(peewee.SchemaManager):
     async def aio_create_table(self, safe: bool = True, **options: Any) -> None:
-        await self.database.aio_execute(self._create_table(safe=safe, **options))
+        await self.database.aio_execute(self._create_table(safe=safe, **options))  # type: ignore[attr-defined]
 
     async def aio_drop_table(self, safe: bool = True, **options: Any) -> None:
-        await self.database.aio_execute(self._drop_table(safe=safe, **options))
+        await self.database.aio_execute(self._drop_table(safe=safe, **options))  # type: ignore[attr-defined]
 
     async def aio_truncate_table(self, restart_identity: bool = False, cascade: bool = False) -> None:
-        await self.database.aio_execute(self._truncate_table(restart_identity, cascade))
+        await self.database.aio_execute(self._truncate_table(restart_identity, cascade))  # type: ignore[attr-defined]
 
     async def aio_create_indexes(self, safe: bool = True) -> None:
-        for query in self._create_indexes(safe=safe):
+        for query in self._create_indexes(safe=safe):  # type: ignore[attr-defined]
             await self.database.aio_execute(query)
 
     async def aio_drop_indexes(self, safe: bool = True) -> None:
-        for query in self._drop_indexes(safe=safe):
+        for query in self._drop_indexes(safe=safe):  # type: ignore[attr-defined]
             await self.database.aio_execute(query)
 
     async def _aio_create_sequence(self, field: peewee.Field) -> Any:
-        self._check_sequences(field)
+        self._check_sequences(field)  # type: ignore[attr-defined]
         if not await self.database.aio_sequence_exists(field.sequence):
-            return self._create_context().literal("CREATE SEQUENCE ").sql(self._sequence_for_field(field))
+            return self._create_context().literal("CREATE SEQUENCE ").sql(self._sequence_for_field(field))  # type: ignore[attr-defined]
 
     async def aio_create_sequence(self, field: peewee.Field) -> None:
         seq_ctx = await self._aio_create_sequence(field)
@@ -48,9 +53,9 @@ class AioSchemaManager(peewee.SchemaManager):
                     await self.aio_create_sequence(field)
 
     async def _aio_drop_sequence(self, field: peewee.Field) -> Any:
-        self._check_sequences(field)
+        self._check_sequences(field)  # type: ignore[attr-defined]
         if await self.database.aio_sequence_exists(field.sequence):
-            return self._create_context().literal("DROP SEQUENCE ").sql(self._sequence_for_field(field))
+            return self._create_context().literal("DROP SEQUENCE ").sql(self._sequence_for_field(field))  # type: ignore[attr-defined]
 
     async def aio_drop_sequence(self, field: peewee.Field) -> None:
         seq_ctx = await self._aio_drop_sequence(field)
@@ -74,7 +79,7 @@ class AioSchemaManager(peewee.SchemaManager):
             await self.aio_drop_sequences()
 
 
-async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
+async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: int = PREFETCH_TYPE.WHERE) -> Any:
     """Asynchronous version of `prefetch()`.
 
     See also:
@@ -83,7 +88,7 @@ async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE =
     if not subqueries:
         return sq
 
-    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)
+    fixed_queries = peewee.prefetch_add_subquery(sq, subqueries, prefetch_type)  # type: ignore[attr-defined]
     deps: dict[Any, Any] = {}
     rel_map: dict[Any, Any] = {}
 
@@ -111,18 +116,18 @@ async def aio_prefetch(sq: Any, *subqueries: Any, prefetch_type: PREFETCH_TYPE =
 
 
 class AioQueryMixin:
-    @peewee.database_required
+    @peewee.database_required  # type: ignore[attr-defined]
     async def aio_execute(self, database: AioDatabase) -> Any:
         return await database.aio_execute(self)
 
     async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> Any:
-        return await fetch_models(cursor, self)
+        return await fetch_models(cursor, self)  # type: ignore[arg-type]
 
 
 class _AioWriteQueryMixin(AioQueryMixin):
     async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> Any:
         if self._return_cursor:  # type: ignore
-            return await fetch_models(cursor, self)
+            return await fetch_models(cursor, self)  # type: ignore[arg-type]
         return await database.aio_rows_affected(cursor)
 
 
@@ -134,12 +139,12 @@ class AioModelUpdate(peewee.ModelUpdate, _AioWriteQueryMixin): ...
 
 class AioModelInsert(peewee.ModelInsert, AioQueryMixin):
     async def fetch_results(self, database: AioDatabase, cursor: CursorProtocol) -> list[Any] | Any | int:
-        if self._returning is None and database.returning_clause and self.table._primary_key:  # type: ignore
+        if self._returning is None and database.returning_clause and self.table._primary_key:  # type: ignore[has-type]
             self._returning = (self.table._primary_key,)
             return await database.aio_last_insert_id(cursor, self)
-        if self._return_cursor:
+        if self._return_cursor:  # type: ignore[attr-defined]
             return await fetch_models(cursor, self)
-        if self._as_rowcount:
+        if self._as_rowcount:  # type: ignore[attr-defined]
             return await database.aio_rows_affected(cursor)
         return await database.aio_last_insert_id(cursor, self)
 
@@ -148,8 +153,10 @@ class AioModelRaw(peewee.ModelRaw, AioQueryMixin):
     pass
 
 
-class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
-    @peewee.database_required
+class AioSelectMixin(AioQueryMixin, peewee.SelectBase):  # type: ignore[misc]
+    model: type[AioModel]
+
+    @database_required
     async def aio_peek(self, database: AioDatabase, n: int = 1) -> Any:
         """
         Asynchronous version of
@@ -163,7 +170,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         if rows:
             return rows[0] if n == 1 else rows
 
-    @peewee.database_required
+    @database_required
     async def aio_scalar(self, database: AioDatabase, as_tuple: bool = False, as_dict: bool = False) -> Any:
         """
         Asynchronous version of `peewee.SelectBase.scalar
@@ -175,14 +182,14 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
 
         return row[0] if row and not as_tuple else row
 
-    @peewee.database_required
+    @database_required
     async def aio_first(self, database: AioDatabase, n: int = 1) -> Any:
         """
         Asynchronous version of `peewee.SelectBase.first
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.first>`_
         """
 
-        if self._limit != n:  # type: ignore
+        if self._limit != n:  # type: ignore[has-type]
             self._limit = n
         return await self.aio_peek(database, n=n)
 
@@ -200,7 +207,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
                 f"{clone.model} instance matching query does not exist:\nSQL: {sql}\nParams: {params}"
             )
 
-    @peewee.database_required
+    @database_required
     async def aio_count(self, database: AioDatabase, clear_limit: bool = False) -> int:
         """
         Asynchronous version of `peewee.SelectBase.count
@@ -208,27 +215,27 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         """
         clone = self.order_by().alias("_wrapped")
         if clear_limit:
-            clone._limit = clone._offset = None
+            clone._limit = clone._offset = None  # type: ignore
         try:
             if (
-                clone._having is None
-                and clone._group_by is None
-                and clone._windows is None
-                and clone._distinct is None
-                and clone._simple_distinct is not True
+                clone._having is None  # type: ignore[attr-defined]
+                and clone._group_by is None  # type: ignore[attr-defined]
+                and clone._windows is None  # type: ignore[attr-defined]
+                and clone._distinct is None  # type: ignore[attr-defined]
+                and clone._simple_distinct is not True  # type: ignore[attr-defined]
             ):
-                clone = clone.select(peewee.SQL("1"))
+                clone = clone.select(peewee.SQL("1"))  # type: ignore[assignment]
         except AttributeError:
             pass
         return cast("int", await AioSelect([clone], [peewee.fn.COUNT(peewee.SQL("1"))]).aio_scalar(database))
 
-    @peewee.database_required
+    @database_required
     async def aio_exists(self, database: AioDatabase) -> bool:
         """
         Asynchronous version of `peewee.SelectBase.exists
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#SelectBase.exists>`_
         """
-        clone = self.columns(peewee.SQL("1"))
+        clone = self.columns(peewee.SQL("1"))  # type: ignore[attr-defined]
         clone._limit = 1
         clone._offset = None
         return bool(await clone.aio_scalar())
@@ -253,7 +260,7 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
 
     __sub__ = except_
 
-    def aio_prefetch(self, *subqueries: Any, prefetch_type: PREFETCH_TYPE = PREFETCH_TYPE.WHERE) -> Any:
+    def aio_prefetch(self, *subqueries: Any, prefetch_type: int = PREFETCH_TYPE.WHERE) -> Any:
         """
         Asynchronous version of `peewee.ModelSelect.prefetch
         <https://docs.peewee-orm.com/en/latest/peewee/api.html#ModelSelect.prefetch>`_
@@ -265,47 +272,52 @@ class AioSelect(AioSelectMixin, peewee.Select):
     pass
 
 
-class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
+class AioModelSelect(AioSelectMixin, peewee.ModelSelect):  # type: ignore[misc]
     """Asynchronous version of **peewee.ModelSelect** that provides async versions of ModelSelect methods"""
 
     pass
 
 
 class AioManyToManyQuery(peewee.ManyToManyQuery):
-    async def add(self, value: Any, clear_existing: bool = False) -> None:
+    _accessor: pw.ManyToManyFieldAccessor
+    _instance: pw.Model
+    _src_attr: str
+    _dest_attr: str
+
+    async def add(self, value: Any, clear_existing: bool = False) -> None:  # type: ignore[override]
         if clear_existing:
             await self.clear()
 
         accessor = self._accessor
         src_id = getattr(self._instance, self._src_attr)
         if isinstance(value, peewee.SelectQuery):
-            query = value.columns(peewee.Value(src_id), accessor.dest_fk.rel_field)
+            query = value.columns(peewee.Value(src_id), accessor.dest_fk.rel_field)  # type: ignore[attr-defined]
             accessor.through_model.insert_from(fields=[accessor.src_fk, accessor.dest_fk], query=query).execute()
         else:
-            value = peewee.ensure_tuple(value)
+            value = ensure_tuple(value)
             if not value:
                 return
 
-            inserts = [{accessor.src_fk.name: src_id, accessor.dest_fk.name: rel_id} for rel_id in self._id_list(value)]
+            inserts = [{accessor.src_fk.name: src_id, accessor.dest_fk.name: rel_id} for rel_id in self._id_list(value)]  # type: ignore[attr-defined]
             accessor.through_model.insert_many(inserts).execute()
 
     async def remove(self, value: Any) -> Any:
         src_id = getattr(self._instance, self._src_attr)
         if isinstance(value, peewee.SelectQuery):
-            column = getattr(value.model, self._dest_attr)
-            subquery = value.columns(column)
+            column = getattr(value.model, self._dest_attr)  # type: ignore[attr-defined]
+            subquery = value.columns(column)  # type: ignore[attr-defined]
             return (
                 self._accessor.through_model.delete()
                 .where((self._accessor.dest_fk << subquery) & (self._accessor.src_fk == src_id))
                 .execute()
             )
         else:
-            value = peewee.ensure_tuple(value)
+            value = ensure_tuple(value)
             if not value:
                 return
             return (
                 self._accessor.through_model.delete()
-                .where((self._accessor.dest_fk << self._id_list(value)) & (self._accessor.src_fk == src_id))
+                .where((self._accessor.dest_fk << self._id_list(value)) & (self._accessor.src_fk == src_id))  # type: ignore[attr-defined]
                 .execute()
             )
 
@@ -317,7 +329,7 @@ class AioManyToManyQuery(peewee.ManyToManyQuery):
         await self.add(value, clear_existing=True)
 
 
-class AioModelCompoundSelectQuery(AioSelectMixin, peewee.ModelCompoundSelectQuery):
+class AioModelCompoundSelectQuery(AioSelectMixin, peewee.ModelCompoundSelectQuery):  # type: ignore[misc]
     pass
 
 
@@ -338,6 +350,14 @@ class AioModel(peewee.Model):
 
         user = await User.aio_get(User.username == 'user')
     """
+
+    # typing compatibility
+    _prune_fields: Callable[[Any, Any], dict[str, Any]]
+    _pk_expr: Callable[[], bool]
+    _dirty: set[Any]
+    _schema: AioSchemaManager
+    _normalize_data: Callable[[Any, Any], dict[str, Any]]
+    DoesNotExist: type[pw.DoesNotExist]
 
     class Meta:
         schema_manager_class = AioSchemaManager
@@ -363,10 +383,7 @@ class AioModel(peewee.Model):
         return self.__rel__.get(name, value)
 
     def aio_m2m(self, name: str) -> Any:
-        descriptor = getattr(self.model_cls, name)
-        if isinstance(descriptor, peewee.ManyToManyFieldAccessor):
-            raise NotImplementedError("Async interface for many-to-many it is not implemented yet")
-        raise AttributeError(f"'{self.model_cls.__name__}' has no ManyToManyField attribute '{name}'")
+        raise NotImplementedError("Async interface for many-to-many it is not implemented yet")
 
     @classmethod
     async def aio_table_exists(cls) -> bool:
@@ -407,7 +424,7 @@ class AioModel(peewee.Model):
         await cls._schema.aio_truncate_table(**options)
 
     @classmethod
-    def select(cls, *fields: Any) -> AioModelSelect:
+    def select(cls, *fields: Any) -> AioModelSelect:  # type: ignore[override]
         is_default = not fields
         if not fields:
             fields = cls._meta.sorted_fields
@@ -476,7 +493,7 @@ class AioModel(peewee.Model):
                 self._dirty.clear()
                 return False
 
-        self._populate_unsaved_relations(field_dict)
+        self._populate_unsaved_relations(field_dict)  # type: ignore[attr-defined]
         rows = 1
 
         if self._meta.auto_increment and pk_value is None:

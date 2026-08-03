@@ -186,7 +186,7 @@ async def test_aio_exists(db: AioDatabase) -> None:
 
 @dbs_all
 @pytest.mark.parametrize("prefetch_type", peewee.PREFETCH_TYPE.values())
-async def test_aio_prefetch(db: AioDatabase, prefetch_type: peewee.PREFETCH_TYPE) -> None:
+async def test_aio_prefetch(db: AioDatabase, prefetch_type: int) -> None:
     alpha_1 = await TestModelAlpha.aio_create(text="Alpha 1")
     alpha_2 = await TestModelAlpha.aio_create(text="Alpha 2")
 
