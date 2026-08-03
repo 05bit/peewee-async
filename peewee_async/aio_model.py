@@ -1,12 +1,16 @@
-from typing import Any, Literal, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import peewee
 from peewee import PREFETCH_TYPE
 from typing_extensions import Self
 
-from .databases import AioDatabase
 from .result_wrappers import fetch_models
-from .utils import CursorProtocol
+
+if TYPE_CHECKING:
+    from .databases import AioDatabase
+    from .utils import CursorProtocol
 
 
 class AioSchemaManager(peewee.SchemaManager):
@@ -229,22 +233,22 @@ class AioSelectMixin(AioQueryMixin, peewee.SelectBase):
         clone._offset = None
         return bool(await clone.aio_scalar())
 
-    def union_all(self, rhs: Any) -> "AioModelCompoundSelectQuery":
+    def union_all(self, rhs: Any) -> AioModelCompoundSelectQuery:
         return AioModelCompoundSelectQuery(self.model, self, "UNION ALL", rhs)
 
     __add__ = union_all
 
-    def union(self, rhs: Any) -> "AioModelCompoundSelectQuery":
+    def union(self, rhs: Any) -> AioModelCompoundSelectQuery:
         return AioModelCompoundSelectQuery(self.model, self, "UNION", rhs)
 
     __or__ = union
 
-    def intersect(self, rhs: Any) -> "AioModelCompoundSelectQuery":
+    def intersect(self, rhs: Any) -> AioModelCompoundSelectQuery:
         return AioModelCompoundSelectQuery(self.model, self, "INTERSECT", rhs)
 
     __and__ = intersect
 
-    def except_(self, rhs: Any) -> "AioModelCompoundSelectQuery":
+    def except_(self, rhs: Any) -> AioModelCompoundSelectQuery:
         return AioModelCompoundSelectQuery(self.model, self, "EXCEPT", rhs)
 
     __sub__ = except_
@@ -265,6 +269,52 @@ class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
     """Asynchronous version of **peewee.ModelSelect** that provides async versions of ModelSelect methods"""
 
     pass
+
+
+class AioManyToManyQuery(peewee.ManyToManyQuery):
+    async def add(self, value: Any, clear_existing: bool = False) -> None:
+        if clear_existing:
+            await self.clear()
+
+        accessor = self._accessor
+        src_id = getattr(self._instance, self._src_attr)
+        if isinstance(value, peewee.SelectQuery):
+            query = value.columns(peewee.Value(src_id), accessor.dest_fk.rel_field)
+            accessor.through_model.insert_from(fields=[accessor.src_fk, accessor.dest_fk], query=query).execute()
+        else:
+            value = peewee.ensure_tuple(value)
+            if not value:
+                return
+
+            inserts = [{accessor.src_fk.name: src_id, accessor.dest_fk.name: rel_id} for rel_id in self._id_list(value)]
+            accessor.through_model.insert_many(inserts).execute()
+
+    async def remove(self, value: Any) -> Any:
+        src_id = getattr(self._instance, self._src_attr)
+        if isinstance(value, peewee.SelectQuery):
+            column = getattr(value.model, self._dest_attr)
+            subquery = value.columns(column)
+            return (
+                self._accessor.through_model.delete()
+                .where((self._accessor.dest_fk << subquery) & (self._accessor.src_fk == src_id))
+                .execute()
+            )
+        else:
+            value = peewee.ensure_tuple(value)
+            if not value:
+                return
+            return (
+                self._accessor.through_model.delete()
+                .where((self._accessor.dest_fk << self._id_list(value)) & (self._accessor.src_fk == src_id))
+                .execute()
+            )
+
+    async def clear(self) -> Any:
+        src_id = getattr(self._instance, self._src_attr)
+        return await self._accessor.through_model.delete().where(self._accessor.src_fk == src_id).aio_execute()
+
+    async def set(self, value: Any) -> None:
+        await self.add(value, clear_existing=True)
 
 
 class AioModelCompoundSelectQuery(AioSelectMixin, peewee.ModelCompoundSelectQuery):
@@ -291,6 +341,32 @@ class AioModel(peewee.Model):
 
     class Meta:
         schema_manager_class = AioSchemaManager
+
+    async def aio_fk(self, field: str | peewee.ForeignKeyField) -> Any:
+        if isinstance(field, str):
+            field = self._meta.combined[field]
+        if not isinstance(field, peewee.ForeignKeyField):
+            raise ValueError("aio_fk() expects a foreign-key field.")
+        if field.name in self.__rel__:
+            return self.__rel__[field.name]
+        if not field.lazy_load:
+            raise ValueError(f"{self.__class__.__name__}.{field.name} has lazy_load=False.")
+        name = field.name
+        value = self.__data__.get(name)
+        if value is None:
+            if field.null:
+                return None
+            raise field.rel_model.DoesNotExist
+
+        obj = await field.rel_model.aio_get(field.rel_field == value)
+        self.__rel__[name] = obj
+        return self.__rel__.get(name, value)
+
+    def aio_m2m(self, name: str) -> Any:
+        descriptor = getattr(self.model_cls, name)
+        if isinstance(descriptor, peewee.ManyToManyFieldAccessor):
+            raise NotImplementedError("Async interface for many-to-many it is not implemented yet")
+        raise AttributeError(f"'{self.model_cls.__name__}' has no ManyToManyField attribute '{name}'")
 
     @classmethod
     async def aio_table_exists(cls) -> bool:

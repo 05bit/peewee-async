@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
-    "peewee>=4,<5",
+    "peewee>=4,<4.1",
     "typing-extensions>=4.12.2"
 ]
 
@@ -40,7 +40,7 @@ dev = [
     "peewee-async[mysql]",
     "peewee-async[psycopg]",
     "peewee-async[sqlite]",
-    "mypy>=1.19.0",
+    "mypy==2.3.0",
     "ruff==0.15.11",
     "types-PyMySQL>=1.1.0",
     "poethepoet==0.44.0",
