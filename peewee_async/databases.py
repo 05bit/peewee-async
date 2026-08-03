@@ -220,7 +220,7 @@ class AioDatabase(peewee.Database):
         self, sql: str, params: Sequence[Any] | None = None, fetch_results: FetchResults | None = None
     ) -> Any:
         __log__.debug((sql, params))
-        with peewee.__exception_wrapper__: # type: ignore[attr-defined]
+        with peewee.__exception_wrapper__:  # type: ignore[attr-defined]
             async with self.aio_connection() as connection:
                 async with connection.cursor() as cursor:
                     await cursor.execute(sql, params or ())
@@ -258,7 +258,7 @@ class AioDatabase(peewee.Database):
         Async version of **peewee.Database.create_tables**
         https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Database.create_tables
         """
-        for model in peewee.sort_models(models): # type: ignore[attr-defined]
+        for model in peewee.sort_models(models):  # type: ignore[attr-defined]
             await model.aio_create_table(**options)
 
     async def aio_drop_tables(self, models: list[Any], **kwargs: Any) -> None:
@@ -266,11 +266,11 @@ class AioDatabase(peewee.Database):
         Async version of **peewee.Database.drop_tables**
         https://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Database.drop_tables
         """
-        for model in reversed(peewee.sort_models(models)): # type: ignore[attr-defined]
+        for model in reversed(peewee.sort_models(models)):  # type: ignore[attr-defined]
             await model.aio_drop_table(**kwargs)
 
     async def aio_table_exists(self, table_name: Any, schema: str | None = None) -> bool:
-        if peewee.is_model(table_name): # type: ignore[attr-defined]
+        if peewee.is_model(table_name):  # type: ignore[attr-defined]
             model = table_name
             table_name = model._meta.table_name
             schema = model._meta.schema
@@ -279,7 +279,7 @@ class AioDatabase(peewee.Database):
 
 class AioPostgresDatabase(AioDatabase):
     async def aio_last_insert_id(self, cursor: CursorProtocol, query: peewee.Insert) -> Any:
-        if query._query_type == peewee.Insert.SIMPLE: # type: ignore[attr-defined]
+        if query._query_type == peewee.Insert.SIMPLE:  # type: ignore[attr-defined]
             try:
                 return (await cursor.fetchmany(1))[0][0]
             except (IndexError, KeyError, TypeError):
@@ -364,7 +364,7 @@ class PostgresqlDatabase(AioPostgresDatabase, ext.PostgresqlExtDatabase):
         self.pool_params.update({"enable_json": True, "enable_hstore": self._register_hstore})
 
 
-class SqliteDatabase(AioDatabase, peewee.SqliteDatabase): # type: ignore[misc]
+class SqliteDatabase(AioDatabase, peewee.SqliteDatabase):  # type: ignore[misc]
     """Sqlite database driver providing **single drop-in sync**
     connection and **async connections pool** interface.
 
