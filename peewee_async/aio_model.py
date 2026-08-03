@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from .utils import CursorProtocol
 
 
-
 class AioSchemaManager(peewee.SchemaManager):
     async def aio_create_table(self, safe: bool = True, **options: Any) -> None:
         await self.database.aio_execute(self._create_table(safe=safe, **options))
@@ -271,29 +270,23 @@ class AioModelSelect(AioSelectMixin, peewee.ModelSelect):
 
     pass
 
+
 class AioManyToManyQuery(peewee.ManyToManyQuery):
-    async def add(self, value: Any, clear_existing: bool=False) -> None:
+    async def add(self, value: Any, clear_existing: bool = False) -> None:
         if clear_existing:
             await self.clear()
 
         accessor = self._accessor
         src_id = getattr(self._instance, self._src_attr)
         if isinstance(value, peewee.SelectQuery):
-            query = value.columns(
-                peewee.Value(src_id),
-                accessor.dest_fk.rel_field)
-            accessor.through_model.insert_from(
-                fields=[accessor.src_fk, accessor.dest_fk],
-                query=query).execute()
+            query = value.columns(peewee.Value(src_id), accessor.dest_fk.rel_field)
+            accessor.through_model.insert_from(fields=[accessor.src_fk, accessor.dest_fk], query=query).execute()
         else:
             value = peewee.ensure_tuple(value)
-            if not value: 
+            if not value:
                 return
 
-            inserts = [{
-                accessor.src_fk.name: src_id,
-                accessor.dest_fk.name: rel_id}
-                for rel_id in self._id_list(value)]
+            inserts = [{accessor.src_fk.name: src_id, accessor.dest_fk.name: rel_id} for rel_id in self._id_list(value)]
             accessor.through_model.insert_many(inserts).execute()
 
     async def remove(self, value: Any) -> Any:
@@ -301,29 +294,24 @@ class AioManyToManyQuery(peewee.ManyToManyQuery):
         if isinstance(value, peewee.SelectQuery):
             column = getattr(value.model, self._dest_attr)
             subquery = value.columns(column)
-            return (self._accessor.through_model
-                    .delete()
-                    .where(
-                        (self._accessor.dest_fk << subquery) &
-                        (self._accessor.src_fk == src_id))
-                    .execute())
+            return (
+                self._accessor.through_model.delete()
+                .where((self._accessor.dest_fk << subquery) & (self._accessor.src_fk == src_id))
+                .execute()
+            )
         else:
             value = peewee.ensure_tuple(value)
             if not value:
                 return
-            return (self._accessor.through_model
-                    .delete()
-                    .where(
-                        (self._accessor.dest_fk << self._id_list(value)) &
-                        (self._accessor.src_fk == src_id))
-                    .execute())
+            return (
+                self._accessor.through_model.delete()
+                .where((self._accessor.dest_fk << self._id_list(value)) & (self._accessor.src_fk == src_id))
+                .execute()
+            )
 
     async def clear(self) -> Any:
         src_id = getattr(self._instance, self._src_attr)
-        return (await self._accessor.through_model
-                .delete()
-                .where(self._accessor.src_fk == src_id)
-                .aio_execute())
+        return await self._accessor.through_model.delete().where(self._accessor.src_fk == src_id).aio_execute()
 
     async def set(self, value: Any) -> None:
         await self.add(value, clear_existing=True)
@@ -354,34 +342,31 @@ class AioModel(peewee.Model):
     class Meta:
         schema_manager_class = AioSchemaManager
 
+    async def aio_fk(self, field: str) -> Any:
+        if isinstance(field, str):
+            field = self._meta.combined[field]
+        if not isinstance(field, peewee.ForeignKeyField):
+            raise ValueError("aio_fk() expects a foreign-key field.")
+        if field.name in self.__rel__:
+            return self.__rel__[field.name]
+        if not field.lazy_load:
+            raise ValueError(f"{self.__class__.__name__}.{field.name} has lazy_load=False.")
+        name = field.name
+        value = self.__data__.get(name)
+        if value is None:
+            if field.null:
+                return None
+            raise field.rel_model.DoesNotExist
 
-    async def aio_fk(self, name: str) -> Any:
-        if name in self._meta.fields:
-            field = self._meta.fields[name]
-            if isinstance(field, peewee.ForeignKeyField):
-                value = self.__data__.get(name)
-                if value is not None or name in self.__rel__:
-                    if name not in self.__rel__ and field.lazy_load:
-                        obj = await field.rel_model.aio_get(field.rel_field == value)
-                        self.__rel__[name] = obj
-                    return self.__rel__.get(name, value)
-                elif not field.null and field.lazy_load:
-                    raise field.rel_model.DoesNotExist
-                return value
-        raise AttributeError(
-            f"'{self.__class__.__name__}' has no ForeignKeyField attribute '{name}'"
-        )
-
+        obj = await field.rel_model.aio_get(field.rel_field == value)
+        self.__rel__[name] = obj
+        return self.__rel__.get(name, value)
 
     def aio_m2m(self, name: str) -> Any:
         descriptor = getattr(self.model_cls, name)
         if isinstance(descriptor, peewee.ManyToManyFieldAccessor):
             raise NotImplementedError("Async interface for many-to-many it is not implemented yet")
-        raise AttributeError(
-            f"'{self.model_cls.__name__}' has no ManyToManyField attribute '{name}'"
-        )
-
-    
+        raise AttributeError(f"'{self.model_cls.__name__}' has no ManyToManyField attribute '{name}'")
 
     @classmethod
     async def aio_table_exists(cls) -> bool:

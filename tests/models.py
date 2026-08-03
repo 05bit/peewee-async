@@ -25,11 +25,16 @@ class TestModelAlpha(peewee_async.AioModel):
 
 class TestModelBeta(peewee_async.AioModel):
     __test__ = False
-    alpha = pw.ForeignKeyField(TestModelAlpha, backref="betas", null=True)
+    alpha = pw.ForeignKeyField(TestModelAlpha, backref="betas")
     text = pw.CharField()
 
     def __str__(self) -> str:
         return f"<{self.__class__.__name__} id={self.id}> {self.text}"
+
+
+class TestFkNullModel(peewee_async.AioModel):
+    __test__ = False
+    alpha = pw.ForeignKeyField(TestModelAlpha, null=True)
 
 
 class TestModelGamma(peewee_async.AioModel):
@@ -72,6 +77,7 @@ class TestSignalModel(peewee_async.signals.AioModel):
 class Tag(peewee_async.AioModel):
     name = pw.CharField()
 
+
 class Article(peewee_async.AioModel):
     title = pw.CharField()
     tags = pw.ManyToManyField(Tag, backref="articles")
@@ -91,5 +97,6 @@ ALL_MODELS = (
     TestSignalModel,
     Tag,
     Article,
-    ArticleTag
+    TestFkNullModel,
+    ArticleTag,
 )
