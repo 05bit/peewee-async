@@ -29,5 +29,5 @@ async def fetch_models(cursor: CursorProtocol, query: BaseQuery, count: int | No
     else:
         rows = await cursor.fetchmany(count)
     sync_cursor = SyncCursorAdapter(rows, cursor.description)
-    _result_wrapper = query._get_cursor_wrapper(sync_cursor)
+    _result_wrapper = query._get_cursor_wrapper(sync_cursor) # type: ignore[attr-defined]
     return list(_result_wrapper)

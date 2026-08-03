@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
-    "peewee>=4,<5",
+    "peewee>=4,<4.4",
     "typing-extensions>=4.12.2"
 ]
 
@@ -95,7 +95,7 @@ disallow_any_generics = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
-exclude = "(venv|load-testing|examples|docs)"
+exclude = "(venv|load-testing|examples|docs|tests)"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
