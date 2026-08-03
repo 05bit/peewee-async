@@ -3,6 +3,8 @@ from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
 from typing import Any, Protocol
 
+import peewee as pw
+
 try:
     import aiopg
 except ImportError:
@@ -63,3 +65,8 @@ class ModuleRequired(Exception):
         self.package = package
         self.message = f"{package} is not installed"
         super().__init__(self.message)
+
+
+sort_models = pw.sort_models  # type: ignore[attr-defined]
+database_required = pw.database_required  # type: ignore[attr-defined]
+ensure_tuple = pw.ensure_tuple  # type: ignore[attr-defined]

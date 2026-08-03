@@ -95,7 +95,7 @@ disallow_any_generics = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
-exclude = "(venv|load-testing|examples|docs|tests)"
+exclude = "(venv|load-testing|examples|docs)"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

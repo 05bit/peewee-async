@@ -7,6 +7,8 @@ import peewee as pw
 from peewee import PREFETCH_TYPE
 from typing_extensions import Self
 
+from peewee_async.utils import database_required, ensure_tuple
+
 from .result_wrappers import fetch_models
 
 if TYPE_CHECKING:
@@ -14,10 +16,6 @@ if TYPE_CHECKING:
 
     from .databases import AioDatabase
     from .utils import CursorProtocol
-
-
-database_required = pw.database_required  # type: ignore[attr-defined]
-ensure_tuple = pw.ensure_tuple  # type: ignore[attr-defined]
 
 
 class AioSchemaManager(peewee.SchemaManager):

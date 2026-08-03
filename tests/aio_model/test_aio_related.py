@@ -40,7 +40,7 @@ async def test_aio_fk_error(db: AioDatabase) -> None:
     alpha = await TestModelAlpha.aio_create(text="Alpha")
 
     with pytest.raises(ValueError):
-        await alpha.aio_fk(TestModelAlpha.text)
+        await alpha.aio_fk(TestModelAlpha.text)  # type: ignore
 
 
 @dbs_all

@@ -7,6 +7,7 @@ import peewee_async.signals
 
 
 class TestModel(peewee_async.AioModel):
+    id: int
     __test__ = False  # disable pytest warnings
     text = pw.CharField(max_length=100, unique=True)
     data = pw.TextField(default="")
@@ -16,6 +17,7 @@ class TestModel(peewee_async.AioModel):
 
 
 class TestModelAlpha(peewee_async.AioModel):
+    id: int
     __test__ = False
     text = pw.CharField()
 
@@ -24,6 +26,7 @@ class TestModelAlpha(peewee_async.AioModel):
 
 
 class TestModelBeta(peewee_async.AioModel):
+    id: int
     __test__ = False
     alpha = pw.ForeignKeyField(TestModelAlpha, backref="betas")
     text = pw.CharField()
@@ -38,6 +41,7 @@ class TestFkNullModel(peewee_async.AioModel):
 
 
 class TestModelGamma(peewee_async.AioModel):
+    id: int
     __test__ = False
     text = pw.CharField()
     beta = pw.ForeignKeyField(TestModelBeta, backref="gammas")
@@ -83,7 +87,7 @@ class Article(peewee_async.AioModel):
     tags = pw.ManyToManyField(Tag, backref="articles")
 
 
-ArticleTag = Article.tags.get_through_model()
+ArticleTag = Article.tags.get_through_model()  # type: ignore
 
 
 ALL_MODELS = (

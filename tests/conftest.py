@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 
 import pytest
-from peewee import sort_models
 
 from peewee_async.databases import AioDatabase
 from peewee_async.testing import TransactionTestCase
+from peewee_async.utils import sort_models
 from tests.db_config import DB_CLASSES, DB_DEFAULTS
 from tests.models import ALL_MODELS
 
