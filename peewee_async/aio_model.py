@@ -342,7 +342,7 @@ class AioModel(peewee.Model):
     class Meta:
         schema_manager_class = AioSchemaManager
 
-    async def aio_fk(self, field: str) -> Any:
+    async def aio_fk(self, field: str | peewee.ForeignKeyField) -> Any:
         if isinstance(field, str):
             field = self._meta.combined[field]
         if not isinstance(field, peewee.ForeignKeyField):
