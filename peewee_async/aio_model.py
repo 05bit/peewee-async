@@ -362,11 +362,27 @@ class AioModel(peewee.Model):
     class Meta:
         schema_manager_class = AioSchemaManager
 
-    async def aio_fk(self, field: str | peewee.ForeignKeyField) -> Any:
+    async def aio_fetch(self, field: str | peewee.ForeignKeyField) -> Any:
+        """
+        Explicitly fetch a related object referenced by a foreign key.
+
+        If the relation has already been loaded (e.g. via ``join()``, or a previous call to
+        ``aio_fetch``), the cached object is returned without issuing a query.
+
+        Otherwise, the related object is loaded asynchronously, cached on the
+        model instance, and returned. Subsequent access to the foreign key
+        attribute will use the cached value.
+
+        :param field: A ``ForeignKeyField`` instance or its attribute name.
+        :returns: The related model instance, or ``None`` if the foreign key is
+            nullable and its value is ``NULL``.
+        :raises ValueError: If ``field`` is not a foreign key or was declared
+            with ``lazy_load=False``.
+        """
         if isinstance(field, str):
             field = self._meta.combined[field]
         if not isinstance(field, peewee.ForeignKeyField):
-            raise ValueError("aio_fk() expects a foreign-key field.")
+            raise ValueError("aio_fetch() expects a foreign-key field.")
         if field.name in self.__rel__:
             return self.__rel__[field.name]
         if not field.lazy_load:
