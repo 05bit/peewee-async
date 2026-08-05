@@ -6,7 +6,7 @@ from peewee import fn
 
 from peewee_async.databases import AioDatabase
 from tests.conftest import dbs_all
-from tests.models import IntegerTestModel, TestModel, TestModelAlpha, TestModelBeta, TestModelGamma
+from tests.models import IntegerTestModel, TestFkNullModel, TestModel, TestModelAlpha, TestModelBeta, TestModelGamma
 
 
 @dbs_all
@@ -128,11 +128,33 @@ async def test_aio_delete_instance(db: AioDatabase) -> None:
 
 
 @dbs_all
-async def test_aio_delete_instance_with_fk(db: AioDatabase) -> None:
+async def test_aio_delete_instance_recursive(db: AioDatabase) -> None:
     alpha = await TestModelAlpha.aio_create(text="test")
     beta = await TestModelBeta.aio_create(alpha=alpha, text="test")
 
     await alpha.aio_delete_instance(recursive=True)
+
+    assert await TestModelAlpha.aio_get_or_none(id=alpha.id) is None
+    assert await TestModelBeta.aio_get_or_none(id=beta.id) is None
+
+
+@dbs_all
+async def test_aio_delete_instance_recursive_nullable(db: AioDatabase) -> None:
+    alpha = await TestModelAlpha.aio_create(text="test")
+    beta = await TestFkNullModel.aio_create(alpha=alpha, text="test")
+
+    await alpha.aio_delete_instance(recursive=True)
+
+    assert await TestModelAlpha.aio_get_or_none(id=alpha.id) is None
+    assert (await TestFkNullModel.aio_get(id=beta.id)).alpha is None
+
+
+@dbs_all
+async def test_aio_delete_instance_recursive_delete_nullable(db: AioDatabase) -> None:
+    alpha = await TestModelAlpha.aio_create(text="test")
+    beta = await TestFkNullModel.aio_create(alpha=alpha, text="test")
+
+    await alpha.aio_delete_instance(recursive=True, delete_nullable=True)
 
     assert await TestModelAlpha.aio_get_or_none(id=alpha.id) is None
     assert await TestModelBeta.aio_get_or_none(id=beta.id) is None

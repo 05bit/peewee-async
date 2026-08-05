@@ -463,8 +463,7 @@ class AioModel(peewee.Model):
         http://docs.peewee-orm.com/en/4.0.0/peewee/api.html#Model.delete_instance
         """
         if recursive:
-            dependencies = self.dependencies(delete_nullable)
-            for query, fk in reversed(list(dependencies)):
+            for query, fk in self.dependencies(exclude_null_children=not delete_nullable):
                 model = fk.model
                 if fk.null and not delete_nullable:
                     await model.update(**{fk.name: None}).where(query).aio_execute()
