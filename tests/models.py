@@ -36,6 +36,7 @@ class TestModelBeta(peewee_async.AioModel):
 
 
 class TestFkNullModel(peewee_async.AioModel):
+    id: int
     __test__ = False
     alpha = pw.ForeignKeyField(TestModelAlpha, null=True)
 
