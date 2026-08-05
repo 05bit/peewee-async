@@ -59,7 +59,10 @@ AioModel
 
 .. automethod:: peewee_async.AioModel.aio_save
 
+.. automethod:: peewee_async.AioModel.aio_fetch
+
 .. autofunction:: peewee_async.aio_prefetch
+
 
 AioModelSelect
 ++++++++++++++
@@ -77,7 +80,6 @@ AioModelSelect
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_count
 
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_exists
-
 .. automethod:: peewee_async.aio_model.AioModelSelect.aio_prefetch
 
 TransactionTestCase
