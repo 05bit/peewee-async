@@ -41,7 +41,7 @@ dev = [
     "peewee-async[psycopg]",
     "peewee-async[sqlite]",
     "mypy==2.3.1",
-    "ruff==0.16.2",
+    "ruff==0.16.5",
     "types-PyMySQL>=1.1.0",
     "poethepoet==0.48.0",
     "commitizen>=4.13.8,<5"
