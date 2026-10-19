@@ -28,7 +28,6 @@ __version__ = version("peewee-async")
 
 
 __all__ = [
-    "PooledPostgresqlDatabase",
     "PostgresqlDatabase",
     "MySQLDatabase",
     "Transaction",

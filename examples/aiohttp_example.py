@@ -7,11 +7,11 @@ from secrets import token_hex
 from aiohttp import web
 from peewee import CharField, DateTimeField, TextField
 
-from peewee_async import AioModel, PooledPostgresqlDatabase
+from peewee_async import AioModel, PostgresqlDatabase
 
 logger = logging.getLogger(__name__)
 
-database = PooledPostgresqlDatabase(
+database = PostgresqlDatabase(
     os.environ.get("POSTGRES_DB", "postgres"),
     user=os.environ.get("POSTGRES_USER", "postgres"),
     password=os.environ.get("POSTGRES_PASSWORD", "postgres"),
@@ -40,8 +40,9 @@ class Post(AioModel):
 
 
 def add_post(title, text):
-    with database.atomic():
-        Post.create(title=title, text=text)
+    with database.allow_sync():
+        with database.atomic():
+            Post.create(title=title, text=text)
 
 
 @routes.get("/")
@@ -88,7 +89,7 @@ if __name__ == "__main__":
     print("Initialize tables and add some random posts...")
 
     try:
-        with database:
+        with database.allow_sync():
             database.create_tables([Post], safe=True)
             print("Tables are created.")
     except Exception as exc:

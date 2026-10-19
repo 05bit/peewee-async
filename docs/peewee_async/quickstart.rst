@@ -6,9 +6,10 @@ Let's provide an example::
     import asyncio
     import peewee
     import logging
-    from peewee_async import PooledPostgresqlDatabase
+    import peewee_async
+    from peewee_async import PostgresqlDatabase
 
-    database = PooledPostgresqlDatabase('test')
+    database = PostgresqlDatabase('test')
 
 
     # Let's define a simple model:
@@ -46,8 +47,7 @@ Finally, let's do something async::
         await title.aio_save()
         print("New:", title.text)
 
-    loop.run_until_complete(my_async_func())
-    loop.close()
+    asyncio.run(my_async_func())
 
 **That's it!** As you may notice there's no need to connect and re-connect before executing async queries! It's all automatic. But you can run ``AioDatabase.aio_connect()`` or ``AioDatabase.aio_close()`` when you need it.
 
