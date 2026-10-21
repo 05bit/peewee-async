@@ -65,7 +65,7 @@ import peewee_async
 
 # Nothing special, just define model and database:
 
-database = peewee_async.PooledPostgresqlDatabase(
+database = peewee_async.PostgresqlDatabase(
     database="db_name",
     user="user",
     host="127.0.0.1",
@@ -83,8 +83,9 @@ class TestModel(peewee_async.AioModel):
 
 # Look, sync code is working!
 
-TestModel.create_table(True)
-TestModel.create(text="Yo, I can do it sync!")
+with database.allow_sync():
+    TestModel.create_table(True)
+    TestModel.create(text="Yo, I can do it sync!")
 database.close()
 
 # No need for sync anymore!

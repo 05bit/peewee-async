@@ -24,7 +24,7 @@ import tornado.web
 from tornado.platform.asyncio import AsyncIOMainLoop
 
 # Set up database and manager
-database = peewee_async.PooledPostgresqlDatabase('test')
+database = peewee_async.PostgresqlDatabase('test')
 
 
 # Define model
@@ -38,10 +38,11 @@ class TestNameModel(peewee_async.AioModel):
 
 
 # Create table, add some instances
-TestNameModel.create_table(True)
-TestNameModel.get_or_create(id=1, defaults={'name': "TestNameModel id=1"})
-TestNameModel.get_or_create(id=2, defaults={'name': "TestNameModel id=2"})
-TestNameModel.get_or_create(id=3, defaults={'name': "TestNameModel id=3"})
+with database.allow_sync():
+    TestNameModel.create_table(True)
+    TestNameModel.get_or_create(id=1, defaults={'name': "TestNameModel id=1"})
+    TestNameModel.get_or_create(id=2, defaults={'name': "TestNameModel id=2"})
+    TestNameModel.get_or_create(id=3, defaults={'name': "TestNameModel id=3"})
 database.close()
 
 AsyncIOMainLoop().install()
@@ -85,7 +86,7 @@ class RootHandler(tornado.web.RequestHandler):
 class CreateHandler(tornado.web.RequestHandler):
     async def get(self):
         loop = asyncio.get_event_loop()
-        task1 = asyncio.Task.current_task() # Just to demonstrate it's None
+        task1 = asyncio.current_task() # Just to demonstrate it's None
         task2 = loop.create_task(self.get_or_create())
         obj = await task2
         self.write({
