@@ -237,7 +237,7 @@ class AioDatabase(peewee.Database):
         :return: result depends on query type, it's the same as for sync `query.execute()`
         """
         ctx = self.get_sql_context()
-        sql, params = ctx.sql(query).query()
+        sql, params = ctx.sql(query).query()  # type: ignore[no-untyped-call]
         fetch_results = fetch_results or getattr(query, "fetch_results", None)
         return await self.aio_execute_sql(sql, params, fetch_results=fetch_results)
 
