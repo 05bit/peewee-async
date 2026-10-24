@@ -97,6 +97,10 @@ class PsycopgPoolBackend(PoolBackend):
 
     required_modules = ["psycopg", "psycopg_pool"]
 
+    def __init__(self, *args, target_session_attrs: str | None = None, **kwargs):
+        self.target_session_attrs = target_session_attrs
+        super().__init__(*args, **kwargs)
+
     async def create(self) -> None:
         params = self.connect_params.copy()
         pool = psycopg_pool.AsyncConnectionPool(
@@ -107,6 +111,7 @@ class PsycopgPoolBackend(PoolBackend):
                 user=params.pop("user"),
                 password=params.pop("password"),
                 path=self.database,
+                target_session_attrs=self.target_session_attrs,
             ),
             kwargs={
                 "cursor_factory": psycopg.AsyncClientCursor,

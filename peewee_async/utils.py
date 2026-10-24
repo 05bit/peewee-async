@@ -56,8 +56,26 @@ class ConnectionProtocol(Protocol):
     async def close(self) -> None: ...
 
 
-def format_dsn(protocol: str, host: str, port: str | int, user: str, password: str, path: str = "") -> str:
-    return f"{protocol}://{user}:{password}@{host}:{port}/{path}"
+def format_dsn(
+    protocol: str,
+    host: str,
+    port: str | int,
+    user: str,
+    password: str,
+    path: str = "",
+    target_session_attrs: str | None = None,
+) -> str:
+    hosts = []
+    if len(host.split(",")) != len(str(port).split(",")):
+        raise ValueError("Number of hosts and ports must be the same")
+    for index, h in enumerate(host.split(",")):
+        p = str(port).split(",")[index]
+        hosts.append(f"{h}:{p}")
+
+    dns = f"{protocol}://{user}:{password}@{','.join(hosts)}/{path}"
+    if target_session_attrs:
+        dns += f"?target_session_attrs={target_session_attrs}"
+    return dns
 
 
 class ModuleRequired(Exception):

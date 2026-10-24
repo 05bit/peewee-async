@@ -329,6 +329,16 @@ class Psycopg3Database(AioPostgresDatabase, ext.Psycopg3Database):
     https://www.psycopg.org/psycopg3/docs/advanced/pool.html
     """
 
+    def __init__(self, *args, target_session_attrs: str | None, **kwargs):
+        self.target_session_attrs = target_session_attrs
+        super().__init__(*args, **kwargs)
+
+    def init(self, database: str | None, **kwargs: Any) -> None:
+        super().init(database, **kwargs)
+        self.pool_backend = self.pool_backend_cls(
+            database=self.database, target_session_attrs=self.target_session_attrs, **self.pool_params
+        )
+
     pool_backend_cls = PsycopgPoolBackend
 
 
